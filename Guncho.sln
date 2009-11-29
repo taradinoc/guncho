@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "XML Index Files", "XML Index Files", "{A26671B1-FE12-4B02-A86C-B3879BD63905}"
+	ProjectSection(SolutionItems) = preProject
+		RealmData\playerIndex.xml = RealmData\playerIndex.xml
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlPanel", "ControlPanel\ControlPanel.csproj", "{2199B2D3-6D26-440F-BA80-0BAD98B8B168}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PassGen", "PassGen\PassGen.csproj", "{BF1FD352-BFC2-4488-AFEA-CB261F8C39F7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoSvc", "GunchoSvc\GunchoSvc.csproj", "{36451BCF-514B-4EA3-A567-75BFE4914BAA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2199B2D3-6D26-440F-BA80-0BAD98B8B168}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2199B2D3-6D26-440F-BA80-0BAD98B8B168}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2199B2D3-6D26-440F-BA80-0BAD98B8B168}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2199B2D3-6D26-440F-BA80-0BAD98B8B168}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF1FD352-BFC2-4488-AFEA-CB261F8C39F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF1FD352-BFC2-4488-AFEA-CB261F8C39F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF1FD352-BFC2-4488-AFEA-CB261F8C39F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF1FD352-BFC2-4488-AFEA-CB261F8C39F7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

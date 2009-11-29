@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<realmIndex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <realms>
+    <realm name="The Outer Realm" src="The Outer Realm.ni" owner="Wizard" privacy="joinable" factory="5Z71" />
+  </realms>
+</realmIndex>

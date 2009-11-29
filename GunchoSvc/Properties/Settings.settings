@@ -1,0 +1,66 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="Guncho.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="StartRealmName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">The Outer Realm</Value>
+    </Setting>
+    <Setting Name="CachePath" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">C:\Guncho\Cache</Value>
+    </Setting>
+    <Setting Name="RealmDataPath" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">C:\Guncho\RealmData</Value>
+    </Setting>
+    <Setting Name="PlayersFileName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">playerIndex.xml</Value>
+    </Setting>
+    <Setting Name="RealmsFileName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">realmIndex.xml</Value>
+    </Setting>
+    <Setting Name="NiSkeletonPath" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">C:\Guncho\Skeleton.inform</Value>
+    </Setting>
+    <Setting Name="MaxRealmsPerPlayer" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="EventGranularity" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">2500</Value>
+    </Setting>
+    <Setting Name="WebAddress" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">http://cp.guncho.com/</Value>
+    </Setting>
+    <Setting Name="RealmFailuresAllowed" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">2</Value>
+    </Setting>
+    <Setting Name="GreetingFileName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">connect.txt</Value>
+    </Setting>
+    <Setting Name="MotdFileName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">motd.txt</Value>
+    </Setting>
+    <Setting Name="GameServerPort" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">4108</Value>
+    </Setting>
+    <Setting Name="LogPath" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">C:\Guncho\Logs</Value>
+    </Setting>
+    <Setting Name="LogSpam" Type="System.Boolean" Scope="Application">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="TransactionTimeout" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">5000</Value>
+    </Setting>
+    <Setting Name="CompilerTimeout" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">10000</Value>
+    </Setting>
+    <Setting Name="GuestMotdFileName" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">guest.txt</Value>
+    </Setting>
+    <Setting Name="MaxHeapSize" Type="System.UInt32" Scope="Application">
+      <Value Profile="(Default)">1048576</Value>
+    </Setting>
+    <Setting Name="NiInstallationsPath" Type="System.String" Scope="Application">
+      <Value Profile="(Default)">C:\Guncho\HackedI7</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>

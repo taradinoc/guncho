@@ -1,0 +1,5 @@
+----------------------------------------------------------------------
+Welcome to the Guncho game server!
+Type "connect <name> <password>" to connect.
+To create a new character, use the web site: http://cp.guncho.com
+----------------------------------------------------------------------

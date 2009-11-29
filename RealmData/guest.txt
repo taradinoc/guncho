@@ -1,0 +1,9 @@
+*** Welcome ***
+
+You're using a temporary guest account named %NAME%.
+
+The place you're about to enter is called The Outer Realm. You can type "help" for a few tips on using it. To speak to other players, use the "say" command, or just type a quotation mark before your message.
+
+If you find your way to another realm and you get stuck, type "@tel The Outer Realm".
+
+-- vaporware

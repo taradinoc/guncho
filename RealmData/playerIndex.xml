@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<playerIndex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <players>
+    <player name="Wizard" id="1" admin="true" pwdSalt="x9m" pwdHash="47XXSQ6hhZYLrqW/c45JqxIkF2Y=" />
+  </players>
+</playerIndex>

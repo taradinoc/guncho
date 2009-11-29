@@ -1,0 +1,91 @@
+*** Bug report form for Inform 7 Public Beta ***
+
+Inform consists of a user interface, specific either to Mac OS X
+or to Windows, together with an underlying suite of software common
+to both. If you find a problem with the OS X user interface, please
+report it to Andrew Hunter (andrew@logicalshift.co.uk); if with the
+Windows user interface, please report it to David Kinder
+(davidk.kinder@virgin.net).
+
+This form is provided for reporting bugs in the underlying software.
+For instance, if you click Go to translate a source text and the
+Errors panel comes up to report that either Inform 7 or Inform 6
+(which is used as a component) have failed, then this is the place
+to report it; or if you are reasonably sure that your source text
+is translating into something which does not do what the documentation
+says it should.
+
+Please check that you are using the current build of the software
+before reporting a bug.
+
+Please use a fresh copy of the form for each different problem found,
+and email to Graham Nelson (graham@gnelson.demon.co.uk), using a
+subject line which begins "[I7]" and then gives a brief note of the
+problem: for instance, "[I7] Kinds don't work". Lastly - many thanks
+indeed for your time and trouble.
+
+ - - - - - - - -
+
+1. Please type your name and email address here (unless you are a
+regular tester, in which case just your initials will be fine).
+
+
+
+ - - - - - - - -
+
+2. The nature of the problem. Please put an X in one of these boxes:
+
+[  ]  The source text looks legal, but generates Problem messages
+[  ]  The source text looks legal, and generates no Problem messages, but
+      then generates errors when fed into Inform 6
+[  ]  The source looks legal and produces a playable game, but
+      the game does not do what it should
+
+[  ]  The source looks illegal, but doesn't generate a Problem, so
+      that compilation finishes apparently normally
+[  ]  The source looks illegal, but generates errors when fed into
+      Inform 6 rather than generating a Problem message as it should
+[  ]  The source looks illegal and does generate a Problem, but
+      with an unhelpful or badly worded error message. (If so, please
+      feel free to draft a suggestion for a better one - see below.)
+
+[  ]  Attempting to compile this source crashes the Inform 7 compiler.
+[  ]  Attempting to compile this source hangs the Inform 7 compiler,
+      so that it never finishes.
+
+ - - - - - - - -
+
+3. What is the build number of the compiler you are using? (This will
+be a four-character code such as 2F32 or 3K10.) Please type here:
+
+
+
+And please X one box: [ ] Mac OS X - [ ] Windows
+
+ - - - - - - - -
+
+4. Please paste in the source which exhibits the problem. Please
+experiment to find the simplest _complete game_ which offends -
+experience shows this can often be done with a single room and
+a couple of sentences. (It is hard to overstate how much this helps
+us in problem-chasing.) Paste here:
+
+
+
+- - - - - - - -
+
+5. What goes wrong? If the source generates error messages, please
+paste them here (in plain text); if a playable game is produced but
+which does the wrong thing, please paste a transcript, or say what
+seems to be wrong.
+
+
+
+- - - - - - - -
+
+6. Comments. If you have any comments about this problem, or ideas
+about what may be causing it, or if you would like to suggest how
+matters might be improved (for instance by offering a better-worded
+Problem message), here's the place:
+
+
