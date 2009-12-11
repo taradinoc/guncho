@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{36451BCF-514B-4EA3-A567-75BFE4914BAA}</ProjectGuid>
     <OutputType>WinExe</OutputType>
@@ -64,6 +64,7 @@
       <DependentUpon>GunchoService.cs</DependentUpon>
     </Compile>
     <Compile Include="ILogger.cs" />
+    <Compile Include="Instance.cs" />
     <Compile Include="Player.cs" />
     <Compile Include="PriorityQueue.cs" />
     <Compile Include="Program.cs" />
@@ -83,6 +84,7 @@
     <Compile Include="RealmFactory.cs" />
     <Compile Include="ReplacingStream.cs" />
     <Compile Include="Server.cs" />
+    <Compile Include="ServerRunner.cs" />
     <Compile Include="XML\playerIndex.cs">
       <DependentUpon>playerIndex.xsd</DependentUpon>
     </Compile>

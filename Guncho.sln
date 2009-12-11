@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PassGen", "PassGen\PassGen.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoSvc", "GunchoSvc\GunchoSvc.csproj", "{36451BCF-514B-4EA3-A567-75BFE4914BAA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoConsole", "GunchoConsole\GunchoConsole.csproj", "{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,6 +32,10 @@ Global
 		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36451BCF-514B-4EA3-A567-75BFE4914BAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

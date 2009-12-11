@@ -30,9 +30,15 @@ namespace Guncho
         public abstract string GetInitialSourceText(string ownerName, string realmName);
         public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
 
-        public Realm LoadRealm(Stream storyFile, string name, string sourceFile, Player owner)
+        public Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
         {
-            return new Realm(server, this, storyFile, name, sourceFile, owner);
+            return new Realm(server, this, name, sourceFile, storyFile, owner);
+        }
+
+        public Instance LoadInstance(Realm realm, string name)
+        {
+            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
+            return new Instance(server, realm, stream, name);
         }
 
         protected static string MakeUUID(string realmName)
