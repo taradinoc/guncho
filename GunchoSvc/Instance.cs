@@ -572,13 +572,18 @@ namespace Guncho
     {
         private bool rawMode;
         private Dictionary<int, Player> players = new Dictionary<int, Player>();
+        private Dictionary<Player, int> playerIDs = new Dictionary<Player, int>();
+        private int nextPlayerID = MIN_PLAYER_ID;
+
+        private const int MIN_PLAYER_ID = 1;
+        private const int MAX_PLAYER_ID = 32767;
 
         private int tagstate = 0;
         private Player curPlayer = null;
         private Stack<Player> prevPlayers = new Stack<Player>();
         private StringBuilder tagParam;
 
-        private static readonly Player Announcer = new Player(-1, "*Announcer*", false);
+        private static readonly Player Announcer = new DummyPlayer("*Announcer*");
         private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
 
         public GameInstance(Server server, Realm realm, Stream zfile, string name)
@@ -595,12 +600,12 @@ namespace Guncho
                 abandoned = new Player[players.Count];
                 players.Values.CopyTo(abandoned, 0);
                 players.Clear();
+                playerIDs.Clear();
+                nextPlayerID = MIN_PLAYER_ID;
             }
 
             foreach (Player p in abandoned)
-                lock (p)
-                    if (p.Connection != null)
-                        p.Connection.FlushOutput();
+                p.FlushOutput();
 
             server.InstanceFinished(this, abandoned, wasTerminated);
         }
@@ -680,6 +685,22 @@ namespace Guncho
             set { rawMode = value; if (value) curPlayer = Announcer; }
         }
 
+        public void QueueInput(Player player, string line, bool silent)
+        {
+            if (rawMode)
+            {
+                QueueInput(line);
+            }
+            else
+            {
+                QueueInput(
+                    string.Format("{0}{1}:{2}",
+                        silent ? "$silent " : "",
+                        playerIDs[player],
+                        line));
+            }
+        }
+
         /// <summary>
         /// Adds a player to the instance.
         /// </summary>
@@ -689,14 +710,49 @@ namespace Guncho
         /// <b>null</b>.</param>
         public void AddPlayer(Player player, string position)
         {
+            int id = GetNewPlayerID();
+
             lock (players)
-                players.Add(player.ID, player);
+            {
+                players[id] = player;
+                playerIDs[player] = id;
+            }
 
             if (!rawMode)
                 QueueInput(string.Format("$join {0}={1}{2}",
                     player.Name,
-                    player.ID,
+                    id,
                     position == null ? "" : "," + position));
+        }
+
+        private int GetNewPlayerID()
+        {
+            if (nextPlayerID > MAX_PLAYER_ID)
+                nextPlayerID = MIN_PLAYER_ID;
+
+            int result = nextPlayerID++;
+
+            lock (players)
+            {
+                bool wrapped = false;
+                while (players.ContainsKey(result))
+                {
+                    result++;
+                    if (result > MAX_PLAYER_ID)
+                    {
+                        if (wrapped)
+                            throw new InvalidOperationException("Too many players");
+
+                        result = MIN_PLAYER_ID;
+                        wrapped = true;
+                    }
+                }
+
+                // reserve the ID
+                players.Add(result, null);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -705,15 +761,22 @@ namespace Guncho
         /// <param name="player">The player who is leaving.</param>
         public void RemovePlayer(Player player)
         {
+            int id;
+            if (!playerIDs.TryGetValue(player, out id))
+                throw new ArgumentException("Player not present", "player");
+
             if (!rawMode)
             {
-                string result = SendAndGet(string.Format("$part {0}", player.ID));
+                string result = SendAndGet(string.Format("$part {0}", id));
                 OnHandleOutput(result);
                 FlushAll();
             }
 
             lock (players)
-                players.Remove(player.ID);
+            {
+                players.Remove(id);
+                playerIDs.Remove(player);
+            }
         }
 
         /// <summary>
@@ -753,6 +816,8 @@ namespace Guncho
                 temp = new Player[players.Count];
                 players.Values.CopyTo(temp, 0);
                 players.Clear();
+                playerIDs.Clear();
+                nextPlayerID = MIN_PLAYER_ID;
             }
 
             foreach (Player p in temp)
@@ -763,7 +828,7 @@ namespace Guncho
                 string locationStr;
                 try
                 {
-                    locationStr = SendAndGet("$locate " + p.ID.ToString());
+                    locationStr = SendAndGet("$locate " + playerIDs[p].ToString());
                 }
                 catch
                 {
@@ -781,9 +846,7 @@ namespace Guncho
         {
             lock (players)
                 foreach (Player p in players.Values)
-                    lock (p)
-                        if (p.Connection != null)
-                            p.Connection.FlushOutput();
+                    p.FlushOutput();
         }
 
         protected override void OnHandleOutput(string text)
@@ -895,9 +958,7 @@ namespace Guncho
                         lock (players)
                             players.TryGetValue(playerNum, out curPlayer);
                         if (curPlayer != null)
-                            lock (curPlayer)
-                                if (curPlayer.Connection != null)
-                                    curPlayer.Connection.WriteLine();
+                            curPlayer.WriteLine();
                         tagParam = null;
                         tagstate = 0;
                     }
@@ -1063,31 +1124,21 @@ namespace Guncho
                     if (c == '\n')
                     {
                         foreach (Player p in players.Values)
-                            lock (p)
-                                if (p.Connection != null)
-                                    p.Connection.Write("\r\n");
+                            p.WriteLine();
                     }
                     else
                     {
                         foreach (Player p in players.Values)
-                            lock (p)
-                                if (p.Connection != null)
-                                    p.Connection.Write(c);
+                            p.Write(c);
                     }
                 }
             }
             else if (curPlayer != null)
             {
-                lock (curPlayer)
-                {
-                    if (curPlayer.Connection != null)
-                    {
-                        if (c == '\n')
-                            curPlayer.Connection.Write("\r\n");
-                        else
-                            curPlayer.Connection.Write(c);
-                    }
-                }
+                if (c == '\n')
+                    curPlayer.WriteLine();
+                else
+                    curPlayer.Write(c);
             }
             else
             {
@@ -1109,15 +1160,11 @@ namespace Guncho
             {
                 lock (players)
                     foreach (Player p in players.Values)
-                        lock (p)
-                            if (p.Connection != null)
-                                p.Connection.Write(str);
+                        p.Write(str);
             }
             else if (curPlayer != null)
             {
-                lock (curPlayer)
-                    if (curPlayer.Connection != null)
-                        curPlayer.Connection.Write(str);
+                curPlayer.Write(str);
             }
             else
             {
@@ -1182,10 +1229,10 @@ namespace Guncho
                 case "pq_id":
                 case "ls_playerid":
                     // ID for player queries
-                    if (queriedPlayer == null)
+                    if (queriedPlayer == null || !playerIDs.ContainsKey(queriedPlayer))
                         value = 0;
                     else
-                        value = queriedPlayer.ID;
+                        value = playerIDs[queriedPlayer];
                     return true;
             }
 
@@ -1221,11 +1268,13 @@ namespace Guncho
                                 return this.Realm.GetAccessLevel(queriedPlayer).ToString();
 
                             case "idletime":
-                                lock (queriedPlayer)
-                                {
-                                    if (queriedPlayer.Connection != null)
-                                        return Server.FormatTimeSpan(queriedPlayer.Connection.IdleTime);
-                                }
+                                NetworkPlayer np = queriedPlayer as NetworkPlayer;
+                                if (np != null)
+                                    lock (np)
+                                    {
+                                        if (np.Connection != null)
+                                            return Server.FormatTimeSpan(np.Connection.IdleTime);
+                                    }
                                 return "";
                         }
 

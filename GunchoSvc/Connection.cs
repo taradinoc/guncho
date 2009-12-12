@@ -16,7 +16,7 @@ namespace Guncho
         private readonly StringBuilder outputBuffer = new StringBuilder();
         private readonly Thread clientThread;
         private DateTime lastActivity;
-        private Player player;
+        private NetworkPlayer player;
 
         public Connection(TcpClient client)
         {
@@ -30,7 +30,7 @@ namespace Guncho
             this.clientThread = Thread.CurrentThread;
         }
 
-        public Player Player
+        public NetworkPlayer Player
         {
             get { return player; }
             set { player = value; }

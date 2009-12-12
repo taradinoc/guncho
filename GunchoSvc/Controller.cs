@@ -231,7 +231,7 @@ namespace Guncho
 
         public void ChangePassword(string playerName, string newPassword)
         {
-            Player player = server.FindPlayer(playerName);
+            NetworkPlayer player = server.FindPlayer(playerName);
             if (player != null)
             {
                 string newSalt = GenerateSalt();

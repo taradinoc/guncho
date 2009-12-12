@@ -20,7 +20,7 @@ namespace Guncho
             if (command.Length == 0)
                 return true;
 
-            Player player;
+            NetworkPlayer player;
             lock (conn)
                 player = conn.Player;
 
@@ -55,7 +55,7 @@ namespace Guncho
                         }
                         else if (name.ToLower() == "guest")
                         {
-                            Player guest;
+                            NetworkPlayer guest;
 
                             lock (players)
                             {
@@ -68,7 +68,7 @@ namespace Guncho
                                     key = guestName.ToLower();
                                 } while (players.ContainsKey(key));
 
-                                guest = new Player(-guestNum, guestName, false, true);
+                                guest = new NetworkPlayer(-guestNum, guestName, false, true);
                                 guest.Connection = conn;
                                 players.Add(key, guest);
                             }
@@ -273,7 +273,7 @@ namespace Guncho
                 return;
             }
 
-            Player targetPlayer = FindPlayer(target);
+            NetworkPlayer targetPlayer = FindPlayer(target);
             if (targetPlayer == null)
             {
                 conn.WriteLine("No such player.");

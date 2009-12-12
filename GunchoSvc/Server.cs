@@ -75,7 +75,7 @@ namespace Guncho
         private volatile bool running;
 
         private readonly List<Connection> connections = new List<Connection>();
-        private readonly Dictionary<string, Player> players = new Dictionary<string, Player>();
+        private readonly Dictionary<string, NetworkPlayer> players = new Dictionary<string, NetworkPlayer>();
         private readonly Dictionary<string, Realm> realms = new Dictionary<string, Realm>();
         private readonly Dictionary<string, Instance> instances = new Dictionary<string, Instance>();
         private readonly Dictionary<string, RealmFactory> factories = new Dictionary<string, RealmFactory>();
@@ -831,11 +831,7 @@ namespace Guncho
                             GameInstance inst = (GameInstance)LoadInstance(newRealm, instPair.Key);
                             foreach (KeyValuePair<Player, string> pair in instPair.Value)
                             {
-                                lock (pair.Key)
-                                {
-                                    if (pair.Key.Connection != null)
-                                        pair.Key.Connection.WriteLine("[The realm shimmers for a moment...]");
-                                }
+                                pair.Key.NotifyInstanceReloading();
                                 EnterInstance(pair.Key, inst, pair.Value);
                             }
                         }
@@ -848,11 +844,7 @@ namespace Guncho
                         foreach (Dictionary<Player, string> positions in saved.Values)
                             foreach (KeyValuePair<Player, string> pair in positions)
                             {
-                                lock (pair.Key)
-                                {
-                                    if (pair.Key.Connection != null)
-                                        pair.Key.Connection.WriteLine("[The realm has failed.]");
-                                }
+                                pair.Key.WriteLine("[The realm has failed.]");
                                 EnterInstance(pair.Key, startInst, pair.Value);
                             }
                     }
@@ -905,14 +897,14 @@ namespace Guncho
 
                 // find an unused ID
                 Dictionary<int,Player> playersById = new Dictionary<int,Player>(players.Count);
-                foreach (Player p in players.Values)
+                foreach (NetworkPlayer p in players.Values)
                     playersById.Add(p.ID, p);
 
                 int id = 1;
                 while (playersById.ContainsKey(id))
                     id++;
 
-                Player result = new Player(id, newName, false);
+                NetworkPlayer result = new NetworkPlayer(id, newName, false);
                 result.PasswordSalt = pwdSalt;
                 result.PasswordHash = pwdHash;
 
@@ -1096,7 +1088,7 @@ namespace Guncho
             players.Clear();
             foreach (XML.playerIndexPlayersPlayer entry in index.Item.player)
             {
-                Player player = new Player(entry.id, entry.name,
+                NetworkPlayer player = new NetworkPlayer(entry.id, entry.name,
                     entry.adminSpecified && entry.admin);
                 player.PasswordSalt = entry.pwdSalt;
                 player.PasswordHash = entry.pwdHash;
@@ -1116,7 +1108,7 @@ namespace Guncho
 
             lock (players)
             {
-                foreach (Player p in players.Values)
+                foreach (NetworkPlayer p in players.Values)
                 {
                     if (p.IsGuest)
                         continue;
@@ -1157,25 +1149,25 @@ namespace Guncho
             }
         }
 
-        public Player FindPlayer(string name)
+        public NetworkPlayer FindPlayer(string name)
         {
-            Player result;
+            NetworkPlayer result;
             players.TryGetValue(name.ToLower(), out result);
             return result;
         }
 
         public string GetPasswordSalt(string name)
         {
-            Player who = FindPlayer(name);
+            NetworkPlayer who = FindPlayer(name);
             if (who == null)
                 return null;
             else
                 return who.PasswordSalt;
         }
 
-        public Player ValidateLogIn(string name, string pwdSalt, string pwdHash)
+        public NetworkPlayer ValidateLogIn(string name, string pwdSalt, string pwdHash)
         {
-            Player player = FindPlayer(name);
+            NetworkPlayer player = FindPlayer(name);
             if (player == null || player.IsGuest)
                 return null;
 
@@ -1193,7 +1185,7 @@ namespace Guncho
             return player;
         }
 
-        public Player ValidateLogIn(string name, string password)
+        public NetworkPlayer ValidateLogIn(string name, string password)
         {
             string salt = GetPasswordSalt(name);
             string hash = Controller.HashPassword(salt, password);
@@ -1359,7 +1351,7 @@ namespace Guncho
                         sb.Length--;
                     line = sb.ToString();
 
-                    Instance instance = null;
+                    GameInstance instance = null;
                     if (conn.Player != null)
                         lock (conn.Player)
                             instance = conn.Player.Instance;
@@ -1396,7 +1388,7 @@ namespace Guncho
                         if (dabString != null)
                         {
                             // repeat the previous command, but hide its output (the disambiguation question)
-                            instance.QueueInput(MakeInputLine(conn, dabString, true));
+                            instance.QueueInput(conn.Player, dabString, true);
                             // provide the answer
                             instance.QueueInput(line);
                         }
@@ -1431,7 +1423,7 @@ namespace Guncho
 #endif
 
                             // pass the line into the realm
-                            instance.QueueInput(MakeInputLine(conn, line, false));
+                            instance.QueueInput(conn.Player, line, false);
                         }
                     }
                 }
@@ -1602,9 +1594,8 @@ namespace Guncho
             if (prevRealm != null)
             {
                 LogMessage(LogLevel.Verbose,
-                    "{0} (#{1}) leaving '{2}'.",
-                    player.Name,
-                    player.ID,
+                    "{0} leaving '{1}'.",
+                    player.LogName,
                     prevRealm.Name);
 
                 prevRealm.RemovePlayer(player);
@@ -1616,9 +1607,8 @@ namespace Guncho
             if (instance != null)
             {
                 LogMessage(LogLevel.Verbose,
-                    "{0} (#{1}) entering '{2}'.",
-                    player.Name,
-                    player.ID,
+                    "{0} entering '{1}'.",
+                    player.LogName,
                     instance.Name);
 
                 if (!instance.IsActive)
@@ -1700,14 +1690,9 @@ namespace Guncho
 
         private static void TransferError(Player player, string realmName, string message)
         {
-            lock (player)
-                if (player.Connection != null)
-                {
-                    player.Connection.WriteLine(
-                        "*** This realm tried to send you to \"{0}\", but {1}. ***",
-                        realmName, message);
-                    player.Connection.FlushOutput();
-                }
+            player.WriteLine("*** This realm tried to send you to \"{0}\", but {1}. ***",
+                realmName, message);
+            player.FlushOutput();
         }
         
         private void ShowWhoList(Connection conn, Player player)
@@ -1789,26 +1774,6 @@ namespace Guncho
                 return string.Format("{0:00}h{1:00}m", timeSpan.Hours, timeSpan.Minutes);
             else
                 return string.Format("{0:00}m{1:00}s", timeSpan.Minutes, timeSpan.Seconds);
-        }
-
-        /// <summary>
-        /// Combines a player ID with a command to form an input line for a realm.
-        /// </summary>
-        /// <param name="conn">The connection that issued the command.</param>
-        /// <param name="line">The command. Any necessary sanitization or encoding
-        /// must have already been applied.</param>
-        /// <param name="silent"><b>true</b> to suppress output from this command.</param>
-        /// <returns>The complete input line.</returns>
-        private string MakeInputLine(Connection conn, string line, bool silent)
-        {
-#if COVERUP
-            return line;
-#else
-            return string.Format("{0}{1}:{2}",
-                silent ? "$silent " : "",
-                conn.Player.ID,
-                line);
-#endif
         }
 
         public static string Sanitize(string str)

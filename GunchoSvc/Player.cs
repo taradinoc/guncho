@@ -5,32 +5,14 @@ using System.Net.Sockets;
 
 namespace Guncho
 {
-    class Player
+    abstract class Player
     {
-        private readonly int id;
-        private readonly bool isAdmin, isGuest;
-        private readonly Dictionary<string, string> attributes = new Dictionary<string, string>();
-        private string name, dab, again;
-        private string pwdSalt, pwdHash;
-        private Connection conn;
+        private string name;
         private GameInstance instance;
 
-        public Player(int id, string name, bool isAdmin)
-            : this(id, name, isAdmin, false)
+        public Player(string name)
         {
-        }
-
-        public Player(int id, string name, bool isAdmin, bool isGuest)
-        {
-            this.id = id;
             this.name = name;
-            this.isAdmin = isAdmin;
-            this.isGuest = isGuest;
-        }
-
-        public int ID
-        {
-            get { return id; }
         }
 
         public string Name
@@ -45,6 +27,124 @@ namespace Guncho
             }
         }
 
+        public abstract string LogName { get; }
+
+        public virtual bool IsAdmin
+        {
+            get { return false; }
+        }
+
+        public virtual bool IsGuest
+        {
+            get { return false; }
+        }
+
+        public Realm Realm
+        {
+            get { return instance.Realm; }
+        }
+
+        public GameInstance Instance
+        {
+            get { return instance; }
+            set { instance = value; }
+        }
+
+        public virtual string Disambiguating
+        {
+            get { return null; }
+            set { /* nada */ }
+        }
+
+        public virtual string GetAttribute(string name)
+        {
+            if (name == null)
+                throw new ArgumentNullException("name");
+
+            return "";
+        }
+
+        public virtual IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
+        {
+            yield break;
+        }
+
+        public virtual void SetAttribute(string name, string value)
+        {
+            if (name == null)
+                throw new ArgumentNullException("name");
+
+            // nada
+        }
+
+        public virtual void NotifyInstanceReloading()
+        {
+            // nada
+        }
+
+        public virtual void FlushOutput()
+        {
+            // nada
+        }
+
+        public virtual void Write(char c)
+        {
+            // nada
+        }
+
+        public virtual void Write(string text)
+        {
+            // nada
+        }
+
+        public virtual void WriteLine()
+        {
+            // nada
+        }
+
+        public virtual void WriteLine(string text)
+        {
+            // nada
+        }
+
+        public virtual void WriteLine(string format, params object[] args)
+        {
+            // nada
+        }
+    }
+
+    class NetworkPlayer : Player
+    {
+        private readonly int id;
+        private readonly bool isAdmin, isGuest;
+        private readonly Dictionary<string, string> attributes = new Dictionary<string, string>();
+        private string dab, again;
+        private string pwdSalt, pwdHash;
+        private Connection conn;
+
+        public NetworkPlayer(int id, string name, bool isAdmin)
+            : this(id, name, isAdmin, false)
+        {
+        }
+
+        public NetworkPlayer(int id, string name, bool isAdmin, bool isGuest)
+            : base(name)
+        {
+            this.id = id;
+            this.isAdmin = isAdmin;
+            this.isGuest = isGuest;
+        }
+
+        public override string LogName
+        {
+            get { return string.Format("{0} (#{1})", Name, ID); }
+        }
+
+        public int ID
+        {
+            get { return id; }
+        }
+
         public string PasswordSalt
         {
             get { return pwdSalt; }
@@ -57,17 +157,17 @@ namespace Guncho
             set { pwdHash = value; }
         }
 
-        public bool IsAdmin
+        public override bool IsAdmin
         {
             get { return isAdmin; }
         }
 
-        public bool IsGuest
+        public override bool IsGuest
         {
             get { return isGuest; }
         }
 
-        public string Disambiguating
+        public override string Disambiguating
         {
             get { return dab; }
             set { dab = value; }
@@ -85,18 +185,7 @@ namespace Guncho
             set { conn = value; }
         }
 
-        public Realm Realm
-        {
-            get { return instance.Realm; }
-        }
-
-        public GameInstance Instance
-        {
-            get { return instance; }
-            set { instance = value; }
-        }
-
-        public string GetAttribute(string name)
+        public override string GetAttribute(string name)
         {
             if (name == null)
                 throw new ArgumentNullException("name");
@@ -108,12 +197,12 @@ namespace Guncho
                 return "";
         }
 
-        public IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
+        public override IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
         {
             return attributes;
         }
 
-        public void SetAttribute(string name, string value)
+        public override void SetAttribute(string name, string value)
         {
             if (name == null)
                 throw new ArgumentNullException("name");
@@ -122,6 +211,96 @@ namespace Guncho
                 attributes.Remove(name);
             else
                 attributes[name] = value;
+        }
+
+        public override void NotifyInstanceReloading()
+        {
+            lock (this)
+                if (conn != null)
+                    conn.WriteLine("[The realm shimmers for a moment...]");
+        }
+
+        public override void FlushOutput()
+        {
+            lock (this)
+                if (conn != null)
+                    conn.FlushOutput();
+        }
+
+        public override void Write(char c)
+        {
+            lock (this)
+                if (conn != null)
+                    conn.Write(c);
+        }
+
+        public override void Write(string text)
+        {
+            lock (this)
+                if (conn != null)
+                    conn.Write(text);
+        }
+
+        public override void WriteLine()
+        {
+            lock (this)
+                if (conn != null)
+                    conn.WriteLine();
+        }
+
+        public override void WriteLine(string text)
+        {
+            lock (this)
+                if (conn != null)
+                    conn.WriteLine(text);
+        }
+
+        public override void WriteLine(string format, params object[] args)
+        {
+            lock (this)
+                if (conn != null)
+                    conn.WriteLine(format, args);
+        }
+    }
+
+    class DummyPlayer : Player
+    {
+        public DummyPlayer(string name)
+            : base(name)
+        {
+        }
+
+        public override string LogName
+        {
+            get { return Name + " (dummy)"; }
+        }
+    }
+
+    class BotPlayer : Player
+    {
+        public BotPlayer(string name)
+            : base(name)
+        {
+        }
+
+        public override string LogName
+        {
+            get { return Name + " (bot)"; }
+        }
+
+        public override void NotifyInstanceReloading()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override string GetAttribute(string name)
+        {
+            return base.GetAttribute(name);
+        }
+
+        public override IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
+        {
+            return base.GetAllAttributes();
         }
     }
 }
