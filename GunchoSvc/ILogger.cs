@@ -6,7 +6,7 @@ using System.IO;
 
 namespace Guncho
 {
-    enum LogLevel
+    public enum LogLevel
     {
         Spam,
         Verbose,
@@ -15,12 +15,12 @@ namespace Guncho
         Error
     }
 
-    interface ILogger
+    public interface ILogger
     {
         void LogMessage(LogLevel level, string text);
     }
 
-    class ConsoleLogger : ILogger
+    public class ConsoleLogger : ILogger
     {
         private object myLock = new object();
 

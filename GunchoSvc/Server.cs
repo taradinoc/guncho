@@ -77,11 +77,12 @@ namespace Guncho
         private readonly List<Connection> connections = new List<Connection>();
         private readonly Dictionary<string, Player> players = new Dictionary<string, Player>();
         private readonly Dictionary<string, Realm> realms = new Dictionary<string, Realm>();
+        private readonly Dictionary<string, Instance> instances = new Dictionary<string, Instance>();
         private readonly Dictionary<string, RealmFactory> factories = new Dictionary<string, RealmFactory>();
         private readonly Queue<VoidDelegate> eventQueue = new Queue<VoidDelegate>();
         private readonly Thread eventThread;
         private readonly PriorityQueue<TimedEvent> timedEvents = new PriorityQueue<TimedEvent>();
-        private readonly Dictionary<Realm, TimedEvent> timedEventsByRealm = new Dictionary<Realm, TimedEvent>();
+        private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
         private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
         public Server(int port, ILogger logger)
@@ -176,14 +177,14 @@ namespace Guncho
 
         private class TimedEvent
         {
-            public readonly Realm Realm;
+            public readonly Instance Instance;
             public readonly int Interval;
             public DateTime Time;
             public bool Deleted;
 
-            public TimedEvent(Realm realm, int interval)
+            public TimedEvent(Instance instance, int interval)
             {
-                this.Realm = realm;
+                this.Instance = instance;
                 this.Time = DateTime.Now.AddSeconds(interval);
                 this.Interval = interval;
             }
@@ -209,7 +210,7 @@ namespace Guncho
                         break;
 
                     timedEvents.Dequeue();
-                    ev.Realm.QueueInput("$rtevent");
+                    ev.Instance.QueueInput("$rtevent");
 
                     ev.Time = now.AddSeconds(ev.Interval);
                     timedEvents.Enqueue(ev, ev.Time.ToFileTime());
@@ -223,20 +224,20 @@ namespace Guncho
 
             lock (realms)
             {
-                foreach (Realm r in realms.Values)
+                foreach (Instance r in instances.Values)
                 {
                     if (now >= r.WatchdogTime)
                     {
-                        Realm failed = r;
-                        QueueEvent(delegate { HandleRealmFailure(failed, "frozen"); });
+                        Instance failed = r;
+                        QueueEvent(delegate { HandleInstanceFailure(failed, "frozen"); });
                     }
                 }
             }
         }
 
-        public void SetEventInterval(Realm realm, int seconds)
+        public void SetEventInterval(Instance instance, int seconds)
         {
-            if (realm == null)
+            if (instance == null)
                 throw new ArgumentNullException("realm");
             if (seconds < 0)
                 throw new ArgumentOutOfRangeException("seconds");
@@ -244,7 +245,7 @@ namespace Guncho
             lock (timedEvents)
             {
                 TimedEvent prev;
-                if (timedEventsByRealm.TryGetValue(realm, out prev))
+                if (timedEventsByInstance.TryGetValue(instance, out prev))
                 {
                     if (prev.Interval != seconds)
                         prev.Deleted = true;
@@ -254,12 +255,12 @@ namespace Guncho
 
                 if (seconds == 0)
                 {
-                    timedEventsByRealm.Remove(realm);
+                    timedEventsByInstance.Remove(instance);
                 }
                 else
                 {
-                    TimedEvent ev = new TimedEvent(realm, seconds);
-                    timedEventsByRealm[realm] = ev;
+                    TimedEvent ev = new TimedEvent(instance, seconds);
+                    timedEventsByInstance[instance] = ev;
                     timedEvents.Enqueue(ev, ev.Time.ToFileTime());
                 }
             }
@@ -590,10 +591,10 @@ namespace Guncho
                 }
 #endif
 
-                FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
+                //FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
                 try
                 {
-                    Realm r = factory.LoadRealm(stream, realmName, sourceFile, owner);
+                    Realm r = factory.LoadRealm(realmName, sourceFile, cachedFile, owner);
 #if COVERUP
                     r.RawMode = true;
 #endif
@@ -609,13 +610,28 @@ namespace Guncho
                     }
                     else
                     {
-                        stream.Close();
+                        //stream.Close();
                         throw new RealmLoadingException(realmName, ex);
                     }
                 }
             }
 
             return RealmEditingOutcome.Success;
+        }
+
+        private Instance LoadInstance(Realm realm, string name)
+        {
+            Instance result;
+
+            lock (instances)
+            {
+                if (GetInstance(name) != null)
+                    throw new ArgumentException("An instance with this name is already loaded", "name");
+                result = realm.Factory.LoadInstance(realm, name);
+                instances.Add(name, result);
+            }
+
+            return result;
         }
 
         public Realm GetRealm(string name)
@@ -627,6 +643,44 @@ namespace Guncho
             lock (realms)
                 realms.TryGetValue(name.ToLower(), out result);
             return result;
+        }
+
+        public Instance GetInstance(string name)
+        {
+            if (name == null)
+                throw new ArgumentNullException("name");
+
+            Instance result;
+            lock (instances)
+                instances.TryGetValue(name.ToLower(), out result);
+            return result;
+        }
+
+        private Instance GetDefaultInstance(Realm realm)
+        {
+            lock (instances)
+            {
+                Instance inst = GetInstance(realm.Name);
+
+                if (inst == null)
+                    inst = LoadInstance(realm, realm.Name);
+
+                return inst;
+            }
+        }
+
+        private Instance[] GetAllInstances(Realm realm)
+        {
+            List<Instance> result = new List<Instance>();
+
+            lock (instances)
+            {
+                foreach (Instance inst in instances.Values)
+                    if (inst.Realm == realm)
+                        result.Add(inst);
+            }
+
+            return result.ToArray();
         }
 
         public string[] ListRealms()
@@ -676,82 +730,112 @@ namespace Guncho
 
             lock (realms)
             {
-                Realm replacement = GetRealm(fromName);
-                if (replacement == null)
-                    throw new ArgumentException("No such realm", "fromName");
-
-                Realm original = GetRealm(toName);
-                if (original == null)
-                    throw new ArgumentException("No such realm", "toName");
-
-                Dictionary<Player, string> positions = new Dictionary<Player, string>();
-                original.ExportPlayerPositions(positions);
-                replacement.ExportPlayerPositions(positions);
-
-                LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
-                realms.Remove(fromName.ToLower());
-                realms.Remove(toName.ToLower());
-
-                SetEventInterval(replacement, 0);
-                replacement.Dispose();
-                SetEventInterval(original, 0);
-                original.PolitelyDispose();
-
-                // move source file
-                string fromSource = replacement.SourceFile;
-                string toSource = original.SourceFile;
-                if (File.Exists(fromSource))
+                lock (instances)
                 {
-                    // TODO: archive the old file so it can be reverted later instead of deleting it
-                    File.Delete(toSource);
-                    File.Move(fromSource, toSource);
-                }
+                    Realm replacement = GetRealm(fromName);
+                    if (replacement == null)
+                        throw new ArgumentException("No such realm", "fromName");
 
-                // delete/move cached realm and index
-                string cachePath = Properties.Settings.Default.CachePath;
-                string toCached = Path.Combine(cachePath, toName + ".ulx");
-                File.Delete(toCached);
-                string fromCached = Path.Combine(cachePath, fromName + ".ulx");
-                if (File.Exists(fromCached))
-                    File.Move(fromCached, toCached);
+                    Realm original = GetRealm(toName);
+                    if (original == null)
+                        throw new ArgumentException("No such realm", "toName");
 
-                string fromIndex = Path.Combine(IndexPath, fromName);
-                string toIndex = Path.Combine(IndexPath, toName);
-                if (Directory.Exists(fromIndex))
-                    RealmFactory.CopyDirectory(fromIndex, toIndex);
+                    Instance[] origInstances = GetAllInstances(original);
+                    Instance[] replcInstances = GetAllInstances(replacement);
+                    var saved = new Dictionary<string, Dictionary<Player, string>>();
 
-                // reload realm
-                LoadRealm(toName, toSource, replacement.Factory.Name, replacement.Owner);
-                Realm newRealm = GetRealm(toName);
-                if (newRealm != null)
-                {
-                    newRealm.CopySettingsFrom(original);
-
-                    LogMessage(LogLevel.Verbose, "Reloaded '{0}'.", newRealm.Name);
-
-                    foreach (KeyValuePair<Player, string> pair in positions)
+                    // extract players from running original instances
+                    foreach (Instance inst in origInstances)
                     {
-                        lock (pair.Key)
-                        {
-                            if (pair.Key.Connection != null)
-                                pair.Key.Connection.WriteLine("[The realm shimmers for a moment...]");
-                        }
-                        EnterRealm(pair.Key, newRealm, pair.Value);
+                        var dict = new Dictionary<Player, string>();
+                        saved.Add(inst.Name, dict);
+                        inst.ExportPlayerPositions(dict);
+                        SetEventInterval(inst, 0);
+                        inst.PolitelyDispose();
+                        instances.Remove(inst.Name);
                     }
-                }
-                else
-                {
-                    LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
-                    Realm startRealm = GetRealm(Properties.Settings.Default.StartRealmName);
-                    foreach (KeyValuePair<Player, string> pair in positions)
+                    // there shouldn't be any players in replacement instances, but
+                    // if there are for some reason, dump them in the new default instance
+                    foreach (Instance inst in replcInstances)
                     {
-                        lock (pair.Key)
+                        Dictionary<Player, string> dict;
+                        if (saved.TryGetValue(toName, out dict) == false)
                         {
-                            if (pair.Key.Connection != null)
-                                pair.Key.Connection.WriteLine("[The realm has failed.]");
+                            dict = new Dictionary<Player, string>();
+                            saved.Add(toName, dict);
                         }
-                        EnterRealm(pair.Key, startRealm, pair.Value);
+                        inst.ExportPlayerPositions(dict);
+                        SetEventInterval(inst, 0);
+                        inst.Dispose();
+                        instances.Remove(inst.Name);
+                    }
+
+                    LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
+                    realms.Remove(fromName.ToLower());
+                    realms.Remove(toName.ToLower());
+
+                    // move source file
+                    string fromSource = replacement.SourceFile;
+                    string toSource = original.SourceFile;
+                    if (File.Exists(fromSource))
+                    {
+                        // TODO: archive the old file so it can be reverted later instead of deleting it
+                        File.Delete(toSource);
+                        File.Move(fromSource, toSource);
+                    }
+
+                    // delete/move cached realm and index
+                    string cachePath = Properties.Settings.Default.CachePath;
+                    string toCached = Path.Combine(cachePath, toName + ".ulx");
+                    File.Delete(toCached);
+                    string fromCached = Path.Combine(cachePath, fromName + ".ulx");
+                    if (File.Exists(fromCached))
+                        File.Move(fromCached, toCached);
+
+                    string fromIndex = Path.Combine(IndexPath, fromName);
+                    string toIndex = Path.Combine(IndexPath, toName);
+                    if (Directory.Exists(fromIndex))
+                        RealmFactory.CopyDirectory(fromIndex, toIndex);
+
+                    // reload realm
+                    LoadRealm(toName, toSource, replacement.Factory.Name, replacement.Owner);
+                    Realm newRealm = GetRealm(toName);
+                    if (newRealm != null)
+                    {
+                        newRealm.CopySettingsFrom(original);
+
+                        LogMessage(LogLevel.Verbose, "Reloaded '{0}'.", newRealm.Name);
+
+                        foreach (var instPair in saved)
+                        {
+                            Instance inst = LoadInstance(newRealm, instPair.Key);
+                            foreach (KeyValuePair<Player, string> pair in instPair.Value)
+                            {
+                                lock (pair.Key)
+                                {
+                                    if (pair.Key.Connection != null)
+                                        pair.Key.Connection.WriteLine("[The realm shimmers for a moment...]");
+                                }
+                                EnterInstance(pair.Key, inst, pair.Value);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
+
+                        Instance startInst = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+                        foreach (Dictionary<Player, string> positions in saved.Values)
+                            foreach (KeyValuePair<Player, string> pair in positions)
+                            {
+                                lock (pair.Key)
+                                {
+                                    if (pair.Key.Connection != null)
+                                        pair.Key.Connection.WriteLine("[The realm has failed.]");
+                                }
+                                EnterInstance(pair.Key, startInst, pair.Value);
+                            }
                     }
                 }
             }
@@ -901,15 +985,20 @@ namespace Guncho
                 realms.Remove(realm.Name.ToLower());
             }
 
-            if (realm.IsActive)
+            // close all instances
+            Instance startInstance = GetDefaultInstance(startRealm);
+            foreach (Instance inst in GetAllInstances(realm))
             {
-                Player[] players = realm.ListPlayers();
-                foreach (Player p in players)
-                    EnterRealm(p, startRealm);
-            }
+                if (inst.IsActive)
+                {
+                    Player[] players = inst.ListPlayers();
+                    foreach (Player p in players)
+                        EnterInstance(p, startInstance);
+                }
 
-            SetEventInterval(realm, 0);
-            realm.PolitelyDispose();
+                SetEventInterval(inst, 0);
+                inst.PolitelyDispose();
+            }
 
             // delete the z-code and index, but leave the source just in case
             try
@@ -1113,7 +1202,7 @@ namespace Guncho
                 eventThread.Join();
 
                 lock (realms)
-                    foreach (Realm r in realms.Values)
+                    foreach (Instance r in instances.Values)
                         r.PolitelyDispose();
             }
             catch (Exception ex)
@@ -1251,12 +1340,12 @@ namespace Guncho
                         sb.Length--;
                     line = sb.ToString();
 
-                    Realm realm = null;
+                    Instance instance = null;
                     if (conn.Player != null)
                         lock (conn.Player)
-                            realm = conn.Player.Realm;
+                            instance = conn.Player.Instance;
 
-                    if (realm == null)
+                    if (instance == null)
                     {
 #if COVERUP
                     conn.WriteLine("Unknown command.");
@@ -1288,9 +1377,9 @@ namespace Guncho
                         if (dabString != null)
                         {
                             // repeat the previous command, but hide its output (the disambiguation question)
-                            realm.QueueInput(MakeInputLine(conn, dabString, true));
+                            instance.QueueInput(MakeInputLine(conn, dabString, true));
                             // provide the answer
-                            realm.QueueInput(line);
+                            instance.QueueInput(line);
                         }
                         else
                         {
@@ -1323,7 +1412,7 @@ namespace Guncho
 #endif
 
                             // pass the line into the realm
-                            realm.QueueInput(MakeInputLine(conn, line, false));
+                            instance.QueueInput(MakeInputLine(conn, line, false));
                         }
                     }
                 }
@@ -1343,7 +1432,7 @@ namespace Guncho
                 if (realm != null)
                     realm.Deactivate();
 #else
-                    EnterRealm(conn.Player, null);
+                    EnterInstance(conn.Player, null);
 #endif
 
 #if COVERUP
@@ -1380,12 +1469,12 @@ namespace Guncho
             }
         }
 
-        public void RealmFinished(Realm realm, Player[] abandonedPlayers, bool wasTerminated)
+        public void InstanceFinished(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
         {
-            QueueEvent(delegate { HandleRealmFinished(realm, abandonedPlayers, wasTerminated); });
+            QueueEvent(delegate { HandleInstanceFinished(instance, abandonedPlayers, wasTerminated); });
         }
 
-        private void HandleRealmFinished(Realm realm, Player[] abandonedPlayers, bool wasTerminated)
+        private void HandleInstanceFinished(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
         {
 #if COVERUP
             lock (realms)
@@ -1399,41 +1488,41 @@ namespace Guncho
                 }
             }
 #else // !COVERUP
-            if (wasTerminated && !realm.RestartRequested)
+            if (wasTerminated && !instance.RestartRequested)
             {
-                LogMessage(LogLevel.Verbose, "Realm terminated: '{0}'", realm.Name);
+                LogMessage(LogLevel.Verbose, "Realm terminated: '{0}'", instance.Name);
             }
             else
             {
                 // TODO: look at how long it's been since the realm was activated, and don't restart it if we suspect it's buggy
 
-                realm.RestartRequested = false;
-                LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", realm.Name);
+                instance.RestartRequested = false;
+                LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", instance.Name);
 
-                realm.Activate();
+                instance.Activate();
             }
 #endif
 
-            Realm initialRealm = GetRealm(Properties.Settings.Default.StartRealmName);
+            Instance initialRealm = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
 
             foreach (Player p in abandonedPlayers)
             {
                 lock (p)
                 {
-                    p.Realm = null;
+                    p.Instance = null;
 #if COVERUP
                     if (p.Connection != null)
                         p.Connection.Terminate();
 #else
-                    EnterRealm(p, initialRealm);
+                    EnterInstance(p, initialRealm);
 #endif
                 }
             }
         }
 
-        private void HandleRealmFailure(Realm r, string reason)
+        private void HandleInstanceFailure(Instance r, string reason)
         {
-            bool isCondemned = r.IncrementFailureCount();
+            bool isCondemned = r.Realm.IncrementFailureCount();
 
             if (isCondemned)
             {
@@ -1468,27 +1557,27 @@ namespace Guncho
             return result;
         }
 
-        private void EnterRealm(Player player, Realm realm)
+        private void EnterInstance(Player player, Instance realm)
         {
-            EnterRealm(player, realm, null, false);
+            EnterInstance(player, realm, null, false);
         }
 
-        private void EnterRealm(Player player, Realm realm, string position)
+        private void EnterInstance(Player player, Instance realm, string position)
         {
-            EnterRealm(player, realm, position, false);
+            EnterInstance(player, realm, position, false);
         }
 
-        private void EnterRealm(Player player, Realm realm, string position, bool traveling)
+        private void EnterInstance(Player player, Instance instance, string position, bool traveling)
         {
-            Realm prevRealm;
+            Instance prevRealm;
             lock (player)
             {
-                prevRealm = player.Realm;
+                prevRealm = player.Instance;
                 if (!traveling)
                     player.SetAttribute("waygone", null);
             }
 
-            if (prevRealm == realm)
+            if (prevRealm == instance)
                 return;
 
             if (prevRealm != null)
@@ -1503,20 +1592,20 @@ namespace Guncho
             }
 
             lock (player)
-                player.Realm = realm;
+                player.Instance = instance;
 
-            if (realm != null)
+            if (instance != null)
             {
                 LogMessage(LogLevel.Verbose,
                     "{0} (#{1}) entering '{2}'.",
                     player.Name,
                     player.ID,
-                    realm.Name);
+                    instance.Name);
 
-                if (!realm.IsActive)
-                    realm.Activate();
+                if (!instance.IsActive)
+                    instance.Activate();
 
-                realm.AddPlayer(player, position);
+                instance.AddPlayer(player, position);
             }
         }
 
@@ -1527,34 +1616,34 @@ namespace Guncho
 
         private void HandleTransferPlayer(Player player, string spec)
         {
-            string realmName, token;
+            string instanceName, token;
 
             int idx = spec.IndexOf('@');
             if (idx == -1)
             {
-                realmName = spec;
+                instanceName = spec;
                 token = "default";
             }
             else
             {
-                realmName = spec.Substring(idx + 1);
+                instanceName = spec.Substring(idx + 1);
                 token = spec.Substring(0, idx);
             }
 
-            Realm dest = GetRealm(realmName);
+            Instance dest = GetInstance(instanceName);
             if (dest != null)
             {
-                if (dest == player.Realm)
+                if (dest == player.Instance)
                 {
-                    TransferError(player, realmName, "you're already there");
+                    TransferError(player, instanceName, "you're already there");
                 }
-                else if (dest.IsCondemned)
+                else if (dest.Realm.IsCondemned)
                 {
-                    TransferError(player, realmName, "that realm has been condemned");
+                    TransferError(player, instanceName, "that realm has been condemned");
                 }
-                else if (dest.GetAccessLevel(player) <= RealmAccessLevel.Banned)
+                else if (dest.Realm.GetAccessLevel(player) <= RealmAccessLevel.Banned)
                 {
-                    TransferError(player, realmName, "you aren't allowed to enter that realm");
+                    TransferError(player, instanceName, "you aren't allowed to enter that realm");
                 }
                 else
                 {
@@ -1565,20 +1654,20 @@ namespace Guncho
                     switch (check)
                     {
                         case "ok":
-                            EnterRealm(player, dest, "=" + token, true);
+                            EnterInstance(player, dest, "=" + token, true);
                             break;
 
                         case "full":
-                            TransferError(player, realmName, "that realm is full");
+                            TransferError(player, instanceName, "that realm is full");
                             break;
 
                         case "invalid":
-                            TransferError(player, realmName,
+                            TransferError(player, instanceName,
                                 "that realm has no entrance called \"" + token + "\"");
                             break;
 
                         default:
-                            TransferError(player, realmName,
+                            TransferError(player, instanceName,
                                 "it failed mysteriously (\"" + check + "\")");
                             break;
                     }
@@ -1586,7 +1675,7 @@ namespace Guncho
             }
             else
             {
-                TransferError(player, realmName, "there is no such place");
+                TransferError(player, instanceName, "there is no such place");
             }
         }
 
