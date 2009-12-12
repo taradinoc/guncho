@@ -13,7 +13,7 @@ namespace Guncho
         private string name, dab, again;
         private string pwdSalt, pwdHash;
         private Connection conn;
-        private Instance instance;
+        private GameInstance instance;
 
         public Player(int id, string name, bool isAdmin)
             : this(id, name, isAdmin, false)
@@ -90,7 +90,7 @@ namespace Guncho
             get { return instance.Realm; }
         }
 
-        public Instance Instance
+        public GameInstance Instance
         {
             get { return instance; }
             set { instance = value; }

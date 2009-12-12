@@ -9,9 +9,9 @@ using System.Text.RegularExpressions;
 
 namespace Guncho
 {
-    class Instance
+    abstract class Instance
     {
-        private readonly Server server;
+        protected readonly Server server;
         private readonly Realm realm;
         private readonly Stream zfile;
         private readonly RealmIO io;
@@ -19,7 +19,6 @@ namespace Guncho
 
         private Engine vm;
 
-        private bool rawMode;
         private bool needReset;
         private bool restartRequested;
         private DateTime watchdogTime = DateTime.MaxValue;
@@ -28,16 +27,13 @@ namespace Guncho
         private Thread terpThread;
         private object terpThreadLock = new object();
 
-        private Dictionary<int, Player> players = new Dictionary<int, Player>();
-
-        private int tagstate = 0;
-        private Player curPlayer = null;
-        private Stack<Player> prevPlayers = new Stack<Player>();
-        private StringBuilder tagParam;
-
         private const int MAX_LINE_LENGTH = 120;
         private const double WATCHDOG_SECONDS = 10.0;
-        private static readonly Player Announcer = new Player(-1, "*Announcer*", false);
+
+        protected abstract void OnVMFinished(bool wasTerminated);
+        protected abstract void OnPreReadLine(Transaction curTrans);
+        protected abstract void OnPostReadLine(ref string line, ref Transaction curTrans);
+        protected abstract void OnHandleOutput(string text);
 
         /// <summary>
         /// Creates an new playable instance of a realm.
@@ -59,21 +55,6 @@ namespace Guncho
             vm.OutputReady += io.FyreOutputReady;
             vm.KeyWanted += io.FyreKeyWanted;
             vm.LineWanted += io.FyreLineWanted;
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether the realm's input and output are unfiltered.
-        /// </summary>
-        /// <remarks>
-        /// Raw mode is meant to allow existing single-player games to be played online. Raw
-        /// realms are unable to distinguish between different players, and cannot interact
-        /// with the Guncho server or other realms.  If multiple players are connected, they
-        /// will all control the same player-character and see the same output.
-        /// </remarks>
-        public bool RawMode
-        {
-            get { return rawMode; }
-            set { rawMode = value; if (value) curPlayer = Announcer; }
         }
 
         /// <summary>
@@ -201,7 +182,6 @@ namespace Guncho
                 finally
                 {
                     needReset = true;
-                    curPlayer = null;
 
                     bool wasTerminated;
                     lock (terpThreadLock)
@@ -210,20 +190,7 @@ namespace Guncho
                         terpThread = null;
                     }
 
-                    Player[] abandoned;
-                    lock (players)
-                    {
-                        abandoned = new Player[players.Count];
-                        players.Values.CopyTo(abandoned, 0);
-                        players.Clear();
-                    }
-
-                    foreach (Player p in abandoned)
-                        lock (p)
-                            if (p.Connection != null)
-                                p.Connection.FlushOutput();
-
-                    server.InstanceFinished(this, abandoned, wasTerminated);
+                    OnVMFinished(wasTerminated);
                 }
             }
             catch (Exception ex)
@@ -285,6 +252,434 @@ namespace Guncho
             return trans.Response.ToString().Trim();
         }
 
+        #region RealmIO
+
+        private class RealmIO
+        {
+            private readonly Instance instance;
+            private readonly Queue<string> inputQueue = new Queue<string>();
+            private readonly Queue<Transaction> transQueue = new Queue<Transaction>();
+            private readonly Queue<string> specialResponses = new Queue<string>();
+            private readonly AutoResetEvent inputReady = new AutoResetEvent(false);
+            private Transaction curTrans;
+
+            public RealmIO(Instance instance)
+            {
+                this.instance = instance;
+            }
+
+            public void QueueInput(string line)
+            {
+                lock (inputQueue)
+                {
+                    inputQueue.Enqueue(line);
+
+                    if (inputQueue.Count == 1)
+                        inputReady.Set();
+                }
+            }
+
+            public void QueueTransaction(Transaction trans)
+            {
+                lock (transQueue)
+                {
+                    transQueue.Enqueue(trans);
+
+                    if (transQueue.Count == 1)
+                        inputReady.Set();
+                }
+            }
+
+            private string GetInputLine()
+            {
+                if (specialResponses.Count > 0)
+                    return specialResponses.Dequeue();
+
+                instance.DisableWatchdog();
+
+                try
+                {
+                    instance.OnPreReadLine(curTrans);
+
+                    // is there a previous transaction?
+                    if (curTrans != null)
+                    {
+                        // response has already been collected, so just unblock the waiting thread
+                        lock (curTrans)
+                            Monitor.Pulse(curTrans);
+
+                        curTrans = null;
+                    }
+
+                    do
+                    {
+                        // is there a transaction waiting?
+                        lock (transQueue)
+                        {
+                            if (transQueue.Count > 0)
+                            {
+                                curTrans = transQueue.Dequeue();
+                                instance.server.LogMessage(LogLevel.Spam,
+                                    "Transaction in {0}: {1}",
+                                    instance.name, curTrans.Query);
+                                return curTrans.Query;
+                            }
+                        }
+
+                        // is there a line of player input waiting?
+                        lock (inputQueue)
+                        {
+                            if (inputQueue.Count > 0)
+                            {
+                                string line = inputQueue.Dequeue();
+                                instance.server.LogMessage(LogLevel.Spam,
+                                    "Processing in {0}: {1}",
+                                    instance.name, line);
+
+                                instance.OnPostReadLine(ref line, ref curTrans);
+
+                                if (line.Length > MAX_LINE_LENGTH)
+                                    line = line.Substring(0, MAX_LINE_LENGTH);
+
+                                return line;
+                            }
+                        }
+
+                        // wait for input and then continue the loop
+                        inputReady.WaitOne();
+                    } while (true);
+                }
+                finally
+                {
+                    instance.ResetWatchdog();
+                }
+            }
+
+            public void FyreLineWanted(object sender, LineWantedEventArgs e)
+            {
+                e.Line = GetInputLine();
+            }
+
+            public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
+            {
+                string line;
+                do
+                {
+                    line = GetInputLine();
+                }
+                while (line == null || line.Length < 1);
+
+                e.Char = line[0];
+            }
+
+            public void FyreOutputReady(object sender, OutputReadyEventArgs e)
+            {
+                string main;
+                if (e.Package.TryGetValue(OutputChannel.Main, out main) == true)
+                {
+                    if (curTrans != null)
+                        curTrans.Response.Append(main);
+                    else
+                        instance.OnHandleOutput(main);
+                }
+
+                string special;
+                if (e.Package.TryGetValue(OutputChannel.Conversation, out special) && special.Length > 0)
+                {
+                    string[] parts = special.Split(new char[] { ' ' }, 3);
+                    if (parts.Length > 0)
+                    {
+                        string name = (parts.Length > 1) ? parts[1] : "";
+                        string rest = (parts.Length > 2) ? parts[2] : "";
+                        int word;
+                        int chunkSize;
+                        string str;
+
+                        switch (parts[0])
+                        {
+                            case "getword":
+                                if (instance.TryGetWordRegister(name, out word))
+                                    specialResponses.Enqueue(word.ToString());
+                                else
+                                    specialResponses.Enqueue("-1");
+                                break;
+
+                            case "gettext":
+                                str = instance.GetTextRegister(name) ?? "";
+                                specialResponses.Enqueue(str.Length.ToString());
+                                if (!int.TryParse(rest, out chunkSize))
+                                    chunkSize = str.Length;
+                                for (int offset = 0; offset < str.Length; offset += chunkSize)
+                                    specialResponses.Enqueue(
+                                        str.Substring(offset, Math.Min(chunkSize, str.Length - offset)));
+                                break;
+
+                            case "putword":
+                                if (int.TryParse(rest, out word) && instance.TryPutWordRegister(name, word))
+                                    specialResponses.Enqueue("1");
+                                else
+                                    specialResponses.Enqueue("0");
+                                break;
+
+                            case "puttext":
+                                instance.PutTextRegister(name, rest);
+                                specialResponses.Enqueue("?");
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+
+        protected class Transaction
+        {
+            public Transaction(string query)
+            {
+                this.Query = query;
+            }
+
+            public readonly string Query;
+            public readonly StringBuilder Response = new StringBuilder();
+        }
+
+        #endregion
+
+        #region Server Registers
+
+        // word registers available to the instance
+        private int timerInterval;              // rteinterval
+
+        // text registers available to the instance
+        protected string chatMsgRegister;       // chatmsg
+        protected string chatTargetRegister;    // chattarget
+
+        // for attribute and realm storage queries
+        protected string queriedAttr;           // pq_attr
+
+        protected virtual bool TryGetWordRegister(string name, out int value)
+        {
+            DateTime dt;
+
+            switch (name)
+            {
+                case "timeq":
+                    // time in quarts (15-second intervals)
+                    dt = DateTime.Now;
+                    value = (dt.Hour * 60 + dt.Minute) * 4 + (dt.Second / 15);
+                    return true;
+
+                case "timehm":
+                    // time as hhmm
+                    dt = DateTime.Now;
+                    value = (dt.Hour * 100) + dt.Minute;
+                    return true;
+
+                case "times":
+                    // seconds past the minute
+                    dt = DateTime.Now;
+                    value = dt.Second;
+                    return true;
+
+                case "datemd":
+                    // date as mmdd
+                    dt = DateTime.Now;
+                    value = (dt.Month * 100) + dt.Day;
+                    return true;
+
+                case "datey":
+                    // year
+                    dt = DateTime.Now;
+                    value = dt.Year;
+                    return true;
+
+                case "datedow":
+                    // day of the week (0 = Sunday)
+                    dt = DateTime.Now;
+                    value = (int)dt.DayOfWeek;
+                    return true;
+
+                case "rteinterval":
+                    // real-time event timer interval
+                    value = timerInterval;
+                    return true;
+
+                default:
+                    value = 0;
+                    return false;
+            }
+        }
+
+        protected virtual bool TryPutWordRegister(string name, int value)
+        {
+            switch (name)
+            {
+                case "rteinterval":
+                    // change real-time event timer interval
+                    timerInterval = value;
+                    server.SetEventInterval(this, value);
+                    break;
+            }
+
+            return false;
+        }
+
+        protected virtual string GetTextRegister(string name)
+        {
+            switch (name)
+            {
+                case "chatmsg":
+                    // complete, capitalized chat text
+                    return chatMsgRegister;
+
+                case "chattarget":
+                    // target of directed chats
+                    return chatTargetRegister;
+
+                case "ls_realmval":
+                    // value of selected realm storage register
+                    if (queriedAttr != null)
+                        return realm.GetRealmStorage(queriedAttr);
+                    else
+                        return "";
+
+            }
+
+            return null;
+        }
+
+        protected virtual void PutTextRegister(string name, string value)
+        {
+            switch (name)
+            {
+                case "pq_attr":
+                case "ls_attr":
+                    // select player attribute or realm/player storage register to query
+                    queriedAttr = value;
+                    break;
+
+                case "ls_realmval":
+                    // change value of selected realm storage register
+                    if (queriedAttr != null)
+                        realm.SetRealmStorage(queriedAttr, value);
+                    break;
+            }
+        }
+
+        #endregion
+    }
+
+    class GameInstance : Instance
+    {
+        private bool rawMode;
+        private Dictionary<int, Player> players = new Dictionary<int, Player>();
+
+        private int tagstate = 0;
+        private Player curPlayer = null;
+        private Stack<Player> prevPlayers = new Stack<Player>();
+        private StringBuilder tagParam;
+
+        private static readonly Player Announcer = new Player(-1, "*Announcer*", false);
+        private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
+
+        public GameInstance(Server server, Realm realm, Stream zfile, string name)
+            : base(server, realm, zfile, name)
+        {
+        }
+
+        protected override void OnVMFinished(bool wasTerminated)
+        {
+            curPlayer = null;
+            Player[] abandoned;
+            lock (players)
+            {
+                abandoned = new Player[players.Count];
+                players.Values.CopyTo(abandoned, 0);
+                players.Clear();
+            }
+
+            foreach (Player p in abandoned)
+                lock (p)
+                    if (p.Connection != null)
+                        p.Connection.FlushOutput();
+
+            server.InstanceFinished(this, abandoned, wasTerminated);
+        }
+
+        protected override void OnPreReadLine(Transaction curTrans)
+        {
+            prevPlayers.Clear();
+            FlushAll();
+
+            if (curTrans is DisambigHelper)
+                curPlayer = ((DisambigHelper)curTrans).Player;
+            else if (!rawMode)
+                curPlayer = null;
+        }
+
+        protected override void OnPostReadLine(ref string line, ref Transaction curTrans)
+        {
+            if (!rawMode)
+            {
+                if (line.StartsWith("$silent "))
+                {
+                    // set up a fake transaction so the output will be hidden
+                    // and the next line's output substituted instead
+                    line = line.Substring(8);
+                    curTrans = new DisambigHelper(this, line);
+                }
+                else
+                {
+                    Match m = chatRegex.Match(line);
+                    if (m.Success)
+                    {
+                        string id = m.Groups[1].Value;
+                        string type = m.Groups[2].Value;
+                        string target = m.Groups[3].Value;
+                        string msg = m.Groups[4].Value;
+                        chatTargetRegister = target;
+                        chatMsgRegister = msg;
+                        line = id + ":$" + type;
+                    }
+                }
+            }
+        }
+
+        private class DisambigHelper : Transaction
+        {
+            /// <summary>
+            /// Constructs a new DisambigHelper.
+            /// </summary>
+            /// <param name="realm">The realm where disambiguation is occurring.</param>
+            /// <param name="line">The command that will need disambiguation, starting with
+            /// the player ID and a colon.</param>
+            public DisambigHelper(GameInstance instance, string line)
+                : base("")
+            {
+                string[] parts = line.Split(':');
+                int num;
+                if (parts.Length >= 2 && int.TryParse(parts[0], out num))
+                    lock (instance.players)
+                        instance.players.TryGetValue(num, out this.Player);
+            }
+
+            public readonly Player Player;
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the realm's input and output are unfiltered.
+        /// </summary>
+        /// <remarks>
+        /// Raw mode is meant to allow existing single-player games to be played online. Raw
+        /// realms are unable to distinguish between different players, and cannot interact
+        /// with the Guncho server or other realms.  If multiple players are connected, they
+        /// will all control the same player-character and see the same output.
+        /// </remarks>
+        public bool RawMode
+        {
+            get { return rawMode; }
+            set { rawMode = value; if (value) curPlayer = Announcer; }
+        }
+
         /// <summary>
         /// Adds a player to the instance.
         /// </summary>
@@ -313,7 +708,7 @@ namespace Guncho
             if (!rawMode)
             {
                 string result = SendAndGet(string.Format("$part {0}", player.ID));
-                HandleOutput(result);
+                OnHandleOutput(result);
                 FlushAll();
             }
 
@@ -391,7 +786,7 @@ namespace Guncho
                             p.Connection.FlushOutput();
         }
 
-        private void HandleOutput(string text)
+        protected override void OnHandleOutput(string text)
         {
             foreach (char c in text)
                 HandleOutput(c);
@@ -739,7 +1134,7 @@ namespace Guncho
                 server.LogMessage(LogLevel.Warning,
                     "Illegal transfer (curPlayer is {0}) attempted from {1} to {2}.",
                     curPlayer == Announcer ? "Announcer" : "null",
-                    name, spec);
+                    this.Name, spec);
             }
             else
             {
@@ -762,6 +1157,11 @@ namespace Guncho
             }
         }
 
+        #region Server Registers (for game instances)
+
+        // for player queries
+        private Player queriedPlayer;       // pq_id
+
         private bool AllowSetPlayerAttribute(string name, string value)
         {
             // TODO: establish rules for setting player attributes
@@ -775,324 +1175,10 @@ namespace Guncho
             return false;
         }
 
-        #region RealmIO
-
-        private class RealmIO
+        protected override bool TryGetWordRegister(string name, out int value)
         {
-            private readonly Instance instance;
-            private readonly Queue<string> inputQueue = new Queue<string>();
-            private readonly Queue<Transaction> transQueue = new Queue<Transaction>();
-            private readonly Queue<string> specialResponses = new Queue<string>();
-            private readonly AutoResetEvent inputReady = new AutoResetEvent(false);
-            private Transaction curTrans;
-
-            public RealmIO(Instance instance)
-            {
-                this.instance = instance;
-            }
-
-            public void QueueInput(string line)
-            {
-                lock (inputQueue)
-                {
-                    inputQueue.Enqueue(line);
-
-                    if (inputQueue.Count == 1)
-                        inputReady.Set();
-                }
-            }
-
-            public void QueueTransaction(Transaction trans)
-            {
-                lock (transQueue)
-                {
-                    transQueue.Enqueue(trans);
-
-                    if (transQueue.Count == 1)
-                        inputReady.Set();
-                }
-            }
-
-            private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
-
-            private string GetInputLine()
-            {
-                if (specialResponses.Count > 0)
-                    return specialResponses.Dequeue();
-
-                instance.DisableWatchdog();
-
-                try
-                {
-                    instance.prevPlayers.Clear();
-                    instance.FlushAll();
-
-                    if (curTrans is DisambigHelper)
-                        instance.curPlayer = ((DisambigHelper)curTrans).Player;
-                    else if (!instance.rawMode)
-                        instance.curPlayer = null;
-
-                    // is there a previous transaction?
-                    if (curTrans != null)
-                    {
-                        // response has already been collected, so just unblock the waiting thread
-                        lock (curTrans)
-                            Monitor.Pulse(curTrans);
-
-                        curTrans = null;
-                    }
-
-                    do
-                    {
-                        // is there a transaction waiting?
-                        lock (transQueue)
-                        {
-                            if (transQueue.Count > 0)
-                            {
-                                curTrans = transQueue.Dequeue();
-                                instance.server.LogMessage(LogLevel.Spam,
-                                    "Transaction in {0}: {1}",
-                                    instance.name, curTrans.Query);
-                                return curTrans.Query;
-                            }
-                        }
-
-                        // is there a line of player input waiting?
-                        lock (inputQueue)
-                        {
-                            if (inputQueue.Count > 0)
-                            {
-                                string line = inputQueue.Dequeue();
-                                instance.server.LogMessage(LogLevel.Spam,
-                                    "Processing in {0}: {1}",
-                                    instance.name, line);
-
-                                if (!instance.rawMode)
-                                {
-                                    if (line.StartsWith("$silent "))
-                                    {
-                                        // set up a fake transaction so the output will be hidden
-                                        // and the next line's output substituted instead
-                                        line = line.Substring(8);
-                                        curTrans = new DisambigHelper(instance, line);
-                                    }
-                                    else
-                                    {
-                                        Match m = chatRegex.Match(line);
-                                        if (m.Success)
-                                        {
-                                            string id = m.Groups[1].Value;
-                                            string type = m.Groups[2].Value;
-                                            string target = m.Groups[3].Value;
-                                            string msg = m.Groups[4].Value;
-                                            instance.chatTargetRegister = target;
-                                            instance.chatMsgRegister = msg;
-                                            line = id + ":$" + type;
-                                        }
-                                    }
-                                }
-
-                                if (line.Length > MAX_LINE_LENGTH)
-                                    line = line.Substring(0, MAX_LINE_LENGTH);
-
-                                return line;
-                            }
-                        }
-
-                        // wait for input and then continue the loop
-                        inputReady.WaitOne();
-                    } while (true);
-                }
-                finally
-                {
-                    instance.ResetWatchdog();
-                }
-            }
-
-            public void FyreLineWanted(object sender, LineWantedEventArgs e)
-            {
-                e.Line = GetInputLine();
-            }
-
-            public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
-            {
-                string line;
-                do
-                {
-                    line = GetInputLine();
-                }
-                while (line == null || line.Length < 1);
-
-                e.Char = line[0];
-            }
-
-            public void FyreOutputReady(object sender, OutputReadyEventArgs e)
-            {
-                string main;
-                if (e.Package.TryGetValue(OutputChannel.Main, out main) == true)
-                {
-                    if (curTrans != null)
-                        curTrans.Response.Append(main);
-                    else
-                        instance.HandleOutput(main);
-                }
-
-                string special;
-                if (e.Package.TryGetValue(OutputChannel.Conversation, out special) && special.Length > 0)
-                {
-                    string[] parts = special.Split(new char[] { ' ' }, 3);
-                    if (parts.Length > 0)
-                    {
-                        string name = (parts.Length > 1) ? parts[1] : "";
-                        string rest = (parts.Length > 2) ? parts[2] : "";
-                        int word;
-                        int chunkSize;
-                        string str;
-
-                        switch (parts[0])
-                        {
-                            case "getword":
-                                if (instance.TryGetWordRegister(name, out word))
-                                    specialResponses.Enqueue(word.ToString());
-                                else
-                                    specialResponses.Enqueue("-1");
-                                break;
-
-                            case "gettext":
-                                str = instance.GetTextRegister(name) ?? "";
-                                specialResponses.Enqueue(str.Length.ToString());
-                                if (!int.TryParse(rest, out chunkSize))
-                                    chunkSize = str.Length;
-                                for (int offset = 0; offset < str.Length; offset += chunkSize)
-                                    specialResponses.Enqueue(
-                                        str.Substring(offset, Math.Min(chunkSize, str.Length - offset)));
-                                break;
-
-                            case "putword":
-                                if (int.TryParse(rest, out word) && instance.TryPutWordRegister(name, word))
-                                    specialResponses.Enqueue("1");
-                                else
-                                    specialResponses.Enqueue("0");
-                                break;
-
-                            case "puttext":
-                                instance.PutTextRegister(name, rest);
-                                specialResponses.Enqueue("?");
-                                break;
-                        }
-                    }
-                }
-            }
-        }
-
-        private class Transaction
-        {
-            public Transaction(string query)
-            {
-                this.Query = query;
-            }
-
-            public readonly string Query;
-            public readonly StringBuilder Response = new StringBuilder();
-        }
-
-        private class DisambigHelper : Transaction
-        {
-            /// <summary>
-            /// Constructs a new DisambigHelper.
-            /// </summary>
-            /// <param name="realm">The realm where disambiguation is occurring.</param>
-            /// <param name="line">The command that will need disambiguation, starting with
-            /// the player ID and a colon.</param>
-            public DisambigHelper(Instance instance, string line)
-                : base("")
-            {
-                string[] parts = line.Split(':');
-                int num;
-                if (parts.Length >= 2 && int.TryParse(parts[0], out num))
-                    lock (instance.players)
-                        instance.players.TryGetValue(num, out this.Player);
-            }
-
-            public readonly Player Player;
-        }
-
-        #endregion
-
-        #region Server Registers
-
-        // for working with text registers
-        private int strRegPtr;
-        private StringBuilder strRegister;  // txtl, txtd
-        private string strRegName;          // txtn
-
-        // for player queries
-        private Player queriedPlayer;       // pq_id
-        private string queriedAttr;         // pq_attr
-
-        // word registers available to the game
-        private int timerInterval;          // rteinterval
-
-        // text registers available to the game
-        private string chatMsgRegister;     // chatmsg
-        private string chatTargetRegister;  // chattarget
-
-        private bool TryGetWordRegister(string name, out int value)
-        {
-            DateTime dt;
-
             switch (name)
             {
-                case "timeq":
-                    // time in quarts (15-second intervals)
-                    dt = DateTime.Now;
-                    value = (dt.Hour * 60 + dt.Minute) * 4 + (dt.Second / 15);
-                    return true;
-
-                case "timehm":
-                    // time as hhmm
-                    dt = DateTime.Now;
-                    value = (dt.Hour * 100) + dt.Minute;
-                    return true;
-
-                case "times":
-                    // seconds past the minute
-                    dt = DateTime.Now;
-                    value = dt.Second;
-                    return true;
-
-                case "datemd":
-                    // date as mmdd
-                    dt = DateTime.Now;
-                    value = (dt.Month * 100) + dt.Day;
-                    return true;
-
-                case "datey":
-                    // year
-                    dt = DateTime.Now;
-                    value = dt.Year;
-                    return true;
-
-                case "datedow":
-                    // day of the week (0 = Sunday)
-                    dt = DateTime.Now;
-                    value = (int)dt.DayOfWeek;
-                    return true;
-
-                case "txtl":
-                    // text register length
-                    if (strRegister == null && strRegName != null)
-                    {
-                        string text = GetTextRegister(strRegName);
-                        if (text != null)
-                            strRegister = new StringBuilder(text);
-                    }
-                    if (strRegister == null)
-                        value = 0;
-                    else
-                        value = strRegister.Length;
-                    return true;
-
                 case "pq_id":
                 case "ls_playerid":
                     // ID for player queries
@@ -1101,57 +1187,30 @@ namespace Guncho
                     else
                         value = queriedPlayer.ID;
                     return true;
-
-                case "rteinterval":
-                    // real-time event timer interval
-                    value = timerInterval;
-                    return true;
-
-                default:
-                    value = 0;
-                    return false;
             }
+
+            return base.TryGetWordRegister(name, out value);
         }
 
-        private bool TryPutWordRegister(string name, int value)
+        protected override bool TryPutWordRegister(string name, int value)
         {
             switch (name)
             {
-                case "txtl":
-                    // declare length of incoming text
-                    strRegPtr = 0;
-                    strRegister = new StringBuilder(value);
-                    return true;
-
                 case "pq_id":
                 case "ls_playerid":
                     // select player to query
                     lock (players)
                         players.TryGetValue(value, out queriedPlayer);
                     break;
-
-                case "rteinterval":
-                    // change real-time event timer interval
-                    timerInterval = value;
-                    server.SetEventInterval(this, value);
-                    break;
             }
 
-            return false;
+            return base.TryPutWordRegister(name, value);
         }
 
-        private string GetTextRegister(string name)
+        protected override string GetTextRegister(string name)
         {
             switch (name)
             {
-                case "chatmsg":
-                    // complete, capitalized chat text
-                    return chatMsgRegister;
-
-                case "chattarget":
-                    // target of directed chats
-                    return chatTargetRegister;
-
                 case "pq_attrval":
                     // value of selected player attribute
                     if (queriedPlayer != null && queriedAttr != null)
@@ -1159,7 +1218,7 @@ namespace Guncho
                         switch (queriedAttr)
                         {
                             case "accesslevel":
-                                return realm.GetAccessLevel(queriedPlayer).ToString();
+                                return this.Realm.GetAccessLevel(queriedPlayer).ToString();
 
                             case "idletime":
                                 lock (queriedPlayer)
@@ -1175,34 +1234,21 @@ namespace Guncho
                     }
                     return null;
 
-                case "ls_realmval":
-                    // value of selected realm storage register
-                    if (queriedAttr != null)
-                        return realm.GetRealmStorage(queriedAttr);
-                    else
-                        return "";
-
                 case "ls_playerval":
                     // value of selected player storage register
                     if (queriedPlayer != null && queriedAttr != null)
-                        return realm.GetPlayerStorage(queriedPlayer, queriedAttr);
+                        return this.Realm.GetPlayerStorage(queriedPlayer, queriedAttr);
                     else
                         return "";
             }
 
-            return null;
+            return base.GetTextRegister(name);
         }
 
-        private void PutTextRegister(string name, string value)
+        protected override void PutTextRegister(string name, string value)
         {
             switch (name)
             {
-                case "pq_attr":
-                case "ls_attr":
-                    // select player attribute or realm/player storage register to query
-                    queriedAttr = value;
-                    break;
-
                 case "pq_attrval":
                     // change value of selected player attribute
                     if (queriedPlayer != null && queriedAttr != null &&
@@ -1213,112 +1259,44 @@ namespace Guncho
                     }
                     break;
 
-                case "ls_realmval":
-                    // change value of selected realm storage register
-                    if (queriedAttr != null)
-                        realm.SetRealmStorage(queriedAttr, value);
-                    break;
-
                 case "ls_playerval":
                     // change value of selected player storage register
                     if (queriedPlayer != null && queriedAttr != null)
-                        realm.SetPlayerStorage(queriedPlayer, queriedAttr, value);
-                    break;
-            }
-        }
-
-        private bool TryGetBlockRegister(string name, int size, out byte[] block)
-        {
-            switch (name)
-            {
-                case "txtd":
-                    // text register data
-                    if (strRegister != null)
-                    {
-                        int count = Math.Min(size, strRegister.Length - strRegPtr);
-                        block = new byte[count];
-                        Encoding.ASCII.GetBytes(strRegister.ToString(), strRegPtr, count, block, 0);
-                        strRegPtr += count;
-                        if (strRegPtr >= strRegister.Length)
-                        {
-                            strRegName = null;
-                            strRegister = null;
-                            strRegPtr = 0;
-                        }
-                        return true;
-                    }
+                        this.Realm.SetPlayerStorage(queriedPlayer, queriedAttr, value);
                     break;
             }
 
-            block = null;
-            return false;
-        }
-
-        private void PutRegister(string name, byte[] block)
-        {
-            if (block.Length == 2)
-            {
-                ushort value = (ushort)((block[0] << 8) + block[1]);
-                if (TryPutWordRegister(name, value))
-                    return;
-            }
-
-            switch (name)
-            {
-                case "txtn":
-                    // text register name
-                    strRegName = Encoding.ASCII.GetString(block);
-                    strRegister = null;
-                    strRegPtr = 0;
-                    break;
-
-                case "txtd":
-                    // text register data
-                    if (strRegister != null)
-                    {
-                        strRegister.Append(Encoding.ASCII.GetString(block));
-                        if (strRegister.Length >= strRegister.Capacity)
-                        {
-                            PutTextRegister(strRegName, strRegister.ToString());
-                            strRegName = null;
-                            strRegister = null;
-                            strRegPtr = 0;
-                        }
-                    }
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// A <see cref="MemoryStream"/> that runs a delegate when it fills up.
-        /// </summary>
-        private class ReactiveMemoryStream : MemoryStream
-        {
-            private int fillLength;
-            private EventHandler whenFilled;
-
-            public ReactiveMemoryStream(int size, EventHandler whenFilled)
-                : base(size)
-            {
-                this.fillLength = size;
-                this.whenFilled = whenFilled;
-            }
-
-            public ReactiveMemoryStream(byte[] buffer, EventHandler whenFilled)
-                : base(buffer)
-            {
-                this.fillLength = buffer.Length;
-                this.whenFilled = whenFilled;
-            }
-
-            public override void Write(byte[] buffer, int offset, int count)
-            {
-                base.Write(buffer, offset, count);
-                if (this.Position >= fillLength && whenFilled != null)
-                    whenFilled(this, EventArgs.Empty);
-            }
+            base.PutTextRegister(name, value);
         }
 
         #endregion
+    }
+
+    class BotInstance : Instance
+    {
+        public BotInstance(Server server, Realm realm, Stream zfile, string name)
+            : base(server, realm, zfile, name)
+        {
+        }
+
+        protected override void OnVMFinished(bool wasTerminated)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override void OnPreReadLine(Transaction curTrans)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override void OnPostReadLine(ref string line, ref Transaction curTrans)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override void OnHandleOutput(string text)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

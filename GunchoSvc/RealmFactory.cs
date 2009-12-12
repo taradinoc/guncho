@@ -27,6 +27,7 @@ namespace Guncho
         }
 
         public abstract string SourceFileExtension { get; }
+        public abstract Type InstanceType { get; }
         public abstract string GetInitialSourceText(string ownerName, string realmName);
         public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
 
@@ -38,7 +39,7 @@ namespace Guncho
         public Instance LoadInstance(Realm realm, string name)
         {
             FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
-            return new Instance(server, realm, stream, name);
+            return (Instance)Activator.CreateInstance(InstanceType, server, realm, stream, name);
         }
 
         protected static string MakeUUID(string realmName)
@@ -182,6 +183,11 @@ namespace Guncho
             get { return ".ni"; }
         }
 
+        public override Type InstanceType
+        {
+            get { return typeof(GameInstance); }
+        }
+
         public override string GetInitialSourceText(string ownerName, string realmName)
         {
             StringBuilder sb = new StringBuilder(100);
@@ -308,7 +314,5 @@ namespace Guncho
                 }
             }
         }
-
-
     }
 }

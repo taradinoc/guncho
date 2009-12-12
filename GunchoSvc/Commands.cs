@@ -236,7 +236,7 @@ namespace Guncho
                 return;
             }
 
-            Instance inst = GetDefaultInstance(dest);
+            GameInstance inst = GetDefaultInstance(dest);
             inst.Activate();
 
             string check = inst.SendAndGet("$knock default");

@@ -656,7 +656,7 @@ namespace Guncho
             return result;
         }
 
-        private Instance GetDefaultInstance(Realm realm)
+        private GameInstance GetDefaultInstance(Realm realm)
         {
             lock (instances)
             {
@@ -665,17 +665,17 @@ namespace Guncho
                 if (inst == null)
                     inst = LoadInstance(realm, realm.Name);
 
-                return inst;
+                return inst as GameInstance;
             }
         }
 
-        private Instance[] GetAllInstances(Realm realm)
+        private GameInstance[] GetAllInstances(Realm realm)
         {
-            List<Instance> result = new List<Instance>();
+            List<GameInstance> result = new List<GameInstance>();
 
             lock (instances)
             {
-                foreach (Instance inst in instances.Values)
+                foreach (GameInstance inst in instances.Values)
                     if (inst.Realm == realm)
                         result.Add(inst);
             }
@@ -740,12 +740,19 @@ namespace Guncho
                     if (original == null)
                         throw new ArgumentException("No such realm", "toName");
 
-                    Instance[] origInstances = GetAllInstances(original);
-                    Instance[] replcInstances = GetAllInstances(replacement);
+                    // can't replace a game realm with a non-game realm or vice versa
+                    bool origBot = original.Factory.InstanceType.IsSubclassOf(typeof(GameInstance));
+                    bool replcBot = replacement.Factory.InstanceType.IsSubclassOf(typeof(GameInstance));
+
+                    if (origBot != replcBot)
+                        throw new ArgumentException("Cannot replace game realm with non-game realm or vice versa");
+
+                    GameInstance[] origInstances = GetAllInstances(original);
+                    GameInstance[] replcInstances = GetAllInstances(replacement);
                     var saved = new Dictionary<string, Dictionary<Player, string>>();
 
                     // extract players from running original instances
-                    foreach (Instance inst in origInstances)
+                    foreach (GameInstance inst in origInstances)
                     {
                         var dict = new Dictionary<Player, string>();
                         saved.Add(inst.Name, dict);
@@ -757,7 +764,7 @@ namespace Guncho
 
                     // there shouldn't be any players in replacement instances, but
                     // if there are for some reason, dump them in the new default instance
-                    foreach (Instance inst in replcInstances)
+                    foreach (GameInstance inst in replcInstances)
                     {
                         Dictionary<Player, string> dict;
                         if (saved.TryGetValue(toName, out dict) == false)
@@ -809,7 +816,7 @@ namespace Guncho
 
                         foreach (var instPair in saved)
                         {
-                            Instance inst = LoadInstance(newRealm, instPair.Key);
+                            GameInstance inst = (GameInstance)LoadInstance(newRealm, instPair.Key);
                             foreach (KeyValuePair<Player, string> pair in instPair.Value)
                             {
                                 lock (pair.Key)
@@ -825,7 +832,7 @@ namespace Guncho
                     {
                         LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
-                        Instance startInst = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+                        GameInstance startInst = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
                         foreach (Dictionary<Player, string> positions in saved.Values)
                             foreach (KeyValuePair<Player, string> pair in positions)
                             {
@@ -986,8 +993,8 @@ namespace Guncho
             }
 
             // close all instances
-            Instance startInstance = GetDefaultInstance(startRealm);
-            foreach (Instance inst in GetAllInstances(realm))
+            GameInstance startInstance = GetDefaultInstance(startRealm);
+            foreach (GameInstance inst in GetAllInstances(realm))
             {
                 if (inst.IsActive)
                 {
@@ -1503,7 +1510,7 @@ namespace Guncho
             }
 #endif
 
-            Instance initialRealm = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+            GameInstance initialRealm = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
 
             foreach (Player p in abandonedPlayers)
             {
@@ -1557,19 +1564,19 @@ namespace Guncho
             return result;
         }
 
-        private void EnterInstance(Player player, Instance realm)
+        private void EnterInstance(Player player, GameInstance realm)
         {
             EnterInstance(player, realm, null, false);
         }
 
-        private void EnterInstance(Player player, Instance realm, string position)
+        private void EnterInstance(Player player, GameInstance realm, string position)
         {
             EnterInstance(player, realm, position, false);
         }
 
-        private void EnterInstance(Player player, Instance instance, string position, bool traveling)
+        private void EnterInstance(Player player, GameInstance instance, string position, bool traveling)
         {
-            Instance prevRealm;
+            GameInstance prevRealm;
             lock (player)
             {
                 prevRealm = player.Instance;
@@ -1630,7 +1637,7 @@ namespace Guncho
                 token = spec.Substring(0, idx);
             }
 
-            Instance dest = GetInstance(instanceName);
+            GameInstance dest = GetInstance(instanceName) as GameInstance;
             if (dest != null)
             {
                 if (dest == player.Instance)
