@@ -162,7 +162,7 @@ namespace Guncho
         }
     }
 
-    class InformRealmFactory : RealmFactory
+    abstract class InformRealmFactory : RealmFactory
     {
         private readonly string niCompilerPath, niExtensionDir;
         private readonly string infCompilerPath, infLibraryDir;
@@ -181,30 +181,6 @@ namespace Guncho
         public override string SourceFileExtension
         {
             get { return ".ni"; }
-        }
-
-        public override Type InstanceType
-        {
-            get { return typeof(GameInstance); }
-        }
-
-        public override string GetInitialSourceText(string ownerName, string realmName)
-        {
-            StringBuilder sb = new StringBuilder(100);
-
-            sb.Append('"'); sb.Append(realmName); sb.Append('"');
-            if (ownerName != null && ownerName.Length > 0)
-            {
-                sb.Append(" by ");
-                sb.Append(ownerName);
-            }
-            sb.AppendLine();
-
-            sb.AppendLine();
-            sb.AppendLine("[TODO: Replace this with your own Inform 7 code.]");
-            sb.AppendLine("Home is a room.");
-
-            return sb.ToString();
         }
 
         public override RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile)
@@ -313,6 +289,74 @@ namespace Guncho
                     return RealmEditingOutcome.NiError;
                 }
             }
+        }
+    }
+
+    class InformGameRealmFactory : InformRealmFactory
+    {
+        public InformGameRealmFactory(Server server, string name,
+            string niCompilerPath, string niExtensionDir,
+            string infCompilerPath, string infLibraryDir)
+            : base(server, name, niCompilerPath, niExtensionDir, infCompilerPath, infLibraryDir)
+        {
+        }
+
+        public override Type InstanceType
+        {
+            get { return typeof(GameInstance); }
+        }
+
+        public override string GetInitialSourceText(string ownerName, string realmName)
+        {
+            StringBuilder sb = new StringBuilder(100);
+
+            sb.Append('"'); sb.Append(realmName); sb.Append('"');
+            if (ownerName != null && ownerName.Length > 0)
+            {
+                sb.Append(" by ");
+                sb.Append(ownerName);
+            }
+            sb.AppendLine();
+
+            sb.AppendLine();
+            sb.AppendLine("[TODO: Replace this with your own Inform 7 code.]");
+            sb.AppendLine("Home is a room.");
+
+            return sb.ToString();
+        }
+    }
+
+    class InformBotRealmFactory : InformRealmFactory
+    {
+        public InformBotRealmFactory(Server server, string name,
+            string niCompilerPath, string niExtensionDir,
+            string infCompilerPath, string infLibraryDir)
+            : base(server, name, niCompilerPath, niExtensionDir, infCompilerPath, infLibraryDir)
+        {
+        }
+
+        public override Type InstanceType
+        {
+            get { return typeof(BotInstance); }
+        }
+
+        public override string GetInitialSourceText(string ownerName, string realmName)
+        {
+            StringBuilder sb = new StringBuilder(100);
+
+            sb.Append('"'); sb.Append(realmName); sb.Append('"');
+            if (ownerName != null && ownerName.Length > 0)
+            {
+                sb.Append(" by ");
+                sb.Append(ownerName);
+            }
+            sb.AppendLine();
+
+            sb.AppendLine();
+            sb.AppendLine("[TODO: Replace this with your own Inform 7 code.]");
+            sb.AppendLine("BotNameHere is a bot.");
+
+            return sb.ToString();
         }
     }
 }

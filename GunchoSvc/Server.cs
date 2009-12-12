@@ -278,16 +278,28 @@ namespace Guncho
                 {
                     string version = Path.GetFileName(subPath);
 
-                    RealmFactory factory = new InformRealmFactory(this, version,
-                        Path.Combine(subPath, @"Compilers\ni.exe"),
-                        Path.Combine(subPath, @"Inform7\Extensions"),
-                        Path.Combine(subPath, @"Compilers\inform-631.exe"),
-                        Path.Combine(subPath, @"Library\Natural"));
+                    string niCompilerPath = Path.Combine(subPath, @"Compilers\ni.exe");
+                    string niExtensionDir = Path.Combine(subPath, @"Inform7\Extensions");
+                    string infCompilerPath = Path.Combine(subPath, @"Compilers\inform-631.exe");
+                    string infLibraryDir = Path.Combine(subPath, @"Library\Natural");
+
+                    // game factory
+                    RealmFactory factory = new InformGameRealmFactory(this, version,
+                        niCompilerPath, niExtensionDir, infCompilerPath, infLibraryDir);
 
                     if (defaultFactory == null || version.CompareTo(defaultFactory) < 0)
                         defaultFactory = version;
 
                     factories.Add(version, factory);
+
+                    // bot factory
+                    niExtensionDir = Path.Combine(subPath, @"Inform7\BotExtensions");
+                    if (Directory.Exists(niExtensionDir))
+                    {
+                        factory = new InformBotRealmFactory(this, version + " (bot)",
+                            niCompilerPath, niExtensionDir, infCompilerPath, infLibraryDir);
+                        factories.Add(version, factory);
+                    }
                 }
             }
 
