@@ -719,7 +719,8 @@ namespace Guncho
             }
 
             if (!rawMode)
-                QueueInput(string.Format("$join {0}={1}{2}",
+                QueueInput(string.Format("${0} {1}={2}{3}",
+                    (player is BotPlayer) ? "botjoin" : "join",
                     player.Name,
                     id,
                     position == null ? "" : "," + position));
@@ -1323,6 +1324,8 @@ namespace Guncho
 
     class BotInstance : Instance
     {
+        private readonly Dictionary<int, BotPlayer> bots = new Dictionary<int, BotPlayer>();
+
         public BotInstance(Server server, Realm realm, Stream zfile, string name)
             : base(server, realm, zfile, name)
         {
@@ -1343,9 +1346,66 @@ namespace Guncho
             throw new NotImplementedException();
         }
 
+        private static string GetToken(char sep, ref string text)
+        {
+            int idx = text.IndexOf(sep);
+
+            string result;
+            if (idx == -1)
+            {
+                result = text;
+                text = string.Empty;
+            }
+            else
+            {
+                result = text.Substring(0, idx);
+                text = text.Substring(idx + 1);
+            }
+
+            return result;
+        }
+
         protected override void OnHandleOutput(string text)
         {
-            throw new NotImplementedException();
+            while (text.Length > 0)
+            {
+                // split off a line
+                string line = GetToken('\n', ref text);
+                if (line.EndsWith("\r"))
+                    line = line.Substring(0, line.Length - 1);
+
+                // split off the first word
+                string word = GetToken(' ', ref line);
+                switch (word)
+                {
+                    case "$register":
+                        switch (GetToken(' ', ref line))
+                        {
+                            case "action":
+                                //XXX
+                                break;
+                            case "kind":
+                                //XXX
+                                break;
+                            case "prop":
+                                //XXX
+                                break;
+                        }
+                        break;
+                    case "$hello":
+                        //XXX
+                        break;
+                    case "$goodbye":
+                        //XXX
+                        break;
+                    case "$connect":
+                        //XXX
+                        break;
+                    case "$action":
+                        //XXX
+                        break;
+                }
+            }
         }
     }
 }

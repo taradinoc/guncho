@@ -87,29 +87,24 @@ namespace Guncho
             // nada
         }
 
-        public virtual void Write(char c)
+        public abstract void Write(char c);
+        public abstract void Write(string text);
+
+        public void WriteLine()
         {
-            // nada
+            Write("\r\n");
         }
 
-        public virtual void Write(string text)
+        public void WriteLine(string text)
         {
-            // nada
+            Write(text);
+            WriteLine();
         }
 
-        public virtual void WriteLine()
+        public void WriteLine(string format, params object[] args)
         {
-            // nada
-        }
-
-        public virtual void WriteLine(string text)
-        {
-            // nada
-        }
-
-        public virtual void WriteLine(string format, params object[] args)
-        {
-            // nada
+            Write(string.Format(format, args));
+            WriteLine();
         }
     }
 
@@ -240,27 +235,6 @@ namespace Guncho
                 if (conn != null)
                     conn.Write(text);
         }
-
-        public override void WriteLine()
-        {
-            lock (this)
-                if (conn != null)
-                    conn.WriteLine();
-        }
-
-        public override void WriteLine(string text)
-        {
-            lock (this)
-                if (conn != null)
-                    conn.WriteLine(text);
-        }
-
-        public override void WriteLine(string format, params object[] args)
-        {
-            lock (this)
-                if (conn != null)
-                    conn.WriteLine(format, args);
-        }
     }
 
     class DummyPlayer : Player
@@ -273,6 +247,16 @@ namespace Guncho
         public override string LogName
         {
             get { return Name + " (dummy)"; }
+        }
+
+        public override void Write(char c)
+        {
+            // nada
+        }
+
+        public override void Write(string text)
+        {
+            // nada
         }
     }
 
@@ -301,6 +285,16 @@ namespace Guncho
         public override IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
         {
             return base.GetAllAttributes();
+        }
+
+        public override void Write(char c)
+        {
+            // nada
+        }
+
+        public override void Write(string text)
+        {
+            // nada
         }
     }
 }
