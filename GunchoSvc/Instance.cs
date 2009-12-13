@@ -18,6 +18,7 @@ namespace Guncho
         private readonly string name;
 
         private Engine vm;
+        private TranslationMap actionMap, kindMap, propMap;
 
         private bool needReset;
         private bool restartRequested;
@@ -177,6 +178,11 @@ namespace Guncho
                         vm.LineWanted += io.FyreLineWanted;
                     }
 
+                    actionMap = new TranslationMap();
+                    kindMap = new TranslationMap();
+                    propMap = new TranslationMap();
+
+                    QueueTransaction(new RealmGreeting());
                     vm.Run();
                 }
                 finally
@@ -191,6 +197,10 @@ namespace Guncho
                     }
 
                     OnVMFinished(wasTerminated);
+
+                    actionMap = null;
+                    kindMap = null;
+                    propMap = null;
                 }
             }
             catch (Exception ex)
@@ -230,6 +240,15 @@ namespace Guncho
         public void QueueInput(string line)
         {
             io.QueueInput(line);
+        }
+
+        /// <summary>
+        /// Adds a <see cref="Transaction"/> to the instance's input queue.
+        /// </summary>
+        /// <param name="trans">The transaction.</param>
+        protected void QueueTransaction(Transaction trans)
+        {
+            io.QueueTransaction(trans);
         }
 
         /// <summary>
@@ -304,9 +323,12 @@ namespace Guncho
                     // is there a previous transaction?
                     if (curTrans != null)
                     {
-                        // response has already been collected, so just unblock the waiting thread
+                        // response has already been collected, so just notify the waiting thread
                         lock (curTrans)
+                        {
+                            curTrans.OnFinished(instance);
                             Monitor.Pulse(curTrans);
+                        }
 
                         curTrans = null;
                     }
@@ -440,6 +462,24 @@ namespace Guncho
 
             public readonly string Query;
             public readonly StringBuilder Response = new StringBuilder();
+
+            public virtual void OnFinished(Instance instance)
+            {
+                // nada
+            }
+        }
+
+        private class RealmGreeting : Transaction
+        {
+            public RealmGreeting()
+                : base("$hello")
+            {
+            }
+
+            public override void OnFinished(Instance instance)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         #endregion
@@ -566,6 +606,31 @@ namespace Guncho
         }
 
         #endregion
+
+        protected class TranslationMap
+        {
+            private readonly Dictionary<int, string> names = new Dictionary<int, string>();
+            private readonly Dictionary<string, int> values = new Dictionary<string, int>();
+
+            public void Add(string name, int value)
+            {
+                names[value] = name;
+                values[name] = value;
+            }
+
+            public int? Translate(int value, TranslationMap toMap)
+            {
+                string name;
+                if (names.TryGetValue(value, out name) == false)
+                    return null;
+
+                int result;
+                if (toMap.values.TryGetValue(name, out result) == false)
+                    return null;
+
+                return result;
+            }
+        }
     }
 
     class GameInstance : Instance
@@ -685,11 +750,20 @@ namespace Guncho
             set { rawMode = value; if (value) curPlayer = Announcer; }
         }
 
-        public void QueueInput(Player player, string line, bool silent)
+        /// <summary>
+        /// Constructs a line of input by combining a player ID with the player's
+        /// command, and adds it to the queue.
+        /// </summary>
+        /// <param name="player">The player sending the command, who must have
+        /// already been added with <see cref="AddPlayer"/>.</param>
+        /// <param name="command">The player's command.</param>
+        /// <param name="silent"><b>true</b> if the command's output should be
+        /// suppressed.</param>
+        public void QueueInput(Player player, string command, bool silent)
         {
             if (rawMode)
             {
-                QueueInput(line);
+                QueueInput(command);
             }
             else
             {
@@ -697,7 +771,7 @@ namespace Guncho
                     string.Format("{0}{1}:{2}",
                         silent ? "$silent " : "",
                         playerIDs[player],
-                        line));
+                        command));
             }
         }
 
@@ -1382,30 +1456,65 @@ namespace Guncho
                         switch (GetToken(' ', ref line))
                         {
                             case "action":
-                                //XXX
+                                RegisterAction(line);
                                 break;
                             case "kind":
-                                //XXX
+                                RegisterKind(line);
                                 break;
                             case "prop":
-                                //XXX
+                                RegisterProperty(line);
                                 break;
                         }
                         break;
-                    case "$hello":
-                        //XXX
+                    case "$addbot":
+                        AddBot(line);
                         break;
-                    case "$goodbye":
-                        //XXX
+                    case "$delbot":
+                        RemoveBot(line);
                         break;
                     case "$connect":
-                        //XXX
+                        ConnectBot(line);
                         break;
                     case "$action":
-                        //XXX
+                        SendBotAction(line);
                         break;
                 }
             }
+        }
+
+        private void SendBotAction(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void ConnectBot(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void RemoveBot(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void AddBot(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void RegisterProperty(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void RegisterKind(string line)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void RegisterAction(string line)
+        {
+            throw new NotImplementedException();
         }
     }
 }
