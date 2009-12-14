@@ -18,7 +18,6 @@ namespace Guncho
         private readonly string name;
 
         private Engine vm;
-        private TranslationMap actionMap, kindMap, propMap;
 
         private bool needReset;
         private bool restartRequested;
@@ -31,10 +30,16 @@ namespace Guncho
         private const int MAX_LINE_LENGTH = 120;
         private const double WATCHDOG_SECONDS = 10.0;
 
-        protected abstract void OnVMFinished(bool wasTerminated);
-        protected abstract void OnPreReadLine(Transaction curTrans);
-        protected abstract void OnPostReadLine(ref string line, ref Transaction curTrans);
+        protected virtual void OnPreReadLine(Transaction curTrans)
+        {
+            // nada
+        }
+        protected virtual void OnPostReadLine(ref string line, ref Transaction curTrans)
+        {
+            // nada
+        }
         protected abstract void OnHandleOutput(string text);
+        protected abstract void OnVMFinished(bool wasTerminated);
 
         /// <summary>
         /// Creates an new playable instance of a realm.
@@ -179,6 +184,7 @@ namespace Guncho
                     }
 
                     actionMap = new TranslationMap();
+                    actionInfos = new Dictionary<int, ActionInfo>();
                     kindMap = new TranslationMap();
                     propMap = new TranslationMap();
 
@@ -199,6 +205,7 @@ namespace Guncho
                     OnVMFinished(wasTerminated);
 
                     actionMap = null;
+                    actionInfos = null;
                     kindMap = null;
                     propMap = null;
                 }
@@ -607,6 +614,54 @@ namespace Guncho
 
         #endregion
 
+        #region Action/Kind/Property Translation
+
+        // these should really just be protected, but C# won't allow one subclass
+        // to access another subclass's protected members (CS1540).
+
+        protected TranslationMap actionMap, kindMap, propMap;
+        protected Dictionary<int, ActionInfo> actionInfos;
+
+        /* These static methods work around a seemingly pointless restriction
+         * in the CLR: in a derived type, protected instance members from the
+         * base may only be accessed through an expression of the derived type
+         * (or one of its subclasses). The compiler will flag error CS1540 if a
+         * method in BotInstance accesses GameInstance.actionMap, even though
+         * both classes inherit it from the same base. */
+        protected static TranslationMap GetActionMap(Instance inst)
+        {
+            return inst.actionMap;
+        }
+
+        protected static TranslationMap GetKindMap(Instance inst)
+        {
+            return inst.kindMap;
+        }
+
+        protected static TranslationMap GetPropMap(Instance inst)
+        {
+            return inst.propMap;
+        }
+
+        protected static Dictionary<int, ActionInfo> GetActionInfos(Instance inst)
+        {
+            return inst.actionInfos;
+        }
+
+        protected enum ArgType
+        {
+            Omitted,
+            Boolean,
+            Number,
+            Object,
+            Text,
+        }
+
+        protected struct ActionInfo
+        {
+            public ArgType ArgType1, ArgType2;
+        }
+
         protected class TranslationMap
         {
             private readonly Dictionary<int, string> names = new Dictionary<int, string>();
@@ -631,6 +686,8 @@ namespace Guncho
                 return result;
             }
         }
+
+        #endregion
     }
 
     class GameInstance : Instance
@@ -775,6 +832,32 @@ namespace Guncho
             }
         }
 
+        /// <summary>
+        /// Constructs a special input command by combining a bot's player ID,
+        /// an action number, and action arguments, processes it, and returns
+        /// the game's output.
+        /// </summary>
+        /// <param name="bot">The player attempting the action.</param>
+        /// <param name="actnum">The action number.</param>
+        /// <param name="arg1">The first action argument, or "$" if the first argument is text.</param>
+        /// <param name="arg2">The second action argument, or "$" if the second argument is text.</param>
+        /// <param name="line">The text of the first or second action argument, or <b>null</b> if
+        /// neither is text.</param>
+        public string RunBotAction(BotPlayer bot, int actnum, string arg1, string arg2, string line)
+        {
+            if (rawMode)
+                throw new InvalidOperationException("Bot actions not supported in raw mode");
+
+            return SendAndGet(
+                string.Format("$action {0} {1} {2} {3}{4}{5}",
+                    playerIDs[bot],
+                    actnum,
+                    arg1,
+                    arg2,
+                    line == null ? "" : " ",
+                    line ?? ""));
+        }
+        
         /// <summary>
         /// Adds a player to the instance.
         /// </summary>
@@ -1399,6 +1482,7 @@ namespace Guncho
     class BotInstance : Instance
     {
         private readonly Dictionary<int, BotPlayer> bots = new Dictionary<int, BotPlayer>();
+        private readonly Dictionary<BotPlayer, int> botIDs = new Dictionary<BotPlayer, int>();
 
         public BotInstance(Server server, Realm realm, Stream zfile, string name)
             : base(server, realm, zfile, name)
@@ -1407,17 +1491,11 @@ namespace Guncho
 
         protected override void OnVMFinished(bool wasTerminated)
         {
-            throw new NotImplementedException();
-        }
+            foreach (BotPlayer bot in bots.Values)
+                server.DisconnectBot(bot);
 
-        protected override void OnPreReadLine(Transaction curTrans)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override void OnPostReadLine(ref string line, ref Transaction curTrans)
-        {
-            throw new NotImplementedException();
+            bots.Clear();
+            botIDs.Clear();
         }
 
         private static string GetToken(char sep, ref string text)
@@ -1484,37 +1562,144 @@ namespace Guncho
 
         private void SendBotAction(string line)
         {
+            // id num arg1 arg2 [text]
+            string word, arg1, arg2;
+            int id, actnum;
+
+            word = GetToken(' ', ref line);
+            if (!int.TryParse(word, out id))
+                return;
+
+            BotPlayer bot;
+            if (!bots.TryGetValue(id, out bot))
+                return;
+
+            lock (bot)
+            {
+                if (bot.Instance == null)
+                    return;
+
+                word = GetToken(' ', ref line);
+                if (!int.TryParse(word, out actnum))
+                    return;
+
+                int? foreignActNum = actionMap.Translate(actnum, GetActionMap(bot.Instance));
+
+                ActionInfo info;
+                if (!actionInfos.TryGetValue(actnum, out info))
+                    return;
+
+                arg1 = GetToken(' ', ref line);
+                if (!ValidateActionArg(arg1, info.ArgType1))
+                    return;
+
+                arg2 = GetToken(' ', ref line);
+                if (!ValidateActionArg(arg2, info.ArgType2))
+                    return;
+
+                if (info.ArgType1 != ArgType.Text && info.ArgType2 != ArgType.Text)
+                    line = null;
+
+                bot.Instance.RunBotAction(bot, actnum, arg1, arg2, line);
+            }
+        }
+
+        private bool ValidateActionArg(string arg1, ArgType argType)
+        {
             throw new NotImplementedException();
         }
 
         private void ConnectBot(string line)
         {
-            throw new NotImplementedException();
+            // id spec
+            string word = GetToken(' ', ref line);
+            int id;
+
+            if (int.TryParse(word, out id) && bots.ContainsKey(id))
+            {
+                BotPlayer player = bots[id];
+                server.TransferPlayer(player, line);
+            }
         }
 
         private void RemoveBot(string line)
         {
-            throw new NotImplementedException();
+            // id
+            int id;
+            if (int.TryParse(line, out id) && bots.ContainsKey(id))
+            {
+                BotPlayer player = bots[id];
+                bots.Remove(id);
+                botIDs.Remove(player);
+                server.DisconnectBot(player);
+            }
         }
 
         private void AddBot(string line)
         {
-            throw new NotImplementedException();
+            // id name
+            string word = GetToken(' ', ref line);
+            int id;
+
+            if (int.TryParse(word, out id) && ValidBotName(line) &&
+                !bots.ContainsKey(id))
+            {
+                BotPlayer player = new BotPlayer(this, line);
+                bots.Add(id, player);
+                botIDs.Add(player, id);
+            }
+        }
+
+        private static bool ValidBotName(string name)
+        {
+            return (name.Length <= 32) && (name.Trim() == name);
         }
 
         private void RegisterProperty(string line)
         {
-            throw new NotImplementedException();
+            // num type name
+            // ... but we actually treat type+name as the name
+            string word = GetToken(' ', ref line);
+            int num;
+
+            if (int.TryParse(word, out num))
+                propMap.Add(line, num);
         }
 
         private void RegisterKind(string line)
         {
-            throw new NotImplementedException();
+            // num name
+            string word = GetToken(' ', ref line);
+            int num;
+
+            if (int.TryParse(word, out num))
+                kindMap.Add(line, num);
         }
 
         private void RegisterAction(string line)
         {
-            throw new NotImplementedException();
+            // num type1 type2 name
+            // ... but we actually treat type1+type2+name as the name
+            string word = GetToken(' ', ref line);
+            int num;
+
+            if (int.TryParse(word, out num))
+            {
+                //XXX add types to actionInfos
+                throw new NotImplementedException();
+
+                actionMap.Add(line, num);
+            }
+        }
+
+        internal void ReceiveLine(BotPlayer bot, string line)
+        {
+            int id;
+            if (botIDs.TryGetValue(bot, out id))
+            {
+                //XXX
+                throw new NotImplementedException();
+            }
         }
     }
 }

@@ -262,9 +262,14 @@ namespace Guncho
 
     class BotPlayer : Player
     {
-        public BotPlayer(string name)
+        private readonly BotInstance instance;
+        private readonly StringBuilder buffer = new StringBuilder();
+        private readonly StringBuilder lineBuffer = new StringBuilder();
+
+        public BotPlayer(BotInstance instance, string name)
             : base(name)
         {
+            this.instance = instance;
         }
 
         public override string LogName
@@ -289,12 +294,45 @@ namespace Guncho
 
         public override void Write(char c)
         {
-            // nada
+            buffer.Append(c);
+            if (c == '\n')
+                CheckForLines();
         }
 
         public override void Write(string text)
         {
-            // nada
+            buffer.Append(text);
+            CheckForLines();
+        }
+
+        private void CheckForLines()
+        {
+            while (buffer.Length > 0)
+            {
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    if (buffer[i] == '\n')
+                    {
+                        // all the lines we care about start with a dollar sign
+                        if (buffer[0] == '$')
+                        {
+                            for (int j = 0; j < i; j++)
+                                lineBuffer.Append(buffer[j]);
+
+                            if (lineBuffer.Length > 0 && lineBuffer[lineBuffer.Length - 1] == '\r')
+                                lineBuffer.Remove(lineBuffer.Length - 1, 1);
+
+                            if (lineBuffer.Length > 0)
+                                instance.ReceiveLine(this, lineBuffer.ToString());
+
+                            lineBuffer.Length = 0;
+                        }
+
+                        buffer.Remove(0, i + 1);
+                        break;
+                    }
+                }
+            }
         }
     }
 }

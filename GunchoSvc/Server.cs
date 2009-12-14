@@ -1694,7 +1694,12 @@ namespace Guncho
                 realmName, message);
             player.FlushOutput();
         }
-        
+
+        public void DisconnectBot(BotPlayer bot)
+        {
+            QueueEvent(delegate { EnterInstance(bot, null); });
+        }
+
         private void ShowWhoList(Connection conn, Player player)
         {
             conn.WriteLine("{0,-25} {1,-6} {2,-6} {3}", "Player", "Conn", "Idle", "Realm");
