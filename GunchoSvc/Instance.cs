@@ -183,10 +183,9 @@ namespace Guncho
                         vm.LineWanted += io.FyreLineWanted;
                     }
 
-                    actionMap = new TranslationMap();
-                    actionInfos = new Dictionary<int, ActionInfo>();
-                    kindMap = new TranslationMap();
-                    propMap = new TranslationMap();
+                    actionMap = new TranslationMap<ActionInfo>();
+                    kindMap = new IntTranslationMap();
+                    propMap = new IntTranslationMap();
 
                     QueueTransaction(new RealmGreeting());
                     vm.Run();
@@ -205,7 +204,6 @@ namespace Guncho
                     OnVMFinished(wasTerminated);
 
                     actionMap = null;
-                    actionInfos = null;
                     kindMap = null;
                     propMap = null;
                 }
@@ -616,76 +614,120 @@ namespace Guncho
 
         #region Action/Kind/Property Translation
 
-        // these should really just be protected, but C# won't allow one subclass
-        // to access another subclass's protected members (CS1540).
-
-        protected TranslationMap actionMap, kindMap, propMap;
-        protected Dictionary<int, ActionInfo> actionInfos;
-
-        /* These static methods work around a seemingly pointless restriction
-         * in the CLR: in a derived type, protected instance members from the
-         * base may only be accessed through an expression of the derived type
-         * (or one of its subclasses). The compiler will flag error CS1540 if a
-         * method in BotInstance accesses GameInstance.actionMap, even though
-         * both classes inherit it from the same base. */
-        protected static TranslationMap GetActionMap(Instance inst)
-        {
-            return inst.actionMap;
-        }
-
-        protected static TranslationMap GetKindMap(Instance inst)
-        {
-            return inst.kindMap;
-        }
-
-        protected static TranslationMap GetPropMap(Instance inst)
-        {
-            return inst.propMap;
-        }
-
-        protected static Dictionary<int, ActionInfo> GetActionInfos(Instance inst)
-        {
-            return inst.actionInfos;
-        }
+        protected TranslationMap<ActionInfo> actionMap;
+        protected IntTranslationMap kindMap, propMap;
 
         protected enum ArgType
         {
             Omitted,
+            Other,
             Boolean,
             Number,
             Object,
             Text,
         }
 
-        protected struct ActionInfo
+        protected static bool TryParseArgType(string text, out ArgType value)
         {
-            public ArgType ArgType1, ArgType2;
+            switch (text)
+            {
+                case ".":
+                    value = ArgType.Omitted;
+                    return true;
+                case "b":
+                    value = ArgType.Boolean;
+                    return true;
+                case "n":
+                    value = ArgType.Number;
+                    return true;
+                case "o":
+                    value = ArgType.Object;
+                    return true;
+                case "t":
+                    value = ArgType.Text;
+                    return true;
+                case "?":
+                    value = ArgType.Other;
+                    return true;
+                default:
+                    value = default(ArgType);
+                    return false;
+            }
         }
 
-        protected class TranslationMap
+        protected interface IProvideNumber
+        {
+            int Number { get; }
+        }
+
+        protected struct ActionInfo : IProvideNumber
+        {
+            public int Number;
+            public ArgType ArgType1;
+            public ArgType ArgType2;
+
+            int IProvideNumber.Number
+            {
+                get { return Number; }
+            }
+        }
+
+        protected struct IntInfo : IProvideNumber
+        {
+            public int Number;
+
+            public static implicit operator IntInfo(int num)
+            {
+                IntInfo result;
+                result.Number = num;
+                return result;
+            }
+
+            int IProvideNumber.Number
+            {
+                get { return Number; }
+            }
+        }
+
+        protected class TranslationMap<T>
+            where T : struct, IProvideNumber
         {
             private readonly Dictionary<int, string> names = new Dictionary<int, string>();
-            private readonly Dictionary<string, int> values = new Dictionary<string, int>();
+            private readonly Dictionary<string, T> values = new Dictionary<string, T>();
 
-            public void Add(string name, int value)
+            public void Add(string name, T value)
             {
-                names[value] = name;
+                names[value.Number] = name;
                 values[name] = value;
             }
 
-            public int? Translate(int value, TranslationMap toMap)
+            public string GetName(int number)
             {
-                string name;
-                if (names.TryGetValue(value, out name) == false)
-                    return null;
-
-                int result;
-                if (toMap.values.TryGetValue(name, out result) == false)
-                    return null;
-
+                string result;
+                names.TryGetValue(number, out result);
                 return result;
             }
+
+            public int? GetNumber(string name)
+            {
+                T info;
+                if (values.TryGetValue(name, out info))
+                    return info.Number;
+                else
+                    return null;
+            }
+
+            public T? GetInfo(string name)
+            {
+                T result;
+                if (values.TryGetValue(name, out result))
+                    return result;
+                else
+                    return null;
+            }
         }
+
+        protected class IntTranslationMap : TranslationMap<IntInfo> { }
 
         #endregion
     }
@@ -838,26 +880,39 @@ namespace Guncho
         /// the game's output.
         /// </summary>
         /// <param name="bot">The player attempting the action.</param>
-        /// <param name="actnum">The action number.</param>
-        /// <param name="arg1">The first action argument, or "$" if the first argument is text.</param>
-        /// <param name="arg2">The second action argument, or "$" if the second argument is text.</param>
-        /// <param name="line">The text of the first or second action argument, or <b>null</b> if
-        /// neither is text.</param>
-        public string RunBotAction(BotPlayer bot, int actnum, string arg1, string arg2, string line)
+        /// <param name="actname">The name of the action (including argument
+        /// types).</param>
+        /// <param name="arg1">The first action argument, or "$" if the first
+        /// argument is text.</param>
+        /// <param name="arg2">The second action argument, or "$" if the second
+        /// argument is text.</param>
+        /// <param name="text">The text of the first or second action argument,
+        /// or <b>null</b> if neither is text.</param>
+        /// <returns>The output from running the action, or <b>null</b> if the
+        /// action is not supported.</returns>
+        public string RunBotAction(BotPlayer bot, string actname, string arg1, string arg2, string text)
         {
             if (rawMode)
                 throw new InvalidOperationException("Bot actions not supported in raw mode");
 
+            int id;
+            if (playerIDs.TryGetValue(bot, out id) == false)
+                throw new ArgumentException("Bot is not connected to the instance", "bot");
+
+            ActionInfo? info = actionMap.GetInfo(actname);
+            if (info == null)
+                return null;
+
             return SendAndGet(
                 string.Format("$action {0} {1} {2} {3}{4}{5}",
-                    playerIDs[bot],
-                    actnum,
+                    id,
+                    info.Value.Number,
                     arg1,
                     arg2,
-                    line == null ? "" : " ",
-                    line ?? ""));
+                    text == null ? "" : " ",
+                    text ?? ""));
         }
-        
+
         /// <summary>
         /// Adds a player to the instance.
         /// </summary>
@@ -1583,24 +1638,26 @@ namespace Guncho
                 if (!int.TryParse(word, out actnum))
                     return;
 
-                int? foreignActNum = actionMap.Translate(actnum, GetActionMap(bot.Instance));
+                string actName = actionMap.GetName(actnum);
+                if (actName == null)
+                    return;
 
-                ActionInfo info;
-                if (!actionInfos.TryGetValue(actnum, out info))
+                ActionInfo? info = actionMap.GetInfo(actName);
+                if (info == null)
                     return;
 
                 arg1 = GetToken(' ', ref line);
-                if (!ValidateActionArg(arg1, info.ArgType1))
+                if (!ValidateActionArg(arg1, info.Value.ArgType1))
                     return;
 
                 arg2 = GetToken(' ', ref line);
-                if (!ValidateActionArg(arg2, info.ArgType2))
+                if (!ValidateActionArg(arg2, info.Value.ArgType2))
                     return;
 
-                if (info.ArgType1 != ArgType.Text && info.ArgType2 != ArgType.Text)
+                if (info.Value.ArgType1 != ArgType.Text && info.Value.ArgType2 != ArgType.Text)
                     line = null;
 
-                bot.Instance.RunBotAction(bot, actnum, arg1, arg2, line);
+                bot.Instance.RunBotAction(bot, actName, arg1, arg2, line);
             }
         }
 
@@ -1681,14 +1738,21 @@ namespace Guncho
             // num type1 type2 name
             // ... but we actually treat type1+type2+name as the name
             string word = GetToken(' ', ref line);
-            int num;
+            ActionInfo info;
 
-            if (int.TryParse(word, out num))
+            if (int.TryParse(word, out info.Number))
             {
-                //XXX add types to actionInfos
-                throw new NotImplementedException();
+                string typedName = line;
 
-                actionMap.Add(line, num);
+                word = GetToken(' ', ref line);
+                if (!TryParseArgType(word, out info.ArgType1))
+                    return;
+
+                word = GetToken(' ', ref line);
+                if (!TryParseArgType(word, out info.ArgType2))
+                    return;
+
+                actionMap.Add(line, info);
             }
         }
 
