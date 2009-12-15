@@ -39,7 +39,27 @@ namespace Guncho
             // nada
         }
         protected abstract void OnHandleOutput(string text);
+        protected abstract void OnVMStarting();
         protected abstract void OnVMFinished(bool wasTerminated);
+
+        protected static string GetToken(char sep, ref string text)
+        {
+            int idx = text.IndexOf(sep);
+
+            string result;
+            if (idx == -1)
+            {
+                result = text;
+                text = string.Empty;
+            }
+            else
+            {
+                result = text.Substring(0, idx);
+                text = text.Substring(idx + 1);
+            }
+
+            return result;
+        }
 
         /// <summary>
         /// Creates an new playable instance of a realm.
@@ -187,7 +207,7 @@ namespace Guncho
                     kindMap = new IntTranslationMap();
                     propMap = new IntTranslationMap();
 
-                    QueueTransaction(new RealmGreeting());
+                    OnVMStarting();
                     vm.Run();
                 }
                 finally
@@ -474,19 +494,6 @@ namespace Guncho
             }
         }
 
-        private class RealmGreeting : Transaction
-        {
-            public RealmGreeting()
-                : base("$hello")
-            {
-            }
-
-            public override void OnFinished(Instance instance)
-            {
-                throw new NotImplementedException();
-            }
-        }
-
         #endregion
 
         #region Server Registers
@@ -614,9 +621,6 @@ namespace Guncho
 
         #region Action/Kind/Property Translation
 
-        protected TranslationMap<ActionInfo> actionMap;
-        protected IntTranslationMap kindMap, propMap;
-
         protected enum ArgType
         {
             Omitted,
@@ -729,6 +733,53 @@ namespace Guncho
 
         protected class IntTranslationMap : TranslationMap<IntInfo> { }
 
+        protected TranslationMap<ActionInfo> actionMap;
+        protected IntTranslationMap kindMap, propMap;
+
+        protected void RegisterProperty(string line)
+        {
+            // num type name
+            // ... but we actually treat type+name as the name
+            string word = GetToken(' ', ref line);
+            int num;
+
+            if (int.TryParse(word, out num))
+                propMap.Add(line, num);
+        }
+
+        protected void RegisterKind(string line)
+        {
+            // num name
+            string word = GetToken(' ', ref line);
+            int num;
+
+            if (int.TryParse(word, out num))
+                kindMap.Add(line, num);
+        }
+
+        protected void RegisterAction(string line)
+        {
+            // num type1 type2 name
+            // ... but we actually treat type1+type2+name as the name
+            string word = GetToken(' ', ref line);
+            ActionInfo info;
+
+            if (int.TryParse(word, out info.Number))
+            {
+                string typedName = line;
+
+                word = GetToken(' ', ref line);
+                if (!TryParseArgType(word, out info.ArgType1))
+                    return;
+
+                word = GetToken(' ', ref line);
+                if (!TryParseArgType(word, out info.ArgType2))
+                    return;
+
+                actionMap.Add(line, info);
+            }
+        }
+
         #endregion
     }
 
@@ -753,6 +804,11 @@ namespace Guncho
         public GameInstance(Server server, Realm realm, Stream zfile, string name)
             : base(server, realm, zfile, name)
         {
+        }
+
+        protected override void OnVMStarting()
+        {
+            QueueTransaction(new RealmGreeting());
         }
 
         protected override void OnVMFinished(bool wasTerminated)
@@ -832,6 +888,48 @@ namespace Guncho
             }
 
             public readonly Player Player;
+        }
+
+        private class RealmGreeting : Transaction
+        {
+            public RealmGreeting()
+                : base("$hello")
+            {
+            }
+
+            private static readonly char[] lineDelim = { '\r', '\n' };
+
+            public override void OnFinished(Instance instance)
+            {
+                GameInstance gi = (GameInstance)instance;
+
+                string[] lines = Response.ToString().Split(lineDelim, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string l in lines)
+                {
+                    if (l[0] == '$')
+                    {
+                        string line = l;
+                        string word = GetToken(' ', ref line);
+                        switch (word)
+                        {
+                            case "$register":
+                                switch (GetToken(' ', ref line))
+                                {
+                                    case "action":
+                                        gi.RegisterAction(line);
+                                        break;
+                                    case "kind":
+                                        gi.RegisterKind(line);
+                                        break;
+                                    case "prop":
+                                        gi.RegisterProperty(line);
+                                        break;
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -1544,6 +1642,11 @@ namespace Guncho
         {
         }
 
+        protected override void OnVMStarting()
+        {
+            // nada
+        }
+
         protected override void OnVMFinished(bool wasTerminated)
         {
             foreach (BotPlayer bot in bots.Values)
@@ -1551,25 +1654,6 @@ namespace Guncho
 
             bots.Clear();
             botIDs.Clear();
-        }
-
-        private static string GetToken(char sep, ref string text)
-        {
-            int idx = text.IndexOf(sep);
-
-            string result;
-            if (idx == -1)
-            {
-                result = text;
-                text = string.Empty;
-            }
-            else
-            {
-                result = text.Substring(0, idx);
-                text = text.Substring(idx + 1);
-            }
-
-            return result;
         }
 
         protected override void OnHandleOutput(string text)
@@ -1663,7 +1747,7 @@ namespace Guncho
 
         private bool ValidateActionArg(string arg1, ArgType argType)
         {
-            throw new NotImplementedException();
+            throw new NotImplementedException();    //XXX
         }
 
         private void ConnectBot(string line)
@@ -1712,57 +1796,13 @@ namespace Guncho
             return (name.Length <= 32) && (name.Trim() == name);
         }
 
-        private void RegisterProperty(string line)
-        {
-            // num type name
-            // ... but we actually treat type+name as the name
-            string word = GetToken(' ', ref line);
-            int num;
-
-            if (int.TryParse(word, out num))
-                propMap.Add(line, num);
-        }
-
-        private void RegisterKind(string line)
-        {
-            // num name
-            string word = GetToken(' ', ref line);
-            int num;
-
-            if (int.TryParse(word, out num))
-                kindMap.Add(line, num);
-        }
-
-        private void RegisterAction(string line)
-        {
-            // num type1 type2 name
-            // ... but we actually treat type1+type2+name as the name
-            string word = GetToken(' ', ref line);
-            ActionInfo info;
-
-            if (int.TryParse(word, out info.Number))
-            {
-                string typedName = line;
-
-                word = GetToken(' ', ref line);
-                if (!TryParseArgType(word, out info.ArgType1))
-                    return;
-
-                word = GetToken(' ', ref line);
-                if (!TryParseArgType(word, out info.ArgType2))
-                    return;
-
-                actionMap.Add(line, info);
-            }
-        }
-
         internal void ReceiveLine(BotPlayer bot, string line)
         {
+            // this is called from the remote instance's thread
             int id;
             if (botIDs.TryGetValue(bot, out id))
             {
-                //XXX
-                throw new NotImplementedException();
+                throw new NotImplementedException();    //XXX
             }
         }
     }

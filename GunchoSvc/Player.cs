@@ -279,7 +279,7 @@ namespace Guncho
 
         public override void NotifyInstanceReloading()
         {
-            throw new NotImplementedException();
+            instance.ReceiveLine(this, "$reloading");
         }
 
         public override string GetAttribute(string name)
