@@ -237,6 +237,13 @@ namespace Guncho
             }
 
             GameInstance inst = GetDefaultInstance(dest);
+
+            if (inst == null)
+            {
+                conn.WriteLine("That realm is only for bots.");
+                return;
+            }
+
             inst.Activate();
 
             string check = inst.SendAndGet("$knock default");

@@ -2,5 +2,6 @@
 <realmIndex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <realms>
     <realm name="The Outer Realm" src="The Outer Realm.ni" owner="Wizard" privacy="joinable" factory="5Z71" />
+    <realm name="BotTest" src="wizard_bottest.ni" owner="Wizard" factory="bot_5Z71" />
   </realms>
 </realmIndex>

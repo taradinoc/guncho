@@ -5756,7 +5756,7 @@ To surreptitiously reckon darkness:
 Section ZZZ - Including the Guncho extensions
 
 Include Guncho FyreVM Support by Guncho Cabal.
-Include Guncho Realms by Guncho Cabal.
+Include Guncho Bot Realms by Guncho Cabal.
 
 The Standard Rules end here.
 
