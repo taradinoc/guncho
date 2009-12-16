@@ -1745,9 +1745,26 @@ namespace Guncho
             }
         }
 
-        private bool ValidateActionArg(string arg1, ArgType argType)
+        private bool ValidateActionArg(string arg, ArgType argType)
         {
-            throw new NotImplementedException();    //XXX
+            long dummy;
+            switch (argType)
+            {
+                case ArgType.Number:
+                    return long.TryParse(arg, out dummy);
+                case ArgType.Object:
+                    // XXX validate object ID
+                    throw new NotImplementedException();
+                case ArgType.Omitted:
+                    return arg == ".";
+                case ArgType.Other:
+                    // let anything through
+                    return true;
+                case ArgType.Text:
+                    return arg == "$";
+                default:
+                    throw new ArgumentException("Type not supported for action arguments", "argType");
+            }
         }
 
         private void ConnectBot(string line)

@@ -49,6 +49,11 @@ namespace ControlPanel
                     if (defaultKey == null || key.CompareTo(defaultKey) < 0)
                         defaultKey = key;
                 }
+                else if (key.Length == 8 && key.StartsWith("bot_") && char.IsDigit(key[4]) &&
+                    char.IsLetter(key[5]) && char.IsDigit(key[6]) && char.IsDigit(key[7]))
+                {
+                    value = "Inform 7 (build " + key.Substring(4) + ") - BOT";
+                }
                 else
                 {
                     value = key;

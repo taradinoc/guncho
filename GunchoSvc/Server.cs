@@ -296,9 +296,10 @@ namespace Guncho
                     niExtensionDir = Path.Combine(subPath, @"Inform7\BotExtensions");
                     if (Directory.Exists(niExtensionDir))
                     {
-                        factory = new InformBotRealmFactory(this, version + " (bot)",
+                        string name = "bot_" + version;
+                        factory = new InformBotRealmFactory(this, name,
                             niCompilerPath, niExtensionDir, infCompilerPath, infLibraryDir);
-                        factories.Add(version, factory);
+                        factories.Add(name, factory);
                     }
                 }
             }
