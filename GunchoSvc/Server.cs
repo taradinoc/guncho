@@ -604,14 +604,14 @@ namespace Guncho
                 }
 #endif
 
-                //FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
+                Realm realm;
                 try
                 {
-                    Realm r = factory.LoadRealm(realmName, sourceFile, cachedFile, owner);
+                    realm = factory.LoadRealm(realmName, sourceFile, cachedFile, owner);
 #if COVERUP
                     r.RawMode = true;
 #endif
-                    realms.Add(realmName.ToLower(), r);
+                    realms.Add(realmName.ToLower(), realm);
                 }
                 catch (Exception ex)
                 {
@@ -623,8 +623,20 @@ namespace Guncho
                     }
                     else
                     {
-                        //stream.Close();
                         throw new RealmLoadingException(realmName, ex);
+                    }
+                }
+
+                if (realm.AutoActivate)
+                {
+                    Instance inst = factory.LoadInstance(realm, realm.Name);
+                    lock (instances)
+                    {
+                        if (!instances.ContainsKey(inst.Name.ToLower()))
+                        {
+                            instances.Add(inst.Name.ToLower(), inst);
+                            inst.Activate();
+                        }
                     }
                 }
             }
@@ -641,7 +653,7 @@ namespace Guncho
                 if (GetInstance(name) != null)
                     throw new ArgumentException("An instance with this name is already loaded", "name");
                 result = realm.Factory.LoadInstance(realm, name);
-                instances.Add(name, result);
+                instances.Add(name.ToLower(), result);
             }
 
             return result;
@@ -682,13 +694,13 @@ namespace Guncho
             }
         }
 
-        private GameInstance[] GetAllInstances(Realm realm)
+        private Instance[] GetAllInstances(Realm realm)
         {
-            List<GameInstance> result = new List<GameInstance>();
+            List<Instance> result = new List<Instance>();
 
             lock (instances)
             {
-                foreach (GameInstance inst in instances.Values)
+                foreach (Instance inst in instances.Values)
                     if (inst.Realm == realm)
                         result.Add(inst);
             }
@@ -753,23 +765,20 @@ namespace Guncho
                     if (original == null)
                         throw new ArgumentException("No such realm", "toName");
 
-                    // can't replace a game realm with a non-game realm or vice versa
-                    bool origBot = original.Factory.InstanceType.IsSubclassOf(typeof(GameInstance));
-                    bool replcBot = replacement.Factory.InstanceType.IsSubclassOf(typeof(GameInstance));
-
-                    if (origBot != replcBot)
-                        throw new ArgumentException("Cannot replace game realm with non-game realm or vice versa");
-
-                    GameInstance[] origInstances = GetAllInstances(original);
-                    GameInstance[] replcInstances = GetAllInstances(replacement);
+                    Instance[] origInstances = GetAllInstances(original);
+                    Instance[] replcInstances = GetAllInstances(replacement);
                     var saved = new Dictionary<string, Dictionary<Player, string>>();
 
                     // extract players from running original instances
-                    foreach (GameInstance inst in origInstances)
+                    foreach (Instance inst in origInstances)
                     {
-                        var dict = new Dictionary<Player, string>();
-                        saved.Add(inst.Name, dict);
-                        inst.ExportPlayerPositions(dict);
+                        GameInstance gi = inst as GameInstance;
+                        if (gi != null)
+                        {
+                            var dict = new Dictionary<Player, string>();
+                            saved.Add(gi.Name, dict);
+                            gi.ExportPlayerPositions(dict);
+                        }
                         SetEventInterval(inst, 0);
                         inst.PolitelyDispose();
                         instances.Remove(inst.Name);
@@ -777,15 +786,19 @@ namespace Guncho
 
                     // there shouldn't be any players in replacement instances, but
                     // if there are for some reason, dump them in the new default instance
-                    foreach (GameInstance inst in replcInstances)
+                    foreach (Instance inst in replcInstances)
                     {
-                        Dictionary<Player, string> dict;
-                        if (saved.TryGetValue(toName, out dict) == false)
+                        GameInstance gi = inst as GameInstance;
+                        if (gi != null)
                         {
-                            dict = new Dictionary<Player, string>();
-                            saved.Add(toName, dict);
+                            Dictionary<Player, string> dict;
+                            if (saved.TryGetValue(toName, out dict) == false)
+                            {
+                                dict = new Dictionary<Player, string>();
+                                saved.Add(toName, dict);
+                            }
+                            gi.ExportPlayerPositions(dict);
                         }
-                        inst.ExportPlayerPositions(dict);
                         SetEventInterval(inst, 0);
                         inst.Dispose();
                         instances.Remove(inst.Name);
@@ -1641,6 +1654,14 @@ namespace Guncho
             }
 
             GameInstance dest = GetInstance(instanceName) as GameInstance;
+
+            if (dest == null)
+            {
+                Realm realm = GetRealm(instanceName);
+                if (realm != null)
+                    dest = GetDefaultInstance(realm);
+            }
+
             if (dest != null)
             {
                 if (dest == player.Instance)

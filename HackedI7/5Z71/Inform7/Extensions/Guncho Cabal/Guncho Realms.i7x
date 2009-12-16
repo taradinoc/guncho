@@ -1,4 +1,4 @@
-Version 2/080522 of Guncho Realms by Guncho Cabal begins here.
+Version 3/091216 of Guncho Realms by Guncho Cabal begins here.
 
 "This extension implements the I7-side changes needed for multiplayer realms."
 
@@ -18,6 +18,7 @@ Chapter 1 - The PC kind
 A PC is a kind of person. A PC is usually proper-named. The PC kind translates into I6 as "i7_pc_kind".
 
 A PC can be reserved or unreserved. A PC is usually unreserved.
+A PC can be botmode. A PC is usually not botmode.
 
 A PC has indexed text called the mud-name. Rule for printing the name of a PC (called whoever) (this is the PC name printing rule): say mud-name of whoever. Understand the mud-name property as describing a PC.
 
@@ -173,11 +174,13 @@ Chapter 1 - Game engine metacommands
 Section 1 - Joining
 
 A special command handling rule (this is the handle joining rule):
-	if the player's command matches the regular expression "^\$join (.+)=(-?\d+)(?:,(.*))?$", case insensitively begin;
-		let the new mud-name be the text matching subexpression 1;
-		let the new mud-id be the numeric value of the text matching subexpression 2;
-		let the new location be the text matching subexpression 3;
+	if the player's command matches the regular expression "^\$(bot)?join (.+)=(-?\d+)(?:,(.*))?$", case insensitively begin;
+		let the new botmode be whether or not the text matching subexpression 1 is "bot";
+		let the new mud-name be the text matching subexpression 2;
+		let the new mud-id be the numeric value of the text matching subexpression 3;
+		let the new location be the text matching subexpression 4;
 		add a player named the new mud-name with ID the new mud-id at location the new location;
+		if the new botmode is true and the new mud-id identifies a PC (called the new bot), now the new bot is botmode;
 		rule succeeds;
 	end if.
 

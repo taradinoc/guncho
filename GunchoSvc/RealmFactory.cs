@@ -27,20 +27,10 @@ namespace Guncho
         }
 
         public abstract string SourceFileExtension { get; }
-        public abstract Type InstanceType { get; }
         public abstract string GetInitialSourceText(string ownerName, string realmName);
         public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
-
-        public Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
-        {
-            return new Realm(server, this, name, sourceFile, storyFile, owner);
-        }
-
-        public Instance LoadInstance(Realm realm, string name)
-        {
-            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
-            return (Instance)Activator.CreateInstance(InstanceType, server, realm, stream, name);
-        }
+        public abstract Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner);
+        public abstract Instance LoadInstance(Realm realm, string name);
 
         protected static string MakeUUID(string realmName)
         {
@@ -301,9 +291,15 @@ namespace Guncho
         {
         }
 
-        public override Type InstanceType
+        public override Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
         {
-            get { return typeof(GameInstance); }
+            return new Realm(server, this, name, sourceFile, storyFile, owner);
+        }
+
+        public override Instance LoadInstance(Realm realm, string name)
+        {
+            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
+            return new GameInstance(server, realm, stream, name);
         }
 
         public override string GetInitialSourceText(string ownerName, string realmName)
@@ -335,9 +331,17 @@ namespace Guncho
         {
         }
 
-        public override Type InstanceType
+        public override Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
         {
-            get { return typeof(BotInstance); }
+            Realm result = new Realm(server, this, name, sourceFile, storyFile, owner);
+            result.AutoActivate = true;
+            return result;
+        }
+
+        public override Instance LoadInstance(Realm realm, string name)
+        {
+            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
+            return new BotInstance(server, realm, stream, name);
         }
 
         public override string GetInitialSourceText(string ownerName, string realmName)

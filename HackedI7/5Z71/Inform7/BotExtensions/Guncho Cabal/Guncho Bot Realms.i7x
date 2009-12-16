@@ -22,6 +22,9 @@ To decide which bot is the bot with ID (N - number):
 Bot connection is an object-based rulebook.
 Bot disconnection is an object-based rulebook.
 
+To connect (victim - a bot) to (realm - text):
+	say "$connect [bot-ID of the victim] [realm][line break]".
+
 Part 2 - The Holodeck and Props
 
 The holodeck-corral is a room.

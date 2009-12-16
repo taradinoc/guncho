@@ -116,9 +116,8 @@ namespace Guncho
 
         private RealmPrivacyLevel privacy = RealmPrivacyLevel.Public;
 
-        private bool condemned;
+        private bool condemned, autoActivate;
         private int failureCount;
-
 
         public Realm(Server server, RealmFactory factory, string name, string sourceFile,
             string storyFile, Player owner)
@@ -145,11 +144,15 @@ namespace Guncho
             get { return factory; }
         }
 
-
-
         public string Name
         {
             get { return name; }
+        }
+
+        public bool AutoActivate
+        {
+            get { return autoActivate; }
+            set { autoActivate = value; }
         }
 
         public RealmPrivacyLevel PrivacyLevel
