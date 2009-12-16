@@ -263,13 +263,21 @@ namespace Guncho
     class BotPlayer : Player
     {
         private readonly BotInstance instance;
+        private readonly int botID;
         private readonly StringBuilder buffer = new StringBuilder();
         private readonly StringBuilder lineBuffer = new StringBuilder();
+        private readonly HashSet<int> objectIDs = new HashSet<int>();
 
-        public BotPlayer(BotInstance instance, string name)
+        public BotPlayer(BotInstance instance, int botID, string name)
             : base(name)
         {
             this.instance = instance;
+            this.botID = botID;
+        }
+
+        public int BotID
+        {
+            get { return botID; }
         }
 
         public override string LogName
@@ -279,7 +287,7 @@ namespace Guncho
 
         public override void NotifyInstanceReloading()
         {
-            instance.ReceiveLine(this, "$reloading");
+            instance.QueueInput("$reloading " + botID.ToString());
         }
 
         public override string GetAttribute(string name)
@@ -323,7 +331,7 @@ namespace Guncho
                                 lineBuffer.Remove(lineBuffer.Length - 1, 1);
 
                             if (lineBuffer.Length > 0)
-                                instance.ReceiveLine(this, lineBuffer.ToString());
+                                FilterAndPassLine(lineBuffer.ToString());
 
                             lineBuffer.Length = 0;
                         }
@@ -332,6 +340,43 @@ namespace Guncho
                         break;
                     }
                 }
+            }
+        }
+
+        private static string GetToken(char sep, ref string text)
+        {
+            int idx = text.IndexOf(sep);
+
+            string result;
+            if (idx == -1)
+            {
+                result = text;
+                text = string.Empty;
+            }
+            else
+            {
+                result = text.Substring(0, idx);
+                text = text.Substring(idx + 1);
+            }
+
+            return result;
+        }
+
+        private void FilterAndPassLine(string line)
+        {
+            string word = GetToken(' ', ref line);
+            switch (word)
+            {
+                case "$object":
+                    throw new NotImplementedException();    //XXX
+                case "$delobject":
+                    throw new NotImplementedException();    //XXX
+                case "$move":
+                    throw new NotImplementedException();    //XXX
+                case "$chprop":
+                    throw new NotImplementedException();    //XXX
+                case "$action":
+                    throw new NotImplementedException();    //XXX
             }
         }
     }

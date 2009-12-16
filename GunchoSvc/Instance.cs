@@ -780,6 +780,36 @@ namespace Guncho
             }
         }
 
+        /// <summary>
+        /// Translates an action number to an action name.
+        /// </summary>
+        /// <param name="actionNum">The action number.</param>
+        /// <returns>The action name, or <b>null</b> if the action number is unregistered.</returns>
+        public string GetActionName(int actionNum)
+        {
+            return actionMap.GetName(actionNum);
+        }
+
+        /// <summary>
+        /// Translates a kind number to a kind name.
+        /// </summary>
+        /// <param name="kindNum">The kind number.</param>
+        /// <returns>The kind name, or <b>null</b> if the kind number is unregistered.</returns>
+        public string GetKindName(int kindNum)
+        {
+            return kindMap.GetName(kindNum);
+        }
+
+        /// <summary>
+        /// Translates a property number to a property name.
+        /// </summary>
+        /// <param name="propNum">The property number.</param>
+        /// <returns>The property name, or <b>null</b> if the property number is unregistered.</returns>
+        public string GetPropertyName(int propNum)
+        {
+            return propMap.GetName(propNum);
+        }
+
         #endregion
     }
 
@@ -1635,7 +1665,6 @@ namespace Guncho
     class BotInstance : Instance
     {
         private readonly Dictionary<int, BotPlayer> bots = new Dictionary<int, BotPlayer>();
-        private readonly Dictionary<BotPlayer, int> botIDs = new Dictionary<BotPlayer, int>();
 
         public BotInstance(Server server, Realm realm, Stream zfile, string name)
             : base(server, realm, zfile, name)
@@ -1653,7 +1682,6 @@ namespace Guncho
                 server.DisconnectBot(bot);
 
             bots.Clear();
-            botIDs.Clear();
         }
 
         protected override void OnHandleOutput(string text)
@@ -1788,7 +1816,6 @@ namespace Guncho
             {
                 BotPlayer player = bots[id];
                 bots.Remove(id);
-                botIDs.Remove(player);
                 server.DisconnectBot(player);
             }
         }
@@ -1802,25 +1829,14 @@ namespace Guncho
             if (int.TryParse(word, out id) && ValidBotName(line) &&
                 !bots.ContainsKey(id))
             {
-                BotPlayer player = new BotPlayer(this, line);
+                BotPlayer player = new BotPlayer(this, id, line);
                 bots.Add(id, player);
-                botIDs.Add(player, id);
             }
         }
 
         private static bool ValidBotName(string name)
         {
             return (name.Length <= 32) && (name.Trim() == name);
-        }
-
-        internal void ReceiveLine(BotPlayer bot, string line)
-        {
-            // this is called from the remote instance's thread
-            int id;
-            if (botIDs.TryGetValue(bot, out id))
-            {
-                throw new NotImplementedException();    //XXX
-            }
         }
     }
 }

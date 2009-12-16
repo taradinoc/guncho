@@ -18,7 +18,8 @@ Chapter 1 - The PC kind
 A PC is a kind of person. A PC is usually proper-named. The PC kind translates into I6 as "i7_pc_kind".
 
 A PC can be reserved or unreserved. A PC is usually unreserved.
-A PC can be botmode. A PC is usually not botmode.
+A PC can be botmode. A PC is usually not botmode. The botmode property translates into I6 as "botmode".
+Include (- Attribute botmode; -) after "Definitions.i6t".
 
 A PC has indexed text called the mud-name. Rule for printing the name of a PC (called whoever) (this is the PC name printing rule): say mud-name of whoever. Understand the mud-name property as describing a PC.
 
@@ -131,6 +132,11 @@ To tell (message - indexed text) to everyone who can see (spectacle - an object)
 		let skipping be false;
 		if except the actor, let skipping be whether or not X is the player;
 		if skipping is false, say "<$t [mud-id of X]>[message]</$t>";
+	end repeat.
+
+To tell (message - indexed text) to bots who can see (spectacle - an object):
+	repeat with X running through connected botmode PCs who can see the spectacle begin;
+		say "<$t [mud-id of X]>[message]</$t>";
 	end repeat.
 
 To announce (message - indexed text):
