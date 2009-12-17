@@ -1,4 +1,7 @@
-﻿using System;
+﻿// send non-player game output to the console?
+#define CONSOLE_SPAM
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -235,7 +238,7 @@ namespace Guncho
             }
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             Deactivate();
 
@@ -635,7 +638,7 @@ namespace Guncho
         {
             switch (text)
             {
-                case ".":
+                case "-":
                     value = ArgType.Omitted;
                     return true;
                 case "b":
@@ -858,7 +861,7 @@ namespace Guncho
 
         protected override void OnVMStarting()
         {
-            QueueTransaction(new RealmGreeting());
+            QueueTransaction(new RealmInfoRequest());
         }
 
         protected override void OnVMFinished(bool wasTerminated)
@@ -940,10 +943,10 @@ namespace Guncho
             public readonly Player Player;
         }
 
-        private class RealmGreeting : Transaction
+        private class RealmInfoRequest : Transaction
         {
-            public RealmGreeting()
-                : base("$hello")
+            public RealmInfoRequest()
+                : base("$info")
             {
             }
 
@@ -1525,6 +1528,9 @@ namespace Guncho
             }
             else if (curPlayer != null)
             {
+#if CONSOLE_SPAM
+                Console.WriteLine(">{0}< {1}", curPlayer.Name, str);
+#endif
                 curPlayer.Write(str);
             }
             else
@@ -1691,6 +1697,15 @@ namespace Guncho
         {
         }
 
+        public override void Dispose()
+        {
+            foreach (BotPlayer bot in bots.Values)
+                server.DisconnectPlayer(bot);
+
+            bots.Clear();
+            base.Dispose();
+        }
+
         protected override void OnVMStarting()
         {
             // nada
@@ -1712,6 +1727,8 @@ namespace Guncho
                 string line = GetToken('\n', ref text);
                 if (line.EndsWith("\r"))
                     line = line.Substring(0, line.Length - 1);
+
+                Console.WriteLine(">>{0}>> {1}", this.Name, line);//XXX
 
                 // split off the first word
                 string word = GetToken(' ', ref line);

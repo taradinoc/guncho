@@ -186,9 +186,14 @@ A special command handling rule (this is the handle joining rule):
 		let the new mud-id be the numeric value of the text matching subexpression 3;
 		let the new location be the text matching subexpression 4;
 		add a player named the new mud-name with ID the new mud-id at location the new location;
-		if the new botmode is true and the new mud-id identifies a PC (called the new bot), now the new bot is botmode;
+		if the new botmode is true and the new mud-id identifies a PC (called the new bot) begin;
+			now the new bot is botmode;
+			tell "$youare [object ID of the new bot][line break]" to the new bot;
+		end if;
 		rule succeeds;
 	end if.
+
+To say object ID of (obj - object): (- print {obj}; -).
 
 [TODO: Rewrite this in I6 so it can treat the digits as characters instead of strings.]
 To decide which number is numeric value of (T - indexed text):
@@ -348,9 +353,44 @@ Section 3 - Polling for info
 
 A special command handling rule (this is the handle info requests rule):
 	if the player's command matches "$info" begin;
-		say "Info text goes here!";
+		describe the known actions;
 		rule succeeds;
 	end if.
+
+To describe the known actions: (- ShowKnownActions(); -).
+
+Include (-
+[ ShowKnownActions  i c act abits;
+	c = ActionData-->0;
+	for (i=1: i<=c: i=i+AD_RECORD_SIZE) {
+		abits = ActionData-->(i + AD_REQUIREMENTS);
+		if (abits & OUT_OF_WORLD_ABIT) continue;
+		act = ActionData-->(i + AD_ACTION);
+		print "$register action ", act, " ";
+		if (abits & NEED_NOUN_ABIT)
+			ShowActionArgType(ActionData-->(i + AD_NOUN_KOV));
+		else
+			print "-";
+		print " ";
+		if (abits & NEED_SECOND_ABIT)
+			ShowActionArgType(ActionData-->(i + AD_SECOND_KOV));
+		else
+			print "-";
+		print " ";
+		DB_Action(0, 0, act, 0, 0, 2);
+		print "^";
+	}
+];
+
+[ ShowActionArgType kov;
+	switch (kov) {
+		OBJECT_TY: print "o";
+		NUMBER_TY: print "n";
+		UNDERSTANDING_TY: print "t";
+		default: print "?";
+	}
+];
+-).
 
 Chapter 2 - Chat commands
 
@@ -1106,6 +1146,35 @@ This is the investigate multiplayer awareness after action and report rule:
 				consider the specific report rulebook;
 				say "</$t>";
 		change the player to the original player.
+
+To report the action in bot mode: (- ReportActionInBotMode(); -).
+
+Include (-
+[ ReportActionInBotMode  i f nk sk;
+	i = FindAction(-1);
+	f = ActionData-->(i+AD_REQUIREMENTS);
+	if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
+	if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
+	print "<$t ", actor.(+ mud-id +), ">$action ", actor.(+ mud-id +), " ", actor, " ", action, " ";
+	PrintActionArg(noun, nk);
+	print " ";
+	PrintActionArg(second, sk);
+	if (nk == UNDERSTANDING_TY || sk == UNDERSTANDING_TY) {
+		print " ";
+		PrintSnippet(parsed_number);
+	}
+	print "^</$t>";
+];
+
+[ PrintActionArg n nk;
+	switch (nk) {
+		NUMBER_TY, OBJECT_TY: print n;
+		UNDERSTANDING_TY: print "$";
+		TRUTH_STATE_TY: if (n) print "1"; else print "0";
+		default: print ".";
+	}
+];
+-).
 
 Chapter 2 - Parser segment
 

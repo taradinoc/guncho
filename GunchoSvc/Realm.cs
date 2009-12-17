@@ -1,6 +1,3 @@
-// send non-player game output to the console?
-#define CONSOLE_SPAM
-
 using System;
 using System.Collections.Generic;
 using System.IO;

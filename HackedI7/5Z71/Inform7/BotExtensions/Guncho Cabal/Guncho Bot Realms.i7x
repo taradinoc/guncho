@@ -7,6 +7,33 @@ Use full-length room descriptions.
 Use dynamic memory allocation of at least 16384.
 Use MAX_STATIC_DATA of 500000.
 
+Part 0 - Utility functions
+
+[TODO: Rewrite this in I6 so it can treat the digits as characters instead of strings.]
+To decide which number is numeric value of (T - indexed text):
+	let S be 1;
+	let L be the number of characters in T;
+	if L is 0, decide on 0;
+	let negated be false;
+	if character number 1 in T is "-" begin;
+		let negated be true;
+		let S be 2;
+	end if;
+	let result be 0;
+	repeat with N running from S to L begin;
+		let C be character number N in T;
+		let D be 0;
+		if C is "1" begin; let D be 1; otherwise if C is "2"; let D be 2;
+		otherwise if C is "3"; let D be 3; otherwise if C is "4"; let D be 4;
+		otherwise if C is "5"; let D be 5; otherwise if C is "6"; let D be 6;
+		otherwise if C is "7"; let D be 7; otherwise if C is "8"; let D be 8;
+		otherwise if C is "9"; let D be 9; otherwise if C is "0"; let D be 0;
+		otherwise; decide on 0; end if;
+		let result be (result * 10) + D;
+	end repeat;
+	if negated is true, let result be 0 - result;
+	decide on result.
+
 Part 1 - Player characters and bots
 
 A PC is a kind of person.
@@ -24,6 +51,21 @@ Bot disconnection is an object-based rulebook.
 
 To connect (victim - a bot) to (realm - text):
 	say "$connect [bot-ID of the victim] [realm][line break]".
+
+Bot-dubbing is an action applying to one topic. Understand "$youare [text]" as bot-dubbing.
+
+Carry out bot-dubbing:
+	say "bot-dub [topic understood][line break]";
+	if the topic understood matches the regular expression "^(\d+) (\d+)$":
+		let botID be the numeric value of the text matching subexpression 1;
+		let holoID be the numeric value of the text matching subexpression 2;
+		say "botID=[botID] holoID=[holoID][line break]";
+		let newbie be the bot with ID botID;
+		if the newbie is a bot:
+			now the newbie is connected;
+			change the holodeck-ID of the newbie to holoID;
+			change the player to the newbie;
+			follow the bot connection rules for the newbie.
 
 Part 2 - The Holodeck and Props
 
@@ -109,10 +151,32 @@ To silently/-- try silently/-- (doing something - action)
 	(- Send{doing something}; -).
 
 Include (-
-[ SendTryAction req by ac n s stora;
-	if (~~(ac ofclass (+bot+))) rfalse;
-	!XXX
-	print "[SendTryAction req=", req, " by=", by, " ac=", ac, " n=", n, " s=", s, " stora=", stora, "]^";
+[ SendTryAction req by ac n s stora  i nk sk f;
+	if (stora) return TryAction(req, by, ac, n, s, stora);
+	if (req || ~~(by ofclass (+ bot +))) rfalse;
+	i = FindAction(ac);
+	f = ActionData-->(i+AD_REQUIREMENTS);
+	if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
+	if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
+	print "$action ", by.(+ bot-ID +), " ", ac, " ";
+	PrintActionArg(n, nk);
+	print " ";
+	PrintActionArg(s, sk);
+	if (nk == UNDERSTANDING_TY) {
+		print " "; PrintSnippet(n);
+	} else if (sk == UNDERSTANDING_TY) {
+		print " "; PrintSnippet(s);
+	}
+	new_line;
+];
+
+[ PrintActionArg n nk;
+	switch (nk) {
+		NUMBER_TY, OBJECT_TY: print n;
+		UNDERSTANDING_TY: print "$";
+		TRUTH_STATE_TY: if (n) print "1"; else print "0";
+		default: print ".";
+	}
 ];
 -).
 
@@ -166,6 +230,231 @@ Include (-
 	}
 ];
 -).
+
+Chapter 2 - Server registers
+
+Include (-
+#ifdef TARGET_GLULX;
+Constant SERV_DATA_SIZE = 256 + 4;
+Array serv_data -> SERV_DATA_SIZE;
+
+[ ParseServNum  rv sign i ch;
+	rv = 0;
+	if (serv_data->WORDSIZE == '-') { sign = -1; i = 1; }
+	else { sign = 1; i = 0; }
+	for ( : i<serv_data-->0: i++ ) {
+		ch = serv_data->(WORDSIZE+i);
+		if (ch < '0' || ch > '9') break;
+		rv = rv * 10 + ch - '0';
+	}
+	return rv * sign;
+];
+
+[ GetServWord name;
+	SuspendOutputBuffer();
+	FyreCall(FY_CHANNEL, FYC_CONVERSATION);
+	print "getword ", (I7_string) name;
+	FyreCall(FY_CHANNEL, FYC_MAIN);
+	FyreCall(FY_READLINE, serv_data, SERV_DATA_SIZE);
+	ResumeOutputBuffer();
+	return ParseServNum();
+];
+
+[ PutServWord name value;
+	SuspendOutputBuffer();
+	FyreCall(FY_CHANNEL, FYC_CONVERSATION);
+	print "putword ", (I7_string) name, " ", value;
+	FyreCall(FY_CHANNEL, FYC_MAIN);
+	FyreCall(FY_READLINE, serv_data, SERV_DATA_SIZE);
+	ResumeOutputBuffer();
+	return (serv_data->WORDSIZE == '1');
+];
+
+[ GetServText name indt  len chunk pos i;
+	SuspendOutputBuffer();
+	FyreCall(FY_CHANNEL, FYC_CONVERSATION);
+	print "gettext ", (I7_string) name, " ", SERV_DATA_SIZE - WORDSIZE;
+	FyreCall(FY_CHANNEL, FYC_MAIN);
+	FyreCall(FY_READLINE, serv_data, SERV_DATA_SIZE);
+
+	len = ParseServNum();
+
+	if (indt == 0) {
+		indt = BlkAllocate(len+1, INDEXED_TEXT_TY, IT_Storage_Flags);
+		if (~~indt) rfalse;
+	} else {
+		if (BlkValueSetExtent(indt, len+1, 1) == false) rfalse;
+	}
+	BlkValueWrite(indt, len, 0);
+
+	pos = 0;
+	while (len > 0) {
+		FyreCall(FY_READLINE, serv_data, SERV_DATA_SIZE);
+		chunk = serv_data-->0;
+		len = len - chunk;
+		for ( i=0: i<chunk: i++ )
+			BlkValueWrite(indt, pos++, serv_data->(WORDSIZE+i));
+	}
+		
+	ResumeOutputBuffer();
+	return indt;
+];
+
+[ PutServText name indt;
+	SuspendOutputBuffer();
+	FyreCall(FY_CHANNEL, FYC_CONVERSATION);
+	print "puttext ", (I7_string) name, " ", (INDEXED_TEXT_TY_Say) indt;
+	FyreCall(FY_CHANNEL, FYC_MAIN);
+	FyreCall(FY_READLINE, serv_data, SERV_DATA_SIZE);
+	ResumeOutputBuffer();
+	return indt;
+];
+#ifnot; ! TARGET_ZCODE
+Array serv_id buffer 16;
+Constant SERV_DATA_SIZE = 32; ! must be <= 255
+Array serv_data -> SERV_DATA_SIZE;
+
+[ GetServWord name  idstr rv;
+	@output_stream 3 serv_id;
+	print (I7_string) name;
+	@output_stream -3;
+	if (serv_id-->0 > 16) serv_id->1 = 16;
+	idstr = serv_id + 1;
+	@restore serv_data WORDSIZE idstr -> rv;
+	if (rv) return serv_data-->0;
+	return -1;
+];
+
+[ PutServWord name value  idstr rv;
+	@output_stream 3 serv_id;
+	print (I7_string) name;
+	@output_stream -3;
+	if (serv_id-->0 > 16) serv_id->1 = 16;
+	idstr = serv_id + 1;
+	serv_data-->0 = value;
+	@save serv_data WORDSIZE idstr -> rv;
+	return rv;
+];
+
+[ GetServText name indt  len rv chunk i pos;
+	! tell the terp which text we want
+	serv_id->0 = 4;
+	serv_id->1 = 't'; serv_id->2 = 'x'; serv_id->3 = 't'; serv_id->4 = 'n';
+	@output_stream 3 serv_data;
+	print (I7_string) name;
+	@output_stream -3;
+	if (serv_data-->0 > SERV_DATA_SIZE) serv_data->1 = SERV_DATA_SIZE;
+	len = serv_data->1;
+	i = serv_data + WORDSIZE;
+	@save i len serv_id -> rv;
+	if (~~rv) rfalse;
+
+	! find out how long it is and allocate space
+	serv_id->4 = 'l';
+	@restore serv_data WORDSIZE serv_id -> rv;
+	if (~~rv) rfalse;
+	len = serv_data-->0;
+	if (indt == 0) {
+		indt = BlkAllocate(len+1, INDEXED_TEXT_TY, IT_Storage_Flags);
+		if (~~indt) rfalse;
+	} else {
+		if (BlkValueSetExtent(indt, len+1, 1) == false) rfalse;
+	}
+
+	! get the text data
+	serv_id->4 = 'd';
+	BlkValueWrite(indt, len, 0);
+	pos = 0;
+	while (len > 0) {
+		if (len > SERV_DATA_SIZE)
+			chunk = SERV_DATA_SIZE;
+		else
+			chunk = len;
+		@restore serv_data chunk serv_id -> rv;
+		if (~~rv) rfalse;
+		for ( i=0: i<chunk: i++, pos++ )
+			BlkValueWrite(indt, pos, serv_data->i);
+		len = len - chunk;
+	}
+
+	return indt;
+];
+
+[ PutServText name indt  len rv chunk i pos;
+	! tell the terp which text we want
+	serv_id->0 = 4;
+	serv_id->1 = 't'; serv_id->2 = 'x'; serv_id->3 = 't'; serv_id->4 = 'n';
+	@output_stream 3 serv_data;
+	print (I7_string) name;
+	@output_stream -3;
+	if (serv_data-->0 > SERV_DATA_SIZE) serv_data->1 = SERV_DATA_SIZE;
+	len = serv_data->1;
+	i = serv_data + WORDSIZE;
+	@save i len serv_id -> rv;
+	if (~~rv) rfalse;
+
+	! declare its length
+	serv_id->4 = 'l';
+	len = IT_CharacterLength(indt);
+	serv_data-->0 = len;
+	@save serv_data WORDSIZE serv_id -> rv;
+	if (~~rv) rfalse;
+
+	! write the text data
+	serv_id->4 = 'd';
+	pos = 0;
+	while (len > 0) {
+		if (len > SERV_DATA_SIZE)
+			chunk = SERV_DATA_SIZE;
+		else
+			chunk = len;
+		for ( i=0: i<chunk: i++, pos++ )
+			serv_data->i = BlkValueRead(indt, pos);
+		@save serv_data chunk serv_id -> rv;
+		if (~~rv) rfalse;
+		len = len - chunk;
+	}
+
+	return indt;
+];
+#endif; ! TARGET_
+
+ -);
+
+To decide which number is server register (register name - text): (- GetServWord({register name}) -).
+To change server register (register name - text) to (new value - number): (- PutServWord({register name}, {new value}); -).
+
+To decide which indexed text is server text register (register name - text): (- GetServText({register name}, {-pointer-to-new:INDEXED_TEXT_TY}) -).
+To change server text register (register name - text) to (new value - indexed text): (- PutServText({register name}, {-pointer-to:new value}); -).
+
+To decide which indexed text is realm storage slot (register name - text):
+    change server text register "ls_attr" to the register name;
+    decide on server text register "ls_realmval".
+To change realm storage slot (register name - text) to (new value - indexed text):
+    change server text register "ls_attr" to the register name;
+    change server text register "ls_realmval" to the new value.
+
+Chapter 3 - Real-time events
+
+Real-time-firing is an action applying to nothing. Understand "$rtevent" as real-time-firing.
+
+Carry out real-time-firing: follow the real-time event rules.
+
+Real-time event is a rulebook.
+
+To request real-time events every (N - number) seconds:
+	change server register "rteinterval" to N.
+
+To stop real-time events:
+	change server register "rteinterval" to 0.
+
+Chapter 4 - Shutdown notification
+
+Shutdown-notifying is an action applying to nothing. Understand "$shutdown" as shutdown-notifying.
+
+Carry out shutdown-notifying: follow the realm shutdown rules.
+
+Realm shutdown is a rulebook.
 
 Guncho Bot Realms ends here.
 
