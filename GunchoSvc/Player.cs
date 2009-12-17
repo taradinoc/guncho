@@ -29,6 +29,11 @@ namespace Guncho
 
         public abstract string LogName { get; }
 
+        public virtual string JoinCommand
+        {
+            get { return "$join"; }
+        }
+
         public virtual bool IsAdmin
         {
             get { return false; }
@@ -257,127 +262,6 @@ namespace Guncho
         public override void Write(string text)
         {
             // nada
-        }
-    }
-
-    class BotPlayer : Player
-    {
-        private readonly BotInstance instance;
-        private readonly int botID;
-        private readonly StringBuilder buffer = new StringBuilder();
-        private readonly StringBuilder lineBuffer = new StringBuilder();
-        private readonly HashSet<int> objectIDs = new HashSet<int>();
-
-        public BotPlayer(BotInstance instance, int botID, string name)
-            : base(name)
-        {
-            this.instance = instance;
-            this.botID = botID;
-        }
-
-        public int BotID
-        {
-            get { return botID; }
-        }
-
-        public override string LogName
-        {
-            get { return Name + " (bot)"; }
-        }
-
-        public override void NotifyInstanceReloading()
-        {
-            instance.QueueInput("$reloading " + botID.ToString());
-        }
-
-        public override string GetAttribute(string name)
-        {
-            return base.GetAttribute(name);
-        }
-
-        public override IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
-        {
-            return base.GetAllAttributes();
-        }
-
-        public override void Write(char c)
-        {
-            buffer.Append(c);
-            if (c == '\n')
-                CheckForLines();
-        }
-
-        public override void Write(string text)
-        {
-            buffer.Append(text);
-            CheckForLines();
-        }
-
-        private void CheckForLines()
-        {
-            while (buffer.Length > 0)
-            {
-                for (int i = 0; i < buffer.Length; i++)
-                {
-                    if (buffer[i] == '\n')
-                    {
-                        // all the lines we care about start with a dollar sign
-                        if (buffer[0] == '$')
-                        {
-                            for (int j = 0; j < i; j++)
-                                lineBuffer.Append(buffer[j]);
-
-                            if (lineBuffer.Length > 0 && lineBuffer[lineBuffer.Length - 1] == '\r')
-                                lineBuffer.Remove(lineBuffer.Length - 1, 1);
-
-                            if (lineBuffer.Length > 0)
-                                FilterAndPassLine(lineBuffer.ToString());
-
-                            lineBuffer.Length = 0;
-                        }
-
-                        buffer.Remove(0, i + 1);
-                        break;
-                    }
-                }
-            }
-        }
-
-        private static string GetToken(char sep, ref string text)
-        {
-            int idx = text.IndexOf(sep);
-
-            string result;
-            if (idx == -1)
-            {
-                result = text;
-                text = string.Empty;
-            }
-            else
-            {
-                result = text.Substring(0, idx);
-                text = text.Substring(idx + 1);
-            }
-
-            return result;
-        }
-
-        private void FilterAndPassLine(string line)
-        {
-            string word = GetToken(' ', ref line);
-            switch (word)
-            {
-                case "$object":
-                    throw new NotImplementedException();    //XXX
-                case "$delobject":
-                    throw new NotImplementedException();    //XXX
-                case "$move":
-                    throw new NotImplementedException();    //XXX
-                case "$chprop":
-                    throw new NotImplementedException();    //XXX
-                case "$action":
-                    throw new NotImplementedException();    //XXX
-            }
         }
     }
 }

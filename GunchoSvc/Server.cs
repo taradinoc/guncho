@@ -1717,7 +1717,7 @@ namespace Guncho
             player.FlushOutput();
         }
 
-        public void DisconnectBot(BotPlayer bot)
+        public void DisconnectPlayer(Player bot)
         {
             QueueEvent(delegate { EnterInstance(bot, null); });
         }

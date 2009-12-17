@@ -205,7 +205,7 @@ namespace Guncho
 
                     actionMap = new TranslationMap<ActionInfo>();
                     kindMap = new IntTranslationMap();
-                    propMap = new IntTranslationMap();
+                    propMap = new TranslationMap<PropInfo>();
 
                     OnVMStarting();
                     vm.Run();
@@ -676,6 +676,17 @@ namespace Guncho
             }
         }
 
+        protected struct PropInfo : IProvideNumber
+        {
+            public int Number;
+            public ArgType Type;
+
+            int IProvideNumber.Number
+            {
+                get { return Number; }
+            }
+        }
+
         protected struct IntInfo : IProvideNumber
         {
             public int Number;
@@ -734,17 +745,26 @@ namespace Guncho
         protected class IntTranslationMap : TranslationMap<IntInfo> { }
 
         protected TranslationMap<ActionInfo> actionMap;
-        protected IntTranslationMap kindMap, propMap;
+        protected IntTranslationMap kindMap;
+        protected TranslationMap<PropInfo> propMap;
 
         protected void RegisterProperty(string line)
         {
             // num type name
             // ... but we actually treat type+name as the name
             string word = GetToken(' ', ref line);
-            int num;
+            PropInfo info;
 
-            if (int.TryParse(word, out num))
-                propMap.Add(line, num);
+            if (int.TryParse(word, out info.Number))
+            {
+                string typedName = line;
+
+                word = GetToken(' ', ref line);
+                if (!TryParseArgType(word, out info.Type))
+                    return;
+
+                propMap.Add(typedName, info);
+            }
         }
 
         protected void RegisterKind(string line)
@@ -776,7 +796,7 @@ namespace Guncho
                 if (!TryParseArgType(word, out info.ArgType2))
                     return;
 
-                actionMap.Add(line, info);
+                actionMap.Add(typedName, info);
             }
         }
 
@@ -1018,14 +1038,14 @@ namespace Guncho
         /// or <b>null</b> if neither is text.</param>
         /// <returns>The output from running the action, or <b>null</b> if the
         /// action is not supported.</returns>
-        public string RunBotAction(BotPlayer bot, string actname, string arg1, string arg2, string text)
+        public string RunBotAction(Player bot, string actname, string arg1, string arg2, string text)
         {
             if (rawMode)
                 throw new InvalidOperationException("Bot actions not supported in raw mode");
 
             int id;
             if (playerIDs.TryGetValue(bot, out id) == false)
-                throw new ArgumentException("Bot is not connected to the instance", "bot");
+                throw new ArgumentException("Player is not connected to the instance", "bot");
 
             ActionInfo? info = actionMap.GetInfo(actname);
             if (info == null)
@@ -1059,8 +1079,8 @@ namespace Guncho
             }
 
             if (!rawMode)
-                QueueInput(string.Format("${0} {1}={2}{3}",
-                    (player is BotPlayer) ? "botjoin" : "join",
+                QueueInput(string.Format("{0} {1}={2}{3}",
+                    player.JoinCommand,
                     player.Name,
                     id,
                     position == null ? "" : "," + position));
@@ -1679,7 +1699,7 @@ namespace Guncho
         protected override void OnVMFinished(bool wasTerminated)
         {
             foreach (BotPlayer bot in bots.Values)
-                server.DisconnectBot(bot);
+                server.DisconnectPlayer(bot);
 
             bots.Clear();
         }
@@ -1759,39 +1779,12 @@ namespace Guncho
                     return;
 
                 arg1 = GetToken(' ', ref line);
-                if (!ValidateActionArg(arg1, info.Value.ArgType1))
-                    return;
-
                 arg2 = GetToken(' ', ref line);
-                if (!ValidateActionArg(arg2, info.Value.ArgType2))
-                    return;
 
                 if (info.Value.ArgType1 != ArgType.Text && info.Value.ArgType2 != ArgType.Text)
                     line = null;
 
-                bot.Instance.RunBotAction(bot, actName, arg1, arg2, line);
-            }
-        }
-
-        private bool ValidateActionArg(string arg, ArgType argType)
-        {
-            long dummy;
-            switch (argType)
-            {
-                case ArgType.Number:
-                    return long.TryParse(arg, out dummy);
-                case ArgType.Object:
-                    // XXX validate object ID
-                    throw new NotImplementedException();
-                case ArgType.Omitted:
-                    return arg == ".";
-                case ArgType.Other:
-                    // let anything through
-                    return true;
-                case ArgType.Text:
-                    return arg == "$";
-                default:
-                    throw new ArgumentException("Type not supported for action arguments", "argType");
+                bot.RunAction(actName, arg1, arg2, line);
             }
         }
 
@@ -1816,7 +1809,7 @@ namespace Guncho
             {
                 BotPlayer player = bots[id];
                 bots.Remove(id);
-                server.DisconnectBot(player);
+                server.DisconnectPlayer(player);
             }
         }
 
@@ -1837,6 +1830,261 @@ namespace Guncho
         private static bool ValidBotName(string name)
         {
             return (name.Length <= 32) && (name.Trim() == name);
+        }
+
+        protected class BotPlayer : Player
+        {
+            private readonly BotInstance botInst;
+            private readonly int botID;
+            private readonly StringBuilder buffer = new StringBuilder();
+            private readonly StringBuilder lineBuffer = new StringBuilder();
+            private readonly HashSet<int> objectIDs = new HashSet<int>();
+
+            public BotPlayer(BotInstance botInstance, int botID, string name)
+                : base(name)
+            {
+                this.botInst = botInstance;
+                this.botID = botID;
+            }
+
+            public int BotID
+            {
+                get { return botID; }
+            }
+
+            public override string LogName
+            {
+                get { return Name + " (bot)"; }
+            }
+
+            public override string JoinCommand
+            {
+                get { return "$botjoin"; }
+            }
+
+            public override void NotifyInstanceReloading()
+            {
+                botInst.QueueInput("$reloading " + botID.ToString());
+            }
+
+            public override string GetAttribute(string name)
+            {
+                return base.GetAttribute(name);
+            }
+
+            public override IEnumerable<KeyValuePair<string, string>> GetAllAttributes()
+            {
+                return base.GetAllAttributes();
+            }
+
+            public override void Write(char c)
+            {
+                buffer.Append(c);
+                if (c == '\n')
+                    CheckForLines();
+            }
+
+            public override void Write(string text)
+            {
+                buffer.Append(text);
+                CheckForLines();
+            }
+
+            private void CheckForLines()
+            {
+                while (buffer.Length > 0)
+                {
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        if (buffer[i] == '\n')
+                        {
+                            // all the lines we care about start with a dollar sign
+                            if (buffer[0] == '$')
+                            {
+                                for (int j = 0; j < i; j++)
+                                    lineBuffer.Append(buffer[j]);
+
+                                if (lineBuffer.Length > 0 && lineBuffer[lineBuffer.Length - 1] == '\r')
+                                    lineBuffer.Remove(lineBuffer.Length - 1, 1);
+
+                                if (lineBuffer.Length > 0)
+                                    FilterAndPassLine(lineBuffer.ToString());
+
+                                lineBuffer.Length = 0;
+                            }
+
+                            buffer.Remove(0, i + 1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            private void FilterAndPassLine(string line)
+            {
+                /* This method must:
+                 * 1. Translate action/kind/prop IDs into the language of the bot instance.
+                 * 2. Keep the objectIDs set up to date.
+                 * 3. Drop lines that refer to unregistered objectIDs, or to actions,
+                 *    kinds, or properties that the bot instance hasn't registered.
+                 * 4. Add the botID to lines that it pases through, so the bot instance
+                 *    knows which bot is being addressed.
+                 */
+
+                string word = GetToken(' ', ref line);
+                int id, k, p;
+                switch (word)
+                {
+                    case "$youare":
+                        // objID
+                        if (int.TryParse(line, out id) && !objectIDs.Contains(id))
+                        {
+                            objectIDs.Add(id);
+                            botInst.QueueInput("$youare " + botID.ToString() + " " + id.ToString());
+                        }
+                        break;
+                    case "$object":
+                        // objID kind parent name
+                        word = GetToken(' ', ref line);
+                        if (int.TryParse(line, out id) && !objectIDs.Contains(id))
+                        {
+                            word = GetToken(' ', ref line);
+                            if (int.TryParse(word, out k))
+                            {
+                                string kn = this.Instance.GetKindName(k);
+                                if (kn != null)
+                                {
+                                    int? kq = botInst.kindMap.GetNumber(kn);
+                                    if (kq != null)
+                                    {
+                                        k = kq.Value;
+                                        word = GetToken(' ', ref line);
+                                        if (int.TryParse(word, out p) && objectIDs.Contains(p))
+                                        {
+                                            objectIDs.Add(id);
+                                            botInst.QueueInput("$object " + botID.ToString() +
+                                                " " + id.ToString() + " " + k.ToString() +
+                                                " " + p.ToString() + " " + line);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case "$delobject":
+                        // objID
+                        if (int.TryParse(line, out id) && objectIDs.Contains(id))
+                        {
+                            objectIDs.Remove(id);
+                            botInst.QueueInput("$delobject " + botID.ToString() + " " + id.ToString());
+                        }
+                        break;
+                    case "$move":
+                        // objID newparent
+                        word = GetToken(' ', ref line);
+                        if (int.TryParse(word, out id) && objectIDs.Contains(id))
+                        {
+                            word = GetToken(' ', ref line);
+                            if (int.TryParse(word, out p) && objectIDs.Contains(p))
+                            {
+                                botInst.QueueInput("$move " + botID.ToString() + " " + id.ToString() +
+                                    " " + p.ToString());
+                            }
+                        }
+                        break;
+                    case "$chprop":
+                        // objID propID value
+                        word = GetToken(' ', ref line);
+                        if (int.TryParse(word, out id) && objectIDs.Contains(id))
+                        {
+                            word = GetToken(' ', ref line);
+                            if (int.TryParse(word, out p))
+                            {
+                                string propn = this.Instance.GetPropertyName(p);
+                                if (propn != null)
+                                {
+                                    PropInfo? info = botInst.propMap.GetInfo(propn);
+                                    if (info != null && ValidateArg(line, info.Value.Type, false))
+                                    {
+                                        botInst.QueueInput("$chprop " + botID.ToString() +
+                                            " " + id.ToString() + " " + info.Value.Number.ToString() +
+                                            " " + line);
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case "$action":
+                        // actor actnum noun second [text]
+                        word = GetToken(' ', ref line);
+                        if (int.TryParse(word, out id) && objectIDs.Contains(id))
+                        {
+                            word = GetToken(' ', ref line);
+                            if (int.TryParse(word, out k))
+                            {
+                                string actn = this.Instance.GetActionName(k);
+                                if (actn != null)
+                                {
+                                    ActionInfo? info = botInst.actionMap.GetInfo(actn);
+                                    if (info != null)
+                                    {
+                                        word = GetToken(' ', ref line);
+                                        if (ValidateArg(word, info.Value.ArgType1, true))
+                                        {
+                                            string n = word;
+                                            word = GetToken(' ', ref line);
+                                            if (ValidateArg(word, info.Value.ArgType2, true))
+                                            {
+                                                string s = word;
+                                                string cmd = "$action " + botID.ToString() + " " +
+                                                    id.ToString() + " " + info.Value.Number.ToString() +
+                                                    " " + n + " " + s;
+                                                if (info.Value.ArgType1 == ArgType.Text ||
+                                                    info.Value.ArgType2 == ArgType.Text)
+                                                    cmd = cmd + " " + line;
+                                                botInst.QueueInput(cmd);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+
+            private bool ValidateArg(string arg, ArgType argType, bool isActionArg)
+            {
+                long dummy;
+                int i;
+                switch (argType)
+                {
+                    case ArgType.Boolean:
+                        return arg == "1" || arg == "0";
+                    case ArgType.Number:
+                        return long.TryParse(arg, out dummy);
+                    case ArgType.Object:
+                        return int.TryParse(arg, out i) && objectIDs.Contains(i);
+                    case ArgType.Omitted:
+                        return arg == ".";
+                    case ArgType.Other:
+                        // let anything through
+                        return true;
+                    case ArgType.Text:
+                        if (isActionArg)
+                            return arg == "$";
+                        else
+                            return true;
+                    default:
+                        throw new ArgumentException("Argument type not recognized", "argType");
+                }
+            }
+
+            public void RunAction(string actName, string arg1, string arg2, string text)
+            {
+                // validate and translate arguments
+                throw new NotImplementedException();    //XXX
+            }
         }
     }
 }
