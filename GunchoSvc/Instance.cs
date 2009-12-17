@@ -1770,21 +1770,10 @@ namespace Guncho
                 if (!int.TryParse(word, out actnum))
                     return;
 
-                string actName = actionMap.GetName(actnum);
-                if (actName == null)
-                    return;
-
-                ActionInfo? info = actionMap.GetInfo(actName);
-                if (info == null)
-                    return;
-
                 arg1 = GetToken(' ', ref line);
                 arg2 = GetToken(' ', ref line);
 
-                if (info.Value.ArgType1 != ArgType.Text && info.Value.ArgType2 != ArgType.Text)
-                    line = null;
-
-                bot.RunAction(actName, arg1, arg2, line);
+                bot.RunAction(actnum, arg1, arg2, line);
             }
         }
 
@@ -2080,10 +2069,50 @@ namespace Guncho
                 }
             }
 
-            public void RunAction(string actName, string arg1, string arg2, string text)
+            /// <summary>
+            /// Performs an action on the remote instance and processes the resulting output.
+            /// </summary>
+            /// <param name="actNum">The action number, as registered by the bot instance.</param>
+            /// <param name="arg1">The first argument, or "$" if the first argument is text.</param>
+            /// <param name="arg2">The second argument, or "$" if the second argument is text.</param>
+            /// <param name="text">The textual argument, or <b>null</b> if neither argument is
+            /// text.</param>
+            /// <remarks>The action will not be performed if:
+            /// <list type="bullet">
+            /// <item><paramref name="actNum"/> was not registered by the bot instance, or</item>
+            /// <item><paramref name="actNum"/> corresponds to an action name that was not
+            /// registered by the remote instance, or</item>
+            /// <item>Either argument is invalid for its type (e.g. an unregistered object ID
+            /// for an object, or a non-numeric value for a number), or</item>
+            /// <item>Either argument is text and <paramref name="text"/> is <b>null</b>.</item>
+            /// </list></remarks>
+            public void RunAction(int actNum, string arg1, string arg2, string text)
             {
-                // validate and translate arguments
-                throw new NotImplementedException();    //XXX
+                // validate action name
+                string actName = botInst.actionMap.GetName(actNum);
+                if (actName == null)
+                    return;
+
+                ActionInfo? info = botInst.actionMap.GetInfo(actName);
+                if (info == null)
+                    return;
+
+                // validate args
+                if (!ValidateArg(arg1, info.Value.ArgType1, true))
+                    return;
+
+                if (!ValidateArg(arg2, info.Value.ArgType2, true))
+                    return;
+
+                if (info.Value.ArgType1 == ArgType.Text || info.Value.ArgType2 == ArgType.Text)
+                {
+                    if (text == null)
+                        return;
+                }
+                else
+                    text = null;
+
+                this.Instance.RunBotAction(this, actName, arg1, arg2, text);
             }
         }
     }
