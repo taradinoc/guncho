@@ -392,6 +392,81 @@ Include (-
 ];
 -).
 
+Section 4 - Injecting actions
+
+A special command handling rule (this is the handle bot actions rule):
+	if the player's command matches the regular expression "^\$action (\d+) (\d+) (\S+) (\S+) ?(.*)$":
+		let botID be the numeric value of the text matching subexpression 1;
+		if botID identifies a botmode person (called the acting bot):
+			let act be the numeric value of the text matching subexpression 2;
+			let nounstr be the text matching subexpression 3;
+			let secondstr be the text matching subexpression 4;
+			let rest be the text matching subexpression 5;
+			let nountype be the noun arg type of act;
+			let secondtype be the second noun arg type of act;
+			if nounstr is valid for nountype and secondstr is valid for secondtype:
+				change the player to the acting bot;
+				change the actor to the player;
+				if nountype is text-arg or secondtype is text-arg, change the text of the player's command to rest;
+				change the noun to the action arg value of nounstr as nountype;
+				change the second noun to the action arg value of secondstr as secondtype;
+				trigger the action act;
+		rule succeeds.
+
+Action-arg-type is a kind of value. The action-arg-types are omitted-arg, boolean-arg, number-arg, object-arg, text-arg, and other-arg.
+
+To decide whether (str - indexed text) is valid for (argtype - action-arg-type):
+	if argtype is:
+		-- omitted-arg: decide on whether or not str is ".";
+		-- boolean-arg: decide on whether or not str is "1" or str is "0";
+		-- number-arg: decide on whether or not str exactly matches the regular expression "-?\d+";
+		-- object-arg:
+			let X be the numeric value of str;
+			decide on whether or not X is a valid object address;
+		-- text-arg: decide on whether or not str is "$";
+		-- other-arg: decide no.
+
+To decide whether (X - number) is a valid object address: (- (({X})->0 == $70) -). [Glulx only!]
+To decide which object is the object at address (X - number): (- {X} -).
+
+To decide which action-arg-type is the noun arg type of (act - number): (- GetActionArgType({act}, AD_NOUN_KOV) -).
+To decide which action-arg-type is the second noun arg type of (act - number): (- GetActionArgType({act}, AD_SECOND_KOV) -).
+
+Include (-
+[ GetActionArgType ac ofs  i f;
+	i = FindAction(ac);
+	if (~~i) return (+ omitted-arg +);
+	f = ActionData-->(i+AD_REQUIREMENTS);
+	if (ofs == AD_NOUN_KOV && ~~(f & NEED_NOUN_ABIT)) return (+ omitted-arg +);
+	if (ofs == AD_SECOND_KOV && ~~(f & NEED_SECOND_ABIT)) return (+ omitted-arg +);
+	switch (ActionData-->(i+ofs)) {
+		TRUTH_STATE_TY: return (+ boolean-arg +);
+		NUMBER_TY: return (+ number-arg +);
+		OBJECT_TY: return (+ object-arg +);
+		UNDERSTANDING_TY: return (+ text-arg +);
+		default: return (+ other-arg +);
+	}
+];
+-).
+
+To decide which object is the action arg value of (str - indexed text) as (type - action-arg-type):
+	if type is:
+		-- boolean-arg:
+			change the truth state understood to whether or not str is not "0";
+		-- number-arg:
+			change the number understood to the numeric value of str;
+			decide on nothing;
+		-- object-arg:
+			let X be the numeric value of str;
+			decide on the object at address X;
+		-- text-arg:
+			change the topic understood to the player's command;
+			decide on nothing;			
+		-- otherwise:
+			decide on nothing.
+
+To trigger the action (act - number): (- TryAction(0, actor, {act}, noun, second, 0); -).
+
 Chapter 2 - Chat commands
 
 A special command handling rule (this is the handle chatting and emoting rule):

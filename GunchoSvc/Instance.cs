@@ -1054,7 +1054,7 @@ namespace Guncho
             if (info == null)
                 return null;
 
-            return SendAndGet(
+            string output = SendAndGet(
                 string.Format("$action {0} {1} {2} {3}{4}{5}",
                     id,
                     info.Value.Number,
@@ -1062,6 +1062,10 @@ namespace Guncho
                     arg2,
                     text == null ? "" : " ",
                     text ?? ""));
+
+            OnHandleOutput(output);
+            FlushAll();
+            return output;
         }
 
         /// <summary>
