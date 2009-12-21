@@ -1956,7 +1956,7 @@ namespace Guncho
                     case "$object":
                         // objID kind parent name
                         word = GetToken(' ', ref line);
-                        if (int.TryParse(line, out id) && !objectIDs.Contains(id))
+                        if (int.TryParse(word, out id) && !objectIDs.Contains(id))
                         {
                             word = GetToken(' ', ref line);
                             if (int.TryParse(word, out k))
@@ -1975,6 +1975,13 @@ namespace Guncho
                                             botInst.QueueInput("$object " + botID.ToString() +
                                                 " " + id.ToString() + " " + k.ToString() +
                                                 " " + p.ToString() + " " + line);
+                                        }
+                                        else if (word == ".")
+                                        {
+                                            objectIDs.Add(id);
+                                            botInst.QueueInput("$object " + botID.ToString() +
+                                                " " + id.ToString() + " " + k.ToString() +
+                                                " . " + line);
                                         }
                                     }
                                 }

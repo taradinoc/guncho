@@ -190,6 +190,8 @@ Chapter 1 - Initial Handshake
 
 When play begins (this is the initial server handshake rule):
 	describe the known actions;
+	describe the known kinds;
+	describe the known properties;
 	let N be 1;
 	repeat with B running through bots:
 		change the bot-ID of B to N;
@@ -197,6 +199,8 @@ When play begins (this is the initial server handshake rule):
 		increase N by 1.
 
 To describe the known actions: (- ShowKnownActions(); -).
+To describe the known kinds: (- ShowKnownKinds(); -).
+To describe the known properties: (- ShowKnownProperties(); -).
 
 Include (-
 [ ShowKnownActions  i c act abits;
@@ -227,6 +231,55 @@ Include (-
 		NUMBER_TY: print "n";
 		UNDERSTANDING_TY: print "t";
 		default: print "?";
+	}
+];
+
+[ ShowKnownKinds  x;
+	objectloop (x ofclass Class && IsI7Kind(x))
+		print "$register kind ", x, " ", (I7_Kind_Name) x, "^";
+];
+
+[ IsI7Kind cl  i l a;
+	if (cl == K0_kind) rfalse;
+	! read the class's property 2 from its inherited property table
+	! the :: operator would make this easy, if only we had an instance
+	#ifdef TARGET_ZCODE;
+	i = 0-->(((0-->5)+124+cl*14)/2);
+	i = CP__Tab(i + 2*(0->i) + 1, -1)+6;
+	a = CP__Tab(i, 2);
+	if (~~a) rfalse;
+	switch (((a-1)->0) & $C0) {
+		0: l = 1;
+		$40: l = 2;
+		$80: l = ((a-1)->0) & $3F;
+	}
+	l = l / WORDSIZE;
+	#ifnot;
+	i = CP__Tab(cl, 2);
+	if (~~i) rfalse;
+	a = i-->1;
+	@aloads i 1 l;
+	#endif;
+
+	for (i=0: i<l: i++)
+		if (a-->i == K0_kind) rtrue;
+	rfalse;
+];
+
+Array GunchoBoolProperties -->
+	(+ neuter +) (+ female +) (+ scenery +)
+	(+ openable +) (+ open +) (+ lockable +) (+ locked +)
+	(+ transparent +) (+ lit +) (+ fixed in place +)
+	0;
+
+[ ShowKnownProperties  i p off;
+	for (i=0::i++) {
+		p = GunchoBoolProperties-->i;
+		if (~~p) rfalse;
+		print "$register prop ", p, " b ";
+		if (p < FBNA_PROP_NUMBER) off = attribute_offsets-->p;
+		else off = property_offsets-->p;
+		print (string) property_metadata-->off, "^";
 	}
 ];
 -).

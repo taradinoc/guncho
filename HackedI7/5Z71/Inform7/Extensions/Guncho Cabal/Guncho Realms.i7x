@@ -117,6 +117,8 @@ The last special command handling rule (this is the unknown special command rule
 
 Chapter 3 - Special output handling
 
+Section 1 - Telling
+
 [BUGFIX: 5J39 contains a bug where passing indexed text from one phrase to another can cause I6 compilation errors when the second phrase has parameters that are runtime type checked. The "target" parameters here should be typed PC, but they're objects instead to work around this bug.]
 
 To tell (message - indexed text) to (target - an object):
@@ -141,6 +143,60 @@ To tell (message - indexed text) to bots who can see (spectacle - an object):
 
 To announce (message - indexed text):
 	say "<$a>[message]</$a>".
+
+Section 2 - Describing objects
+
+To decide which list of objects is the topographically sorted list of (D - description):
+	let the unsorted set be the list of D;
+	let the result list be a list of objects;
+	while the unsorted set is not empty:
+		let elem be entry 1 in the unsorted set;
+		while the holder of elem is listed in the unsorted set, let elem be the holder of elem;
+		add elem to the result list;
+		remove elem from the unsorted set;
+	decide on the result list.
+
+To describe (D - description) in botmode to (bot - PC):
+	let L be the topographically sorted list of D;
+	repeat with X running through L:
+		describe X in botmode to the bot.
+
+To describe (obj - object) in botmode to (bot - PC):
+	tell "$object [object ID of obj] [kind ID of obj] [object ID of the holder of obj] [obj][line break]" to the bot;
+	tell "[boolean properties of obj]" to the bot;
+
+To say object ID of (obj - object): (- SayObjectID({obj}); -).
+
+To say kind ID of (obj - object): (- SayKindIDOf({obj}); -).
+
+To say boolean properties of (obj - object): (- SayBoolPropsOf({obj}); -).
+
+Include (-
+[ SayObjectID obj; if (obj) print obj; else print "."; ];
+
+[ SayKindIDOf obj  i a;
+	a = obj.&2;
+	if ((~~a) || (a-->0 == K0_kind)) { print (+ thing +); rfalse; }
+	print a-->0;
+];
+
+[ SayBoolPropsOf obj  i p f;
+	for (i=0::i++) {
+		p = GunchoBoolProperties-->i;
+		if (~~p) rfalse;
+		if (p < FBNA_PROP_NUMBER) f = obj has p;
+		else f = obj provides p && obj.p;
+		if (f) print "$chprop ", obj, " ", p, " 1^";
+	}
+];
+-).
+
+To decide which number is property ID of (prop - property): (- {prop} -).
+
+Carry out looking (this is the describe nearby objects to bots rule):
+	if the player is botmode:
+		describe the location of the player in botmode to the player;
+		describe unconcealed things that can be seen by the player in botmode to the player.
 
 Chapter 4 - Winning and losing
 
@@ -185,15 +241,13 @@ A special command handling rule (this is the handle joining rule):
 		let the new mud-name be the text matching subexpression 2;
 		let the new mud-id be the numeric value of the text matching subexpression 3;
 		let the new location be the text matching subexpression 4;
-		add a player named the new mud-name with ID the new mud-id at location the new location;
-		if the new botmode is true and the new mud-id identifies a PC (called the new bot) begin;
-			now the new bot is botmode;
-			tell "$youare [object ID of the new bot][line break]" to the new bot;
+		if the new botmode is true begin;
+			add a player named the new mud-name with ID the new mud-id at location the new location, in botmode;
+		otherwise;
+			add a player named the new mud-name with ID the new mud-id at location the new location;
 		end if;
 		rule succeeds;
 	end if.
-
-To say object ID of (obj - object): (- print {obj}; -).
 
 [TODO: Rewrite this in I6 so it can treat the digits as characters instead of strings.]
 To decide which number is numeric value of (T - indexed text):
@@ -220,7 +274,7 @@ To decide which number is numeric value of (T - indexed text):
 	if negated is true, let result be 0 - result;
 	decide on result.
 
-To add a player named (new mud-name - indexed text) with ID (new mud-id - number) at location (new path - indexed text):
+To add a player named (new mud-name - indexed text) with ID (new mud-id - number) at location (new path - indexed text), in botmode:
 	if no PC is in the PC-corral begin;
 		say "No available player slots.";
 	otherwise if the new mud-id identifies a PC;
@@ -231,11 +285,13 @@ To add a player named (new mud-name - indexed text) with ID (new mud-id - number
 		if a PC (called the reserved body) is reserved, let newbie be the reserved body;
 		otherwise let newbie be a random PC in the PC-corral;
 		now the newbie is unreserved;
-        now the newbie is proper-named;
+		now the newbie is proper-named;
+		if in botmode, now the newbie is botmode;
 		reset pronouns for the newbie;
 		move the newbie along entrance path the new path;
 		change the mud-id of the newbie to the new mud-id;
 		change the mud-name of the newbie to the new mud-name;
+		if in botmode, tell "$youare [object ID of the newbie][line break]" to the newbie;
 		follow the player joining rules for the newbie;
 	end if.
 
@@ -354,10 +410,14 @@ Section 3 - Polling for info
 A special command handling rule (this is the handle info requests rule):
 	if the player's command matches "$info" begin;
 		describe the known actions;
+		describe the known kinds;
+		describe the known properties;
 		rule succeeds;
 	end if.
 
 To describe the known actions: (- ShowKnownActions(); -).
+To describe the known kinds: (- ShowKnownKinds(); -).
+To describe the known properties: (- ShowKnownProperties(); -).
 
 Include (-
 [ ShowKnownActions  i c act abits;
@@ -388,6 +448,55 @@ Include (-
 		NUMBER_TY: print "n";
 		UNDERSTANDING_TY: print "t";
 		default: print "?";
+	}
+];
+
+[ ShowKnownKinds  x;
+	objectloop (x ofclass Class && IsI7Kind(x))
+		print "$register kind ", x, " ", (I7_Kind_Name) x, "^";
+];
+
+[ IsI7Kind cl  i l a;
+	if (cl == K0_kind) rfalse;
+	! read the class's property 2 from its inherited property table
+	! the :: operator would make this easy, if only we had an instance
+	#ifdef TARGET_ZCODE;
+	i = 0-->(((0-->5)+124+cl*14)/2);
+	i = CP__Tab(i + 2*(0->i) + 1, -1)+6;
+	a = CP__Tab(i, 2);
+	if (~~a) rfalse;
+	switch (((a-1)->0) & $C0) {
+		0: l = 1;
+		$40: l = 2;
+		$80: l = ((a-1)->0) & $3F;
+	}
+	l = l / WORDSIZE;
+	#ifnot;
+	i = CP__Tab(cl, 2);
+	if (~~i) rfalse;
+	a = i-->1;
+	@aloads i 1 l;
+	#endif;
+
+	for (i=0: i<l: i++)
+		if (a-->i == K0_kind) rtrue;
+	rfalse;
+];
+
+Array GunchoBoolProperties -->
+	(+ neuter +) (+ female +) (+ scenery +)
+	(+ openable +) (+ open +) (+ lockable +) (+ locked +)
+	(+ transparent +) (+ lit +) (+ fixed in place +)
+	0;
+
+[ ShowKnownProperties  i p off;
+	for (i=0::i++) {
+		p = GunchoBoolProperties-->i;
+		if (~~p) rfalse;
+		print "$register prop ", p, " b ";
+		if (p < FBNA_PROP_NUMBER) off = attribute_offsets-->p;
+		else off = property_offsets-->p;
+		print (string) property_metadata-->off, "^";
 	}
 ];
 -).
