@@ -41,10 +41,14 @@ A PC is a kind of person.
 A bot is a kind of person.
 A bot can be connected or disconnected. A bot is usually disconnected.
 A bot has a number called bot-ID.
+A bot has a number called direction-ID-index.
 
 To decide which bot is the bot with ID (N - number):
 	repeat with B running through bots:
 		if the bot-ID of B is N, decide on B.
+
+The verb to be directionally indexed as implies the direction-ID-index property.
+Definition: a number is direction-index-available if no bot is directionally indexed as it.
 
 Bot connection is an object-based rulebook.
 Bot disconnection is an object-based rulebook.
@@ -55,11 +59,11 @@ To connect (victim - a bot) to (realm - text):
 Bot-dubbing is an action applying to one topic. Understand "$youare [text]" as bot-dubbing.
 
 Carry out bot-dubbing:
-	say "bot-dub [topic understood][line break]";
+	[say "bot-dub [topic understood][line break]";]
 	if the topic understood matches the regular expression "^(\d+) (\d+)$":
 		let botID be the numeric value of the text matching subexpression 1;
 		let holoID be the numeric value of the text matching subexpression 2;
-		say "botID=[botID] holoID=[holoID][line break]";
+		[say "botID=[botID] holoID=[holoID][line break]";]
 		let newbie be the bot with ID botID;
 		if the newbie is a bot:
 			now the newbie is connected;
@@ -69,14 +73,33 @@ Carry out bot-dubbing:
 
 Part 2 - The Holodeck and Props
 
+Chapter 1 - Holodeck kinds
+
 The holodeck-corral is a room.
 
-A thing can be remote. A thing is usually remote. A bot is never remote.
-A room can be remote. A room is usually remote. The holodeck-corral is not remote.
+A thing can be remote. A bot is never remote.
+A room can be remote. The holodeck-corral is not remote.
+A direction can be remote. A direction is usually not remote.
 A thing has a number called holodeck-ID.
 A room has a number called holodeck-ID.
+A direction has a list of numbers called holodeck-IDs.
 A thing has indexed text called the remote name.
 A room has indexed text called the remote name.
+A direction has indexed text called the remote name.
+
+To decide which number is the holodeck-ID of (dir - direction) for (B - bot):
+	let idx be the direction-ID-index of B;
+	let L be the holodeck-IDs of dir;
+	if the number of entries in L is at least idx:
+		decide on entry idx of L;
+	otherwise:
+		say "*** [B] can't refer to direction [dir] ***[line break]";
+		decide on 0.
+
+To decide which direction is the direction identified by (ID - number) for (B - bot):
+	repeat with dir running through directions:
+		if ID is listed in the holodeck-IDs of dir, decide on dir;
+	decide on nothing.
 
 Understand the remote name property as describing a thing.
 
@@ -88,27 +111,44 @@ Rule for printing the name of a remote room (called R):
 
 A holodeck is a kind of thing. There are 5 holodecks.
 
-Holosimulation relates one holodeck (called the associated holodeck) to various rooms. The verb to be simulated by implies the holosimulation relation.
+Holosimulation relates one holodeck (called the associated holodeck) to various things. The verb to be simulated by implies the holosimulation relation.
+
+Definition: a holodeck is empty if no things are simulated by it.
+
+Holodeck-direction-1 is a direction. It is remote.
+Holodeck-direction-2 is a direction. It is remote.
+Holodeck-direction-3 is a direction. It is remote.
+Holodeck-direction-4 is a direction. It is remote.
+Holodeck-direction-5 is a direction. It is remote.
+Holodeck-direction-6 is a direction. It is remote.
+Holodeck-direction-7 is a direction. It is remote.
+Holodeck-direction-8 is a direction. It is remote.
+Holodeck-direction-9 is a direction. It is remote.
+Holodeck-direction-10 is a direction. It is remote.
 
 A holodeck-room is a kind of room. It is always remote. There are 20 holodeck-rooms.
 
-A holodeck-thing is a kind of thing. There are 50 holodeck-things in the holodeck-corral.
+A holodeck-thing is a kind of thing. It is always remote. There are 50 holodeck-things in the holodeck-corral.
 
-A holodeck-container is a kind of container. There are 20 holodeck-containers in the holodeck-corral.
+A holodeck-container is a kind of container. It is always remote. There are 20 holodeck-containers in the holodeck-corral.
 
-A holodeck-supporter is a kind of supporter. There are 20 holodeck-supporters in the holodeck-corral.
+A holodeck-supporter is a kind of supporter. It is always remote. There are 20 holodeck-supporters in the holodeck-corral.
 
-A holodeck-person is a kind of person. There are 20 holodeck-persons in the holodeck-corral.
+A holodeck-person is a kind of person. It is always remote. There are 20 holodeck-persons in the holodeck-corral.
 
-The plural of holodeck-man is holodeck-men. A holodeck-man is a kind of man. There are 20 holodeck-men in the holodeck-corral.
+The plural of holodeck-man is holodeck-men. A holodeck-man is a kind of man. It is always remote. There are 20 holodeck-men in the holodeck-corral.
 
-The plural of holodeck-woman is holodeck-women. A holodeck-woman is a kind of woman. There are 20 holodeck-women in the holodeck-corral.
+The plural of holodeck-woman is holodeck-women. A holodeck-woman is a kind of woman. It is always remote. There are 20 holodeck-women in the holodeck-corral.
 
 Definition: a thing is unallocated if its holodeck-ID is 0.
 Definition: a room is unallocated if its holodeck-ID is 0.
+Definition: a direction is unallocated if its holodeck-IDs is empty.
 
 Definition: a thing is reclaimable if it is off-stage or it is in a reclaimable room.
 Definition: a room is reclaimable if it does not enclose a bot and it is not adjacent to a room that encloses a bot.
+Definition: a direction is reclaimable if it is not an exit from a room which is not reclaimable.
+
+Exiting-from relates a direction (called D) to a room (called R) when the room-or-door D from R is not nothing. The verb to be an exit from implies the exiting-from relation.
 
 To reclaim (victim - object):
 	let C be the first thing held by the victim;
@@ -126,19 +166,63 @@ To reclaim (victim - object):
 	change the holodeck-ID of the victim to 0;
 	change the remote name of the victim to "".
 
-To decide which object is a newly allocated (D - description) with ID (N - number):
-	repeat with M running through members of D:
+To decide which object is a fresh holodeck prop with kind ID (KN - number) and object ID (ON - number) for (B - bot): (- FreshHolodeckProp({KN}, {ON}, {B}) -).
+
+Include (-
+[ FreshHolodeckProp k id bot  x a l;
+	objectloop (x ofclass k) {
+		! only accept remote objects
+		#iftrue (+ remote +) < FBNA_PROP_NUMBER;
+		if (x hasnt (+ remote +)) continue;
+		#ifnot;
+		if (~~(x provides (+ remote +) && x.(+ remote +))) continue;
+		#endif;
+		! if k is thing, we'll accept holodeck-thing (direct subkind) but not holodeck-person (indirect subkind)
+		a = x.&2;
+		if (~~a) continue;
+		l = x.#2 / WORDSIZE;
+		if (a-->0 ~= k && (l == 1 || a-->1 ~= k)) continue;
+		if (~~((+ unallocated +)(x) && (+ reclaimable +)(x))) continue;
+		! found one
+		if (k == (+ direction +))
+			LIST_OF_TY_InsertItem(x.(+ holodeck-IDs +), id, 1, bot.(+ direction-ID-index +));
+		else
+			x.(+ holodeck-ID +) = id;
+		return x;
+	}
+	print "*** Out of holodeck props (k = ", (I7_Kind_Name) k, ") ***^";
+	rfalse;
+];
+-) after "Miscellaneous Loose Ends" in "Output.i6t". [which is where FBNA_PROP_NUMBER is defined]
+
+[	repeat with M running through members of D:
 		if M is not unallocated and M is not reclaimable, next;
 		change the holodeck-ID of M to N;
 		decide on M;
 	say "*** Out of holodeck props ***[line break]";
-	decide on nothing.
+	decide on nothing.]
 
 To decide which object is the object with ID (N - number):
 	repeat with R running through rooms:
 		if the holodeck-ID of R is N, decide on R;
 	repeat with T running through things:
 		if the holodeck-ID of T is N, decide on T.
+
+Chapter 2 - Building the holodeck
+
+Object-defining is an action applying to one topic. Understand "$object [text]" as object-defining.
+
+Carry out object-defining:
+	if the topic understood matches the regular expression "^(\d+) (\d+) (\d+) (\d+|\.) (.*)$":
+		let botID be the numeric value of the text matching subexpression 1;
+		let objID be the numeric value of the text matching subexpression 2;
+		let kindID be the numeric value of the text matching subexpression 3;
+		if the text matching subexpression 4 is ".":
+			let parentID be 0;
+		otherwise:
+			let parentID be the numeric value of the text matching subexpression 4;
+		let objName be the text matching subexpression 5;
+		[XXX]
 
 Part 2 - Actions
 

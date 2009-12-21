@@ -1327,7 +1327,10 @@ This is the investigate multiplayer awareness after action and report rule:
 				if rule succeeded, let observant be true;
 			if observant is true:
 				say "<$t [mud-id of X]>";
-				consider the specific report rulebook;
+				if X is botmode:
+					report the action in bot mode;
+				otherwise:
+					consider the specific report rulebook;
 				say "</$t>";
 		change the player to the original player.
 
@@ -1339,7 +1342,7 @@ Include (-
 	f = ActionData-->(i+AD_REQUIREMENTS);
 	if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
 	if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
-	print "<$t ", actor.(+ mud-id +), ">$action ", actor.(+ mud-id +), " ", actor, " ", action, " ";
+	print "$action ", actor, " ", action, " ";
 	PrintActionArg(noun, nk);
 	print " ";
 	PrintActionArg(second, sk);
@@ -1347,7 +1350,7 @@ Include (-
 		print " ";
 		PrintSnippet(parsed_number);
 	}
-	print "^</$t>";
+	print "^";
 ];
 
 [ PrintActionArg n nk;
