@@ -293,6 +293,7 @@ To add a player named (new mud-name - indexed text) with ID (new mud-id - number
 		change the mud-name of the newbie to the new mud-name;
 		if in botmode, tell "$youare [object ID of the newbie][line break]" to the newbie;
 		follow the player joining rules for the newbie;
+		if in botmode, tell "$yourloc [object ID of the holder of the newbie][line break]" to the newbie;
 	end if.
 
 To reset pronouns for (victim - object): (- ResetPronouns({victim}); -).

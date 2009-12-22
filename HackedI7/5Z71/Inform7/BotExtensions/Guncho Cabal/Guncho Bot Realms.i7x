@@ -59,15 +59,25 @@ To connect (victim - a bot) to (realm - text):
 Bot-dubbing is an action applying to one topic. Understand "$youare [text]" as bot-dubbing.
 
 Carry out bot-dubbing:
-	[say "bot-dub [topic understood][line break]";]
 	if the topic understood matches the regular expression "^(\d+) (\d+)$":
 		let botID be the numeric value of the text matching subexpression 1;
 		let holoID be the numeric value of the text matching subexpression 2;
-		[say "botID=[botID] holoID=[holoID][line break]";]
 		let newbie be the bot with ID botID;
 		if the newbie is a bot:
 			now the newbie is connected;
 			change the holodeck-ID of the newbie to holoID;
+			if a holodeck (called H) is empty, change the associated holodeck of the newbie to H;
+			otherwise say "*** Out of holodecks ***[line break]".
+
+Bot-placing is an action applying to one topic. Understand "$yourloc [text]" as bot-placing.
+
+Carry out bot-placing:
+	if the topic understood matches the regular expression "^(\d+) (\d+)$":
+		let botID be the numeric value of the text matching subexpression 1;
+		let holoID be the numeric value of the text matching subexpression 2;
+		let newbie be the bot with ID botID;
+		if the newbie is a bot:
+			move the newbie to the object with ID holoID;
 			change the player to the newbie;
 			follow the bot connection rules for the newbie.
 
@@ -111,9 +121,12 @@ Rule for printing the name of a remote room (called R):
 
 A holodeck is a kind of thing. There are 5 holodecks.
 
-Holosimulation relates one holodeck (called the associated holodeck) to various things. The verb to be simulated by implies the holosimulation relation.
+A room has an object called the associated holodeck. The associated holodeck of a room is usually nothing.
+A thing has an object called the associated holodeck. The associated holodeck of a thing is usually nothing.
+A direction has an object called the associated holodeck. The associated holodeck of a direction is usually nothing.
+The verb to be simulated by implies the associated holodeck property.
 
-Definition: a holodeck is empty if no things are simulated by it.
+Definition: a holodeck is empty rather than non-empty if no things are simulated by it.
 
 Holodeck-direction-1 is a direction. It is remote.
 Holodeck-direction-2 is a direction. It is remote.
@@ -129,6 +142,12 @@ Holodeck-direction-10 is a direction. It is remote.
 A holodeck-room is a kind of room. It is always remote. There are 20 holodeck-rooms.
 
 A holodeck-thing is a kind of thing. It is always remote. There are 50 holodeck-things in the holodeck-corral.
+
+[XXX can't define doors without connecting them to the map]
+[A holodeck-door is a kind of door. It is always remote. There are 20 holodeck-doors.]
+
+[XXX backdrops can't easily be moved the way we want to move them, without some template hacking]
+[A holodeck-backdrop is a kind of backdrop. It is always remote. There are 20 holodeck-backdrops.]
 
 A holodeck-container is a kind of container. It is always remote. There are 20 holodeck-containers in the holodeck-corral.
 
@@ -164,7 +183,8 @@ To reclaim (victim - object):
 		repeat with D running through directions:
 			change the D exit of the victim to nowhere;
 	change the holodeck-ID of the victim to 0;
-	change the remote name of the victim to "".
+	change the remote name of the victim to "";
+	change the associated holodeck of the victim to nothing.
 
 To decide which object is a fresh holodeck prop with kind ID (KN - number) and object ID (ON - number) for (B - bot): (- FreshHolodeckProp({KN}, {ON}, {B}) -).
 
@@ -182,7 +202,9 @@ Include (-
 		if (~~a) continue;
 		l = x.#2 / WORDSIZE;
 		if (a-->0 ~= k && (l == 1 || a-->1 ~= k)) continue;
-		if (~~((+ unallocated +)(x) && (+ reclaimable +)(x))) continue;
+		! BUGFIX: 5Z71 compiles adjectives inside ( + + ) incorrectly (as routine calls applied to subst__v instead of names)
+		subst__v = x;
+		if (~~((+ unallocated +) && (+ reclaimable +))) continue;
 		! found one
 		if (k == (+ direction +))
 			LIST_OF_TY_InsertItem(x.(+ holodeck-IDs +), id, 1, bot.(+ direction-ID-index +));
@@ -194,13 +216,6 @@ Include (-
 	rfalse;
 ];
 -) after "Miscellaneous Loose Ends" in "Output.i6t". [which is where FBNA_PROP_NUMBER is defined]
-
-[	repeat with M running through members of D:
-		if M is not unallocated and M is not reclaimable, next;
-		change the holodeck-ID of M to N;
-		decide on M;
-	say "*** Out of holodeck props ***[line break]";
-	decide on nothing.]
 
 To decide which object is the object with ID (N - number):
 	repeat with R running through rooms:
@@ -215,6 +230,7 @@ Object-defining is an action applying to one topic. Understand "$object [text]" 
 Carry out object-defining:
 	if the topic understood matches the regular expression "^(\d+) (\d+) (\d+) (\d+|\.) (.*)$":
 		let botID be the numeric value of the text matching subexpression 1;
+		let curbot be the bot with ID botID;
 		let objID be the numeric value of the text matching subexpression 2;
 		let kindID be the numeric value of the text matching subexpression 3;
 		if the text matching subexpression 4 is ".":
@@ -222,7 +238,11 @@ Carry out object-defining:
 		otherwise:
 			let parentID be the numeric value of the text matching subexpression 4;
 		let objName be the text matching subexpression 5;
-		[XXX]
+		let the new prop be a fresh holodeck prop with kind ID kindID and object ID objID for curbot;
+		if the new prop is nothing, stop;
+		unless parentID is 0, move the new prop to the object with ID parentID;
+		change the remote name of the new prop to objName;
+		now the new prop is simulated by the associated holodeck of curbot.
 
 Part 2 - Actions
 

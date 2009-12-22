@@ -1953,6 +1953,13 @@ namespace Guncho
                             botInst.QueueInput("$youare " + botID.ToString() + " " + id.ToString());
                         }
                         break;
+                    case "$yourloc":
+                        // objID
+                        if (int.TryParse(line, out id) && objectIDs.Contains(id))
+                        {
+                            botInst.QueueInput("$yourloc " + botID.ToString() + " " + id.ToString());
+                        }
+                        break;
                     case "$object":
                         // objID kind parent name
                         word = GetToken(' ', ref line);
