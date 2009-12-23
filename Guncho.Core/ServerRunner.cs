@@ -40,8 +40,9 @@ namespace Guncho
         {
             Environment.SetEnvironmentVariable("HOME", homeDir);
 
-            Directory.CreateDirectory(homeDir + @"\Inform\Documentation");
-            Directory.CreateDirectory(homeDir + @"\Inform\Extensions");
+            string idir = Path.Combine(homeDir, "Inform");
+            Directory.CreateDirectory(Path.Combine(idir, "Documentation"));
+            Directory.CreateDirectory(Path.Combine(idir, "Extensions"));
 
             bool ownLogger = false;
             if (logger == null)
