@@ -274,15 +274,16 @@ namespace Guncho
             factories.Clear();
             foreach (string subPath in Directory.GetDirectories(Properties.Settings.Default.NiInstallationsPath))
             {
-                if (File.Exists(Path.Combine(subPath, @"Compilers\ni.exe")))
+                string nibin, i6bin;
+                if (InformRealmFactory.FindCompilers(Path.Combine(subPath, "Compilers"), out nibin, out i6bin))
                 {
                     string version = Path.GetFileName(subPath);
 
                     RealmFactory factory = new InformRealmFactory(this, version,
-                        Path.Combine(subPath, @"Compilers\ni.exe"),
-                        Path.Combine(subPath, @"Inform7\Extensions"),
-                        Path.Combine(subPath, @"Compilers\inform-631.exe"),
-                        Path.Combine(subPath, @"Library\Natural"));
+                        nibin,
+                        Path.Combine(subPath, "Inform7" + Path.DirectorySeparatorChar + "Extensions"),
+                        i6bin,
+                        Path.Combine(subPath, "Library" + Path.DirectorySeparatorChar + "Natural"));
 
                     if (defaultFactory == null || version.CompareTo(defaultFactory) < 0)
                         defaultFactory = version;

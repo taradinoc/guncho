@@ -207,8 +207,8 @@ namespace Guncho
             string uuid = MakeUUID(realmName);
             File.WriteAllText(Path.Combine(skeleton, "uuid.txt"), uuid);
 
-            string tempNI = Path.Combine(skeleton, @"Source\story.ni");
-            string tempINF = Path.Combine(skeleton, @"Build\auto.inf");
+            string tempNI = Path.Combine(skeleton, "Source" + Path.DirectorySeparatorChar + "story.ni");
+            string tempINF = Path.Combine(skeleton, "Build" + Path.DirectorySeparatorChar + "auto.inf");
             File.Delete(tempNI);
             File.Delete(tempINF);
             File.Copy(sourceFile, tempNI);
@@ -249,7 +249,7 @@ namespace Guncho
             {
                 // copy Problems.html
                 File.Copy(
-                    Path.Combine(skeleton, @"Build\Problems.html"),
+                    Path.Combine(skeleton, "Build" + Path.DirectorySeparatorChar + "Problems.html"),
                     Path.Combine(realmIndexPath, "Problems.html"),
                     true);
 
@@ -309,6 +309,35 @@ namespace Guncho
             }
         }
 
+        private static readonly string[] niBins = { "ni", "ni.exe" };
+        private static readonly string[] i6Bins = { "inform-631", "inform-631.exe" };
 
+        public static bool FindCompilers(string dir, out string nibin, out string i6bin)
+        {
+            nibin = i6bin = null;
+
+            if (Directory.Exists(dir))
+            {
+                foreach (string name in niBins)
+                {
+                    if (File.Exists(Path.Combine(dir, name)))
+                    {
+                        nibin = Path.Combine(dir, name);
+                        break;
+                    }
+                }
+
+                foreach (string name in i6Bins)
+                {
+                    if (File.Exists(Path.Combine(dir, name)))
+                    {
+                        i6bin = Path.Combine(dir, name);
+                        break;
+                    }
+                }
+            }
+
+            return (nibin != null) && (i6bin != null);
+        }
     }
 }
