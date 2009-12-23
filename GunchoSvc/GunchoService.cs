@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.IO;
 
-namespace Guncho
+namespace Guncho.WinService
 {
     public partial class GunchoService : ServiceBase
     {
@@ -53,11 +53,11 @@ namespace Guncho
 
             if (oldThread != null)
             {
-                runner.Server.Shutdown("Stopping the service");
+                runner.Stop("Stopping the service");
 
                 if (oldThread != System.Threading.Thread.CurrentThread)
                 {
-                    RequestAdditionalTime(Properties.Settings.Default.EventGranularity * 2);
+                    RequestAdditionalTime(Guncho.Properties.Settings.Default.EventGranularity * 2);
                     oldThread.Join();
                 }
             }
@@ -67,9 +67,9 @@ namespace Guncho
         {
             if (serverThread != null)
             {
-                runner.Server.Shutdown("Host is shutting down");
+                runner.Stop("Host is shutting down");
 
-                RequestAdditionalTime(Properties.Settings.Default.EventGranularity * 2);
+                RequestAdditionalTime(Guncho.Properties.Settings.Default.EventGranularity * 2);
 
                 Thread oldThread = serverThread;
                 serverThread = null;

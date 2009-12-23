@@ -6,7 +6,7 @@ using System.Configuration.Install;
 using System.Linq;
 
 
-namespace Guncho
+namespace Guncho.WinService
 {
     [RunInstaller(true)]
     public partial class ProjectInstaller : Installer

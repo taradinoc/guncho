@@ -8,7 +8,7 @@
     <ProjectGuid>{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>GunchoConsole</RootNamespace>
+    <RootNamespace>Guncho.ConsoleDaemon</RootNamespace>
     <AssemblyName>GunchoConsole</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -49,9 +49,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\GunchoSvc\GunchoSvc.csproj">
-      <Project>{36451BCF-514B-4EA3-A567-75BFE4914BAA}</Project>
-      <Name>GunchoSvc</Name>
+    <ProjectReference Include="..\Guncho.Core\Guncho.Core.csproj">
+      <Project>{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}</Project>
+      <Name>Guncho.Core</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

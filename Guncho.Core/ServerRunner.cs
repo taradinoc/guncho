@@ -69,5 +69,11 @@ namespace Guncho
                 }
             }
         }
+
+        public void Stop(string reason)
+        {
+            if (svr != null)
+                svr.Shutdown(reason);
+        }
     }
 }

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>9.0.21022</ProductVersion>
+    <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{2199B2D3-6D26-440F-BA80-0BAD98B8B168}</ProjectGuid>
     <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
@@ -153,9 +153,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\GunchoSvc\GunchoSvc.csproj">
-      <Project>{36451BCF-514B-4EA3-A567-75BFE4914BAA}</Project>
-      <Name>GunchoSvc</Name>
+    <ProjectReference Include="..\Guncho.Core\Guncho.Core.csproj">
+      <Project>{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}</Project>
+      <Name>Guncho.Core</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -182,6 +182,9 @@
           <OverrideIISAppRootUrl>True</OverrideIISAppRootUrl>
           <IISAppRootUrl>http://localhost/ControlPanel</IISAppRootUrl>
           <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>False</UseCustomServer>
+          <CustomServerUrl>
+          </CustomServerUrl>
           <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
         </WebProjectProperties>
       </FlavorProperties>
