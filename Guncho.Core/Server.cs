@@ -629,7 +629,7 @@ namespace Guncho
                 if (GetInstance(name) != null)
                     throw new ArgumentException("An instance with this name is already loaded", "name");
                 result = realm.Factory.LoadInstance(realm, name);
-                instances.Add(name, result);
+                instances.Add(name.ToLower(), result);
             }
 
             return result;

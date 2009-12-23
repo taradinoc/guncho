@@ -255,6 +255,14 @@ namespace Guncho
 
                 if (File.Exists(tempINF) && output.Contains("source text has successfully been translated"))
                 {
+                    // Linux I7 adds a blank line at the top of auto.inf that breaks ICL parsing
+                    string tempContent = File.ReadAllText(tempINF);
+                    int i = 0;
+                    while (i < tempContent.Length && char.IsWhiteSpace(tempContent[i]))
+                        i++;
+                    if (i > 0 && i < tempContent.Length)
+                        File.WriteAllText(tempINF, tempContent.Substring(i));
+                    
                     output = Execute(infCompilerPath,
                         "-Gw",
                         "+include_path=" + infLibraryDir,
@@ -310,7 +318,7 @@ namespace Guncho
         }
 
         private static readonly string[] niBins = { "ni", "ni.exe" };
-        private static readonly string[] i6Bins = { "inform-631", "inform-631.exe" };
+        private static readonly string[] i6Bins = { "inform-6.31-biplatform", "inform-631.exe" };
 
         public static bool FindCompilers(string dir, out string nibin, out string i6bin)
         {
