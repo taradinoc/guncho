@@ -1,4 +1,4 @@
-﻿namespace Guncho
+﻿namespace Guncho.WinService
 {
     partial class ProjectInstaller
     {

@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoSvc", "GunchoSvc\Gunc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoConsole", "GunchoConsole\GunchoConsole.csproj", "{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Core", "Guncho.Core\Guncho.Core.csproj", "{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +38,10 @@ Global
 		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
