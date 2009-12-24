@@ -435,7 +435,9 @@ Include (-
 		if (abits & OUT_OF_WORLD_ABIT) continue;
 		act = ActionData-->(i + AD_ACTION);
 		print "$register action ", act, " ";
-		if (abits & NEED_NOUN_ABIT)
+		if (act == (+ chatting action +) or (+ emoting action +))
+			print "t";
+		else if (abits & NEED_NOUN_ABIT)
 			ShowActionArgType(ActionData-->(i + AD_NOUN_KOV));
 		else
 			print "-";
@@ -524,7 +526,9 @@ A special command handling rule (this is the handle bot actions rule):
 			if nounstr is valid for nountype and secondstr is valid for secondtype:
 				change the player to the acting bot;
 				change the actor to the player;
-				if nountype is text-arg or secondtype is text-arg, change the text of the player's command to rest;
+				if nountype is text-arg or secondtype is text-arg:
+					change the text of the player's command to rest;
+					change the text spoken to rest;
 				change the noun to the action arg value of nounstr as nountype;
 				change the second noun to the action arg value of secondstr as secondtype;
 				trigger the action act;
@@ -551,6 +555,8 @@ To decide which action-arg-type is the second noun arg type of (act - number): (
 
 Include (-
 [ GetActionArgType ac ofs  i f;
+	if (ac == (+ chatting action +) or (+ emoting action +) && ofs == AD_NOUN_KOV)
+		return (+ text-arg +);
 	i = FindAction(ac);
 	if (~~i) return (+ omitted-arg +);
 	f = ActionData-->(i+AD_REQUIREMENTS);
@@ -605,8 +611,10 @@ A special command handling rule (this is the handle chatting and emoting rule):
 		rule succeeds;
 	end if.
 
-The text spoken is an indexed text that varies.
+The text spoken is an indexed text that varies. The text spoken variable translates into I6 as "text_spoken".
 The chat direction is an indexed text that varies.
+
+Include (- Global text_spoken; -) after "Global Variables" in "Output.i6t".
 
 Chatting is an action applying to nothing.
 
@@ -1344,19 +1352,25 @@ To report the action in bot mode: (- ReportActionInBotMode(); -).
 
 Include (-
 [ ReportActionInBotMode  i f nk sk;
-	i = FindAction(-1);
-	f = ActionData-->(i+AD_REQUIREMENTS);
-	if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
-	if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
-	print "$action ", actor, " ", action, " ";
-	PrintActionArg(noun, nk);
-	print " ";
-	PrintActionArg(second, sk);
-	if (nk == UNDERSTANDING_TY || sk == UNDERSTANDING_TY) {
+	if (action == (+ chatting action +) or (+ emoting action +)) {
+		print "$action ", actor, " " , action, " $ . ";
+		INDEXED_TEXT_TY_Say(text_spoken);
+		print "^";
+	} else {
+		i = FindAction(-1);
+		f = ActionData-->(i+AD_REQUIREMENTS);
+		if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
+		if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
+		print "$action ", actor, " ", action, " ";
+		PrintActionArg(noun, nk);
 		print " ";
-		PrintSnippet(parsed_number);
+		PrintActionArg(second, sk);
+		if (nk == UNDERSTANDING_TY || sk == UNDERSTANDING_TY) {
+			print " ";
+			PrintSnippet(parsed_number);
+		}
+		print "^";
 	}
-	print "^";
 ];
 
 [ PrintActionArg n nk;

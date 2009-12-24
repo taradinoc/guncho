@@ -20,4 +20,5 @@ After someone offering something to Floyd:
 	try Floyd dropping the noun.
 
 After someone chatting:
-	try Floyd chatting "lol [the topic understood]".
+	change the text of the player's command to "lol [the topic understood]";
+	try Floyd chatting the player's command.
