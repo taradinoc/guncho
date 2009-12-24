@@ -64,7 +64,6 @@ Carry out bot-dubbing:
 		let holoID be the numeric value of the text matching subexpression 2;
 		let newbie be the bot with ID botID;
 		if the newbie is a bot:
-			now the newbie is connected;
 			change the holodeck-ID of the newbie to holoID;
 			if a holodeck (called H) is empty, change the associated holodeck of the newbie to H;
 			otherwise say "*** Out of holodecks ***[line break]".
@@ -77,6 +76,7 @@ Carry out bot-placing:
 		let holoID be the numeric value of the text matching subexpression 2;
 		let newbie be the bot with ID botID;
 		if the newbie is a bot:
+			now the newbie is connected;
 			move the newbie to the object with ID holoID;
 			change the player to the newbie;
 			follow the bot connection rules for the newbie.
@@ -159,6 +159,8 @@ The plural of holodeck-man is holodeck-men. A holodeck-man is a kind of man. It 
 
 The plural of holodeck-woman is holodeck-women. A holodeck-woman is a kind of woman. It is always remote. There are 20 holodeck-women in the holodeck-corral.
 
+A holodeck-PC is a kind of PC. It is always remote. There are 20 holodeck-PCs in the holodeck-corral.
+
 Definition: a thing is unallocated if its holodeck-ID is 0.
 Definition: a room is unallocated if its holodeck-ID is 0.
 Definition: a direction is unallocated if its holodeck-IDs is empty.
@@ -217,11 +219,22 @@ Include (-
 ];
 -) after "Miscellaneous Loose Ends" in "Output.i6t". [which is where FBNA_PROP_NUMBER is defined]
 
-To decide which object is the object with ID (N - number):
-	repeat with R running through rooms:
-		if the holodeck-ID of R is N, decide on R;
-	repeat with T running through things:
-		if the holodeck-ID of T is N, decide on T.
+To decide which object is the object with ID (N - number): (- FindObjectByID({N}) -).
+
+Include (-
+[ FindObjectByID num  x;
+	objectloop (x) {
+		if (x provides (+ holodeck-ID +)) {
+			if (x.(+ holodeck-ID +) == num)
+				return x;
+		} else if (x provides (+ holodeck-IDs +)) {
+			if (LIST_OF_TY_FindItem(x.(+ holodeck-IDs +), num))
+				return x;
+		}
+	}
+	rfalse;
+];
+-).
 
 Chapter 2 - Building the holodeck
 
@@ -263,9 +276,9 @@ Include (-
 	if (f & NEED_NOUN_ABIT) nk = ActionData-->(i+AD_NOUN_KOV);
 	if (f & NEED_SECOND_ABIT) sk = ActionData-->(i+AD_SECOND_KOV);
 	print "$action ", by.(+ bot-ID +), " ", ac, " ";
-	PrintActionArg(n, nk);
+	PrintActionArg(n, nk, by);
 	print " ";
-	PrintActionArg(s, sk);
+	PrintActionArg(s, sk, by);
 	if (nk == UNDERSTANDING_TY) {
 		print " "; PrintSnippet(n);
 	} else if (sk == UNDERSTANDING_TY) {
@@ -274,9 +287,22 @@ Include (-
 	new_line;
 ];
 
-[ PrintActionArg n nk;
+[ PrintActionArg n nk bot  i list;
 	switch (nk) {
-		NUMBER_TY, OBJECT_TY: print n;
+		NUMBER_TY: print n;
+		OBJECT_TY:
+			if (n provides (+ holodeck-ID +)) {
+				print n.(+ holodeck-ID +);
+			} else if (n provides (+ holodeck-IDs +)) {
+				list = n.(+ holodeck-IDs +);
+				i = bot.(+ direction-ID-index +);
+				if (LIST_OF_TY_GetLength(list) >= i)
+					print LIST_OF_TY_GetItem(list, i);
+				else
+					print ".";
+			} else {
+				print ".";
+			}
 		UNDERSTANDING_TY: print "$";
 		TRUTH_STATE_TY: if (n) print "1"; else print "0";
 		default: print ".";
@@ -286,7 +312,62 @@ Include (-
 
 Chapter 2 - Receiving Actions
 
-[XXX]
+Action-firing is an action applying to one topic. Understand "$action [text]" as action-firing.
+
+Carry out action-firing:
+	if the topic understood matches the regular expression "^(\d+) (\d+) (\d+) (\S+) (\S+) ?(.*)$":
+		let botID be the numeric value of the text matching subexpression 1;
+		let actorID be the numeric value of the text matching subexpression 2;
+		let actionID be the numeric value of the text matching subexpression 3;
+		if the text matching subexpression 4 is ".", let nounID be 0;
+		otherwise let nounID be the numeric value of the text matching subexpression 4;
+		if the text matching subexpression 5 is ".", let secondID be 0;
+		otherwise let secondID be the numeric value of the text matching subexpression 5;
+		let rest be the text matching subexpression 6;
+		[fire the action]
+		let curbot be the bot with ID botID;
+		if curbot is not a connected bot, stop;
+		change the player to curbot;
+		change the actor to the object with ID actorID;
+		handle the remote action actionID with noun nounID second secondID and remainder rest.
+
+To handle the remote action (N - number) with noun (nid - number) second (sid - number) and remainder (T - indexed text): (- HandleRemoteAction({N}, {nid}, {sid}, {-pointer-to:T}); -).
+
+Include (-
+[ HandleRemoteAction act nid sid rest  i;
+	i = FindAction(act);
+	if (i < 0) rfalse;
+	switch (ActionData-->(i + AD_NOUN_KOV)) {
+		TRUTH_STATE_TY: parsed_number = (nid ~= 0);
+		NUMBER_TY: parsed_number = nid;
+		OBJECT_TY: noun = FindObjectByID(nid);
+		UNDERSTANDING_TY: SetPlayersCommand(rest); parsed_number = players_command;
+	}
+	switch (ActionData-->(i + AD_SECOND_KOV)) {
+		TRUTH_STATE_TY: parsed_number = (sid ~= 0);
+		NUMBER_TY: parsed_number = sid;
+		OBJECT_TY: second = FindObjectByID(sid);
+		UNDERSTANDING_TY: SetPlayersCommand(rest); parsed_number = players_command;
+	}
+	action = act;
+	return ProcessRulebook((+ after rules +));
+];
+-).
+
+[We use carry out rules to handle messages from the server, and trigger our own after rules to respond to remote actions. We don't need the rest of the standard action processing rules.]
+
+The investigate player's awareness before action rule is not listed in the specific action-processing rulebook.
+The check stage rule is not listed in the specific action-processing rulebook.
+The after stage rule is not listed in the specific action-processing rulebook.
+The investigate player's awareness after action rule is not listed in the specific action-processing rulebook.
+The report stage rule is not listed in the specific action-processing rulebook.
+
+Chapter 3 - New Action Definitions
+
+Offering it to is an action applying to two things.
+Accepting is an action applying to one thing.
+Chatting is an action applying to one topic.
+Emoting is an action applying to one topic.
 
 Part 3 - Server Communication
 

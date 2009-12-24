@@ -161,9 +161,7 @@ To describe (D - description) in botmode to (bot - PC):
 	repeat with X running through L:
 		describe X in botmode to the bot.
 
-To describe (obj - object) in botmode to (bot - PC):
-	tell "$object [object ID of obj] [kind ID of obj] [object ID of the holder of obj] [obj][line break]" to the bot;
-	tell "[boolean properties of obj]" to the bot;
+To describe (obj - object) in botmode to (bot - PC): (- DescribeInBotmode({obj}, {bot}); -).
 
 To say object ID of (obj - object): (- SayObjectID({obj}); -).
 
@@ -172,6 +170,15 @@ To say kind ID of (obj - object): (- SayKindIDOf({obj}); -).
 To say boolean properties of (obj - object): (- SayBoolPropsOf({obj}); -).
 
 Include (-
+[ DescribeInBotmode obj bot;
+	print "<$t ", bot.(+ mud-id +), ">$object ", obj, " ", (SayKindIDOf) obj,
+		" ", (SayObjectID) HolderOf(obj), " ", (PrintShortName) obj, "^";
+	
+	SayBoolPropsOf(obj);
+	
+	print "</$t>";
+];
+
 [ SayObjectID obj; if (obj) print obj; else print "."; ];
 
 [ SayKindIDOf obj  i a;
@@ -1328,10 +1335,8 @@ This is the investigate multiplayer awareness after action and report rule:
 				if rule succeeded, let observant be true;
 			if observant is true:
 				say "<$t [mud-id of X]>";
-				if X is botmode:
-					report the action in bot mode;
-				otherwise:
-					consider the specific report rulebook;
+				if X is botmode, report the action in bot mode;
+				otherwise consider the specific report rulebook;
 				say "</$t>";
 		change the player to the original player.
 
@@ -1898,6 +1903,82 @@ Include (-
 -).
 
 Chapter 3 - WorldModel segment
+
+Include (-
+[ MoveObject F T opt going_mode was x;
+	if (F == nothing) return RunTimeProblem(RTP_CANTMOVENOTHING);
+	if (F ofclass K7_backdrop) {
+		if (T ofclass K9_region) {
+			give F ~absent; F.found_in = T.regional_found_in;
+			if (TestRegionalContainment(LocationOf(player), T)) move F to LocationOf(player);
+			else remove F;
+			return; }
+		return RunTimeProblem(RTP_BACKDROP, F, T);
+	}
+	if (~~(F ofclass K2_thing)) return RunTimeProblem(RTP_NOTTHING, F, T);
+	if (T ofclass K9_region) return RunTimeProblem(RTP_NOTBACKDROP, F, T);
+	if (F has worn) {
+		give F ~worn;
+		if (F in T) return;
+	}
+	objectloop (x has botmode && x ofclass (+ PC +))
+		if (TestVisibility(x, F)) give x workflag2; else give x ~workflag2;
+	DetachPart(F);
+	if (going_mode == false) {
+		if (F == player) { PlayerTo(T, opt); jump TellBots; }
+		if ((IndirectlyContains(F, player)) && (LocationOf(player) ~= LocationOf(T))) {
+			was = parent(player);
+			move player to real_location;
+			move F to T;
+			PlayerTo(was, true);
+			jump TellBots;
+		}
+	}
+	move F to T;
+	.TellBots;
+	objectloop (x has botmode && x ofclass (+ PC +)) {
+		if (TestVisibility(x, F)) {
+			if (x has workflag2) {
+				print "<$t ", x.(+ mud-id +), ">$move ", F, " ", T, "^</$t>";
+			} else {
+				IntroduceObjToBot(F, x);
+			}
+		} else {
+			if (x has workflag2) {
+				RevokeObjFromBot(F, x);
+			}
+		}
+		give x ~workflag2;
+	}
+];
+
+[ IntroduceObjToBot obj bot  x;
+	DescribeInBotmode(obj, bot);
+	objectloop (x in obj)
+		IntroduceObjToBot(x, bot);
+	if (obj provides component_child)
+		for (x = obj.component_child: x: x = x.component_sibling)
+			IntroduceObjToBot(x, bot);
+];
+
+[ RevokeObjFromBot obj bot  x;
+	print "<$t ", bot.(+ mud-id +), ">$delobject ", obj, "^</$t>";
+	objectloop (x in obj)
+		RevokeObjFromBot(x, bot);
+	if (obj provides component_child)
+		for (x = obj.component_child: x: x = x.component_sibling)
+			RevokeObjFromBot(x, bot);
+];
+
+[ RemoveFromPlay F;
+	if (F == nothing) return RunTimeProblem(RTP_CANTREMOVENOTHING);
+	if (F == player) return RunTimeProblem(RTP_CANTREMOVEPLAYER);
+	if (F ofclass K4_door) return RunTimeProblem(RTP_CANTREMOVEDOORS);
+	give F ~worn; DetachPart(F);
+	if (F ofclass K7_backdrop) give F absent;
+	remove F;
+];
+-) instead of "Movements" in "WorldModel.i6t".
 
 Include (-
 [ ChangePlayer obj  pn;
