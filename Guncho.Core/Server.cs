@@ -294,7 +294,7 @@ namespace Guncho
                     factories.Add(version, factory);
 
                     // bot factory
-                    niExtensionDir = Path.Combine(subPath, @"Inform7\BotExtensions");
+                    niExtensionDir = Path.Combine(subPath, "Inform7" + Path.DirectorySeparatorChar + "BotExtensions");
                     if (Directory.Exists(niExtensionDir))
                     {
                         string name = "bot_" + version;
@@ -560,7 +560,7 @@ namespace Guncho
 
             RealmFactory factory;
             if (factories.TryGetValue(factoryName, out factory) == false)
-                throw new ArgumentException("Unrecognized realm factory", "factoryName");
+                throw new ArgumentException("Unrecognized realm factory: " + factoryName, "factoryName");
 
             lock (realms)
             {
