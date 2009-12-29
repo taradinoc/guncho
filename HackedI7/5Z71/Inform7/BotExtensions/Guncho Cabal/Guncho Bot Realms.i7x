@@ -241,19 +241,24 @@ Chapter 2 - Building the holodeck
 Object-defining is an action applying to one topic. Understand "$object [text]" as object-defining.
 
 Carry out object-defining:
-	if the topic understood matches the regular expression "^(\d+) (\d+) (\d+) (\d+|\.) (.*)$":
+	if the topic understood matches the regular expression "^(\d+) (\d+) (\d+) (\S+) (\d+|\.) (.*)$":
 		let botID be the numeric value of the text matching subexpression 1;
 		let curbot be the bot with ID botID;
 		let objID be the numeric value of the text matching subexpression 2;
 		let kindID be the numeric value of the text matching subexpression 3;
-		if the text matching subexpression 4 is ".":
+		let parentRel be the text matching subexpression 4;
+		if the text matching subexpression 5 is ".":
 			let parentID be 0;
 		otherwise:
-			let parentID be the numeric value of the text matching subexpression 4;
-		let objName be the text matching subexpression 5;
+			let parentID be the numeric value of the text matching subexpression 5;
+		let objName be the text matching subexpression 6;
 		let the new prop be a fresh holodeck prop with kind ID kindID and object ID objID for curbot;
 		if the new prop is nothing, stop;
-		unless parentID is 0, move the new prop to the object with ID parentID;
+		unless parentID is 0:
+			if parentRel is "part":
+				now the new prop is part of the object with ID parentID;
+			otherwise:
+				move the new prop to the object with ID parentID;
 		change the remote name of the new prop to objName;
 		now the new prop is simulated by the associated holodeck of curbot.
 

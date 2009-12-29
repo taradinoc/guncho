@@ -170,9 +170,14 @@ To say kind ID of (obj - object): (- SayKindIDOf({obj}); -).
 To say boolean properties of (obj - object): (- SayBoolPropsOf({obj}); -).
 
 Include (-
-[ DescribeInBotmode obj bot;
-	print "<$t ", bot.(+ mud-id +), ">$object ", obj, " ", (SayKindIDOf) obj,
-		" ", (SayObjectID) HolderOf(obj), " ", (PrintShortName) obj, "^";
+[ DescribeInBotmode obj bot  p;
+	if (~~obj) rfalse;
+	print "<$t ", bot.(+ mud-id +), ">$object ", obj, " ", (SayKindIDOf) obj, " ";
+	p = HolderOf(obj);
+	if (obj.component_parent) print "part ";
+	else if (p ofclass (+ supporter +)) print "on ";
+	else print "in ";
+	print (SayObjectID) p, " ", (PrintShortName) obj, "^";
 	
 	SayBoolPropsOf(obj);
 	
@@ -1953,7 +1958,10 @@ Include (-
 	objectloop (x has botmode && x ofclass (+ PC +)) {
 		if (TestVisibility(x, F)) {
 			if (x has workflag2) {
-				print "<$t ", x.(+ mud-id +), ">$move ", F, " ", T, "^</$t>";
+				print "<$t ", x.(+ mud-id +), ">$move ", F, " ";
+				if (T ofclass (+ supporter +)) print "on ";
+				else print "in ";
+				print T, "^</$t>";
 			} else {
 				IntroduceObjToBot(F, x);
 			}

@@ -1961,7 +1961,7 @@ namespace Guncho
                         }
                         break;
                     case "$object":
-                        // objID kind parent name
+                        // objID kind parentRelation parent name
                         word = GetToken(' ', ref line);
                         if (int.TryParse(word, out id) && !objectIDs.Contains(id))
                         {
@@ -1975,21 +1975,20 @@ namespace Guncho
                                     if (kq != null)
                                     {
                                         k = kq.Value;
+                                        string parentRel = GetToken(' ', ref line);
                                         word = GetToken(' ', ref line);
+                                        string pstr;
                                         if (int.TryParse(word, out p) && objectIDs.Contains(p))
-                                        {
-                                            objectIDs.Add(id);
-                                            botInst.QueueInput("$object " + botID.ToString() +
-                                                " " + id.ToString() + " " + k.ToString() +
-                                                " " + p.ToString() + " " + line);
-                                        }
+                                            pstr = p.ToString();
                                         else if (word == ".")
-                                        {
-                                            objectIDs.Add(id);
-                                            botInst.QueueInput("$object " + botID.ToString() +
-                                                " " + id.ToString() + " " + k.ToString() +
-                                                " . " + line);
-                                        }
+                                            pstr = ".";
+                                        else
+                                            break;
+
+                                        objectIDs.Add(id);
+                                        botInst.QueueInput("$object " + botID.ToString() +
+                                            " " + id.ToString() + " " + k.ToString() +
+                                            " " + parentRel + " " + pstr + " " + line);
                                     }
                                 }
                             }
@@ -2004,15 +2003,16 @@ namespace Guncho
                         }
                         break;
                     case "$move":
-                        // objID newparent
+                        // objID newparentRel newparent
                         word = GetToken(' ', ref line);
                         if (int.TryParse(word, out id) && objectIDs.Contains(id))
                         {
+                            string parentRel = GetToken(' ', ref line);
                             word = GetToken(' ', ref line);
                             if (int.TryParse(word, out p) && objectIDs.Contains(p))
                             {
                                 botInst.QueueInput("$move " + botID.ToString() + " " + id.ToString() +
-                                    " " + p.ToString());
+                                    " " + parentRel + " " + p.ToString());
                             }
                         }
                         break;
