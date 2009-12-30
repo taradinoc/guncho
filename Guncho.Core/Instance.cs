@@ -207,7 +207,7 @@ namespace Guncho
                     }
 
                     actionMap = new TranslationMap<ActionInfo>();
-                    kindMap = new IntTranslationMap();
+                    kindMap = new TranslationMap<KindInfo>();
                     propMap = new TranslationMap<PropInfo>();
 
                     OnVMStarting();
@@ -690,6 +690,17 @@ namespace Guncho
             }
         }
 
+        protected struct KindInfo : IProvideNumber
+        {
+            public int Number;
+            public int Parent;
+
+            int IProvideNumber.Number
+            {
+                get { return Number; }
+            }
+        }
+
         protected struct IntInfo : IProvideNumber
         {
             public int Number;
@@ -717,6 +728,16 @@ namespace Guncho
             {
                 names[value.Number] = name;
                 values[name] = value;
+            }
+
+            public bool ContainsName(string name)
+            {
+                return values.ContainsKey(name);
+            }
+
+            public bool ContainsNumber(int number)
+            {
+                return names.ContainsKey(number);
             }
 
             public string GetName(int number)
@@ -748,7 +769,7 @@ namespace Guncho
         protected class IntTranslationMap : TranslationMap<IntInfo> { }
 
         protected TranslationMap<ActionInfo> actionMap;
-        protected IntTranslationMap kindMap;
+        protected TranslationMap<KindInfo> kindMap;
         protected TranslationMap<PropInfo> propMap;
 
         protected void RegisterProperty(string line)
@@ -772,12 +793,20 @@ namespace Guncho
 
         protected void RegisterKind(string line)
         {
-            // num name
+            // num parent name
             string word = GetToken(' ', ref line);
-            int num;
+            KindInfo info;
 
-            if (int.TryParse(word, out num))
-                kindMap.Add(line, num);
+            if (int.TryParse(word, out info.Number))
+            {
+                word = GetToken(' ', ref line);
+                if (word == ".")
+                    info.Parent = 0;
+                else if (!int.TryParse(word, out info.Parent))
+                    return;
+                
+                kindMap.Add(line, info);
+            }
         }
 
         protected void RegisterAction(string line)
@@ -1968,6 +1997,7 @@ namespace Guncho
                             word = GetToken(' ', ref line);
                             if (int.TryParse(word, out k))
                             {
+                                // XXX need to translate kinds based on the intersection of both realms' kind trees (precalculate a table for the game instance to translate real kind ID to common base kind ID)
                                 string kn = this.Instance.GetKindName(k);
                                 if (kn != null)
                                 {

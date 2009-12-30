@@ -468,7 +468,7 @@ Include (-
 
 [ ShowKnownKinds  x;
 	objectloop (x ofclass Class && IsI7Kind(x))
-		print "$register kind ", x, " ", (I7_Kind_Name) x, "^";
+		print "$register kind ", x, " ", (SayParentKind) x, " ", (I7_Kind_Name) x, "^";
 ];
 
 [ IsI7Kind cl  i l a;
@@ -496,6 +496,36 @@ Include (-
 	for (i=0: i<l: i++)
 		if (a-->i == K0_kind) rtrue;
 	rfalse;
+];
+
+[ GetParentKind cl  i l a;
+	if (cl == K0_kind) rfalse;
+	! read the class's property 2 from its inherited property table
+	! the :: operator would make this easy, if only we had an instance
+	#ifdef TARGET_ZCODE;
+	i = 0-->(((0-->5)+124+cl*14)/2);
+	i = CP__Tab(i + 2*(0->i) + 1, -1)+6;
+	a = CP__Tab(i, 2);
+	if (~~a) rfalse;
+	switch (((a-1)->0) & $C0) {
+		0: l = 1;
+		$40: l = 2;
+		$80: l = ((a-1)->0) & $3F;
+	}
+	l = l / WORDSIZE;
+	#ifnot;
+	i = CP__Tab(cl, 2);
+	if (~~i) rfalse;
+	a = i-->1;
+	@aloads i 1 l;
+	#endif;
+
+	return a-->0;
+];
+
+[ SayParentKind cl;
+	cl = GetParentKind(cl);
+	if (cl) print cl; else print ".";
 ];
 
 Array GunchoBoolProperties -->
