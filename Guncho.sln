@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "XML Index Files", "XML Index Files", "{A26671B1-FE12-4B02-A86C-B3879BD63905}"
 	ProjectSection(SolutionItems) = preProject
 		RealmData\playerIndex.xml = RealmData\playerIndex.xml
