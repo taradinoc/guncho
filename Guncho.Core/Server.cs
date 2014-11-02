@@ -753,7 +753,7 @@ namespace Guncho
                         inst.ExportPlayerPositions(dict);
                         SetEventInterval(inst, 0);
                         inst.PolitelyDispose();
-                        instances.Remove(inst.Name);
+                        instances.Remove(inst.Name.ToLower());
                     }
 
                     // there shouldn't be any players in replacement instances, but
@@ -769,7 +769,7 @@ namespace Guncho
                         inst.ExportPlayerPositions(dict);
                         SetEventInterval(inst, 0);
                         inst.Dispose();
-                        instances.Remove(inst.Name);
+                        instances.Remove(inst.Name.ToLower());
                     }
 
                     LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
