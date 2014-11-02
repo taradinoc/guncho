@@ -30,9 +30,15 @@ namespace Guncho
         public abstract string GetInitialSourceText(string ownerName, string realmName);
         public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
 
-        public Realm LoadRealm(Stream storyFile, string name, string sourceFile, Player owner)
+        public Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
         {
-            return new Realm(server, this, storyFile, name, sourceFile, owner);
+            return new Realm(server, this, name, sourceFile, storyFile, owner);
+        }
+
+        public Instance LoadInstance(Realm realm, string name)
+        {
+            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
+            return new Instance(server, realm, stream, name);
         }
 
         protected static string MakeUUID(string realmName)
@@ -201,8 +207,8 @@ namespace Guncho
             string uuid = MakeUUID(realmName);
             File.WriteAllText(Path.Combine(skeleton, "uuid.txt"), uuid);
 
-            string tempNI = Path.Combine(skeleton, @"Source\story.ni");
-            string tempINF = Path.Combine(skeleton, @"Build\auto.inf");
+            string tempNI = Path.Combine(skeleton, "Source" + Path.DirectorySeparatorChar + "story.ni");
+            string tempINF = Path.Combine(skeleton, "Build" + Path.DirectorySeparatorChar + "auto.inf");
             File.Delete(tempNI);
             File.Delete(tempINF);
             File.Copy(sourceFile, tempNI);
@@ -243,12 +249,20 @@ namespace Guncho
             {
                 // copy Problems.html
                 File.Copy(
-                    Path.Combine(skeleton, @"Build\Problems.html"),
+                    Path.Combine(skeleton, "Build" + Path.DirectorySeparatorChar + "Problems.html"),
                     Path.Combine(realmIndexPath, "Problems.html"),
                     true);
 
                 if (File.Exists(tempINF) && output.Contains("source text has successfully been translated"))
                 {
+                    // Linux I7 adds a blank line at the top of auto.inf that breaks ICL parsing
+                    string tempContent = File.ReadAllText(tempINF);
+                    int i = 0;
+                    while (i < tempContent.Length && char.IsWhiteSpace(tempContent[i]))
+                        i++;
+                    if (i > 0 && i < tempContent.Length)
+                        File.WriteAllText(tempINF, tempContent.Substring(i));
+                    
                     output = Execute(infCompilerPath,
                         "-Gw",
                         "+include_path=" + infLibraryDir,
@@ -303,6 +317,35 @@ namespace Guncho
             }
         }
 
+        private static readonly string[] niBins = { "ni", "ni.exe" };
+        private static readonly string[] i6Bins = { "inform-6.31-biplatform", "inform-631.exe" };
 
+        public static bool FindCompilers(string dir, out string nibin, out string i6bin)
+        {
+            nibin = i6bin = null;
+
+            if (Directory.Exists(dir))
+            {
+                foreach (string name in niBins)
+                {
+                    if (File.Exists(Path.Combine(dir, name)))
+                    {
+                        nibin = Path.Combine(dir, name);
+                        break;
+                    }
+                }
+
+                foreach (string name in i6Bins)
+                {
+                    if (File.Exists(Path.Combine(dir, name)))
+                    {
+                        i6bin = Path.Combine(dir, name);
+                        break;
+                    }
+                }
+            }
+
+            return (nibin != null) && (i6bin != null);
+        }
     }
 }

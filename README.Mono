@@ -1,0 +1,16 @@
+GunchoConsole has been tested with Mono 2.0 on x86 Linux. To run it:
+
+1. Build the server:
+	
+    $ make
+
+2. Obtain the Linux tarball from inform7.com, and extract the compiler
+binaries "ni" and "inform-6.31-biplatform" into HackedI7/<build>/Compilers.
+
+3. Copy Guncho.Core/app.config to bin/GunchoConsole.exe.config, then edit it
+to set appropriate values for CachePath, RealmDataPath, NiSkeletonPath,
+LogPath, and NiInstallationsPath.
+
+4. Start the server:
+
+    $ mono bin/GunchoConsole.exe

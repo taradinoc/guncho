@@ -9,12 +9,12 @@ using System.Text;
 using System.Threading;
 using System.IO;
 
-namespace Guncho
+namespace Guncho.WinService
 {
     public partial class GunchoService : ServiceBase
     {
         private Thread serverThread;
-        private Server svr;
+        private ServerRunner runner;
         private readonly object serverThreadLock = new object();
 
         public GunchoService()
@@ -26,20 +26,8 @@ namespace Guncho
         {
             Thread.CurrentThread.Name = "Server Net";
 
-            string homeDir = Properties.Settings.Default.CachePath;
-            Environment.SetEnvironmentVariable("HOME", homeDir);
-
-            Directory.CreateDirectory(homeDir + @"\Inform\Documentation");
-            Directory.CreateDirectory(homeDir + @"\Inform\Extensions");
-
-            using (FileLogger logger = new FileLogger(
-                Properties.Settings.Default.LogPath,
-                Properties.Settings.Default.LogSpam))
-            {
-                svr = new Server(Properties.Settings.Default.GameServerPort, logger);
-                svr.Run();
-                svr.LogMessage(LogLevel.Notice, "Service terminating.");
-            }
+            runner = new ServerRunner();
+            runner.Run();
 
             lock (serverThreadLock)
                 serverThread = null;
@@ -65,11 +53,11 @@ namespace Guncho
 
             if (oldThread != null)
             {
-                svr.Shutdown("Stopping the service");
+                runner.Stop("Stopping the service");
 
                 if (oldThread != System.Threading.Thread.CurrentThread)
                 {
-                    RequestAdditionalTime(Properties.Settings.Default.EventGranularity * 2);
+                    RequestAdditionalTime(Guncho.Properties.Settings.Default.EventGranularity * 2);
                     oldThread.Join();
                 }
             }
@@ -79,9 +67,9 @@ namespace Guncho
         {
             if (serverThread != null)
             {
-                svr.Shutdown("Host is shutting down");
+                runner.Stop("Host is shutting down");
 
-                RequestAdditionalTime(Properties.Settings.Default.EventGranularity * 2);
+                RequestAdditionalTime(Guncho.Properties.Settings.Default.EventGranularity * 2);
 
                 Thread oldThread = serverThread;
                 serverThread = null;

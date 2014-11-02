@@ -1,134 +1,33 @@
-// send non-player game output to the console?
-#define CONSOLE_SPAM
-
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Xml.Serialization;
+using System.IO;
 using Textfyre.VM;
-using System.ComponentModel;
+using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace Guncho
 {
-    /// <summary>
-    /// Describes the level of access that a player has to a realm.
-    /// </summary>
-    public enum RealmAccessLevel
-    {
-        /// <summary>
-        /// The realm or player doesn't exist.
-        /// </summary>
-        Invalid,
-        /// <summary>
-        /// The player isn't allowed to enter the realm.
-        /// </summary>
-        Banned,
-        /// <summary>
-        /// The player isn't told of the realm's existence.
-        /// </summary>
-        Hidden,
-        /// <summary>
-        /// The player can see that the realm exists.
-        /// </summary>
-        Visible,
-        /// <summary>
-        /// The player can teleport into the realm.
-        /// </summary>
-        Invited,
-        /// <summary>
-        /// The player can view the realm's source and index.
-        /// </summary>
-        ViewSource,
-        /// <summary>
-        /// The player can make changes to the realm source.
-        /// </summary>
-        EditSource,
-        /// <summary>
-        /// The player can change the realm's metadata.
-        /// </summary>
-        EditSettings,
-        /// <summary>
-        /// The player can change other players' access to the realm.
-        /// </summary>
-        EditAccess,
-        /// <summary>
-        /// The player can make changes that are drastic or permanent,
-        /// such as deleting the realm.
-        /// </summary>
-        SafetyOff,
-
-        [Browsable(false)]
-        OWNER = SafetyOff,
-        [Browsable(false)]
-        ADMIN = SafetyOff
-    }
-
-    /// <summary>
-    /// Describes the default visibility and accessibility of a realm
-    /// to players other than the owner.
-    /// </summary>
-    public enum RealmPrivacyLevel
-    {
-        /// <summary>
-        /// Players aren't allowed to enter the realm.
-        /// </summary>
-        Private,
-        /// <summary>
-        /// Players aren't told of the realm's existence.
-        /// </summary>
-        Hidden,
-        /// <summary>
-        /// Players can see that the realm exists.
-        /// </summary>
-        Public,
-        /// <summary>
-        /// Players can jump to the realm with @teleport.
-        /// </summary>
-        Joinable,
-        /// <summary>
-        /// Players can view the realm's source code.
-        /// </summary>
-        Viewable,
-    }
-
-    struct RealmAccessListEntry
-    {
-        public readonly Player Player;
-        public readonly RealmAccessLevel Level;
-
-        public RealmAccessListEntry(Player player, RealmAccessLevel level)
-        {
-            this.Player = player;
-            this.Level = level;
-        }
-    }
-
-    class Realm : IDisposable
+    class Instance
     {
         private readonly Server server;
-        private readonly RealmFactory factory;
-        private Engine vm;
-        private readonly RealmIO io;
+        private readonly Realm realm;
         private readonly Stream zfile;
-        private readonly string name, sourceFile;
-        private readonly Player owner;
-        private RealmAccessListEntry[] accessList;
+        private readonly RealmIO io;
+        private readonly string name;
+
+        private Engine vm;
 
         private bool rawMode;
-        private RealmPrivacyLevel privacy = RealmPrivacyLevel.Public;
         private bool needReset;
+        private bool restartRequested;
         private DateTime watchdogTime = DateTime.MaxValue;
         private object watchdogLock = new object();
-
-        private bool condemned, restartRequested;
-        private int failureCount;
         private DateTime activationTime;
-
         private Thread terpThread;
         private object terpThreadLock = new object();
+
         private Dictionary<int, Player> players = new Dictionary<int, Player>();
 
         private int tagstate = 0;
@@ -140,16 +39,19 @@ namespace Guncho
         private const double WATCHDOG_SECONDS = 10.0;
         private static readonly Player Announcer = new Player(-1, "*Announcer*", false);
 
-        public Realm(Server server, RealmFactory factory, Stream zfile, string name, string sourceFile,
-            Player owner)
+        /// <summary>
+        /// Creates an new playable instance of a realm.
+        /// </summary>
+        /// <param name="server">The Guncho server.</param>
+        /// <param name="realm">The realm to instantiate.</param>
+        /// <param name="zfile">The compiled realm file.</param>
+        /// <param name="name">The unique name of the instance.</param>
+        public Instance(Server server, Realm realm, Stream zfile, string name)
         {
             this.server = server;
-            this.factory = factory;
+            this.realm = realm;
             this.zfile = zfile;
             this.name = name;
-            this.sourceFile = sourceFile;
-            this.owner = owner;
-            this.accessList = new RealmAccessListEntry[0];
 
             this.io = new RealmIO(this);
             this.vm = new Engine(zfile);
@@ -157,60 +59,37 @@ namespace Guncho
             vm.OutputReady += io.FyreOutputReady;
             vm.KeyWanted += io.FyreKeyWanted;
             vm.LineWanted += io.FyreLineWanted;
-
-            /*vm.CodeCacheSize = Properties.Settings.Default.CodeCacheSize;
-            vm.MaxUndoDepth = 0;*/
-
-            LoadStorage();
         }
 
-        public Realm(Realm other, string newName)
-            : this(other.server, other.factory, other.zfile, newName, other.sourceFile, other.owner)
-        {
-            CopySettingsFrom(other);
-        }
-
-        public RealmFactory Factory
-        {
-            get { return factory; }
-        }
-
+        /// <summary>
+        /// Gets or sets a value indicating whether the realm's input and output are unfiltered.
+        /// </summary>
+        /// <remarks>
+        /// Raw mode is meant to allow existing single-player games to be played online. Raw
+        /// realms are unable to distinguish between different players, and cannot interact
+        /// with the Guncho server or other realms.  If multiple players are connected, they
+        /// will all control the same player-character and see the same output.
+        /// </remarks>
         public bool RawMode
         {
             get { return rawMode; }
             set { rawMode = value; if (value) curPlayer = Announcer; }
         }
 
+        /// <summary>
+        /// Gets the realm that this instance was created from.
+        /// </summary>
+        public Realm Realm
+        {
+            get { return realm; }
+        }
+
+        /// <summary>
+        /// Gets the unique name of this instance.
+        /// </summary>
         public string Name
         {
             get { return name; }
-        }
-
-        public bool IsActive
-        {
-            get { return terpThread != null; }
-        }
-
-        public RealmPrivacyLevel PrivacyLevel
-        {
-            get { return privacy; }
-            set { privacy = value; }
-        }
-
-        public RealmAccessListEntry[] AccessList
-        {
-            get { return (RealmAccessListEntry[])accessList.Clone(); }
-            set { accessList = (RealmAccessListEntry[])value.Clone(); }
-        }
-
-        public Player Owner
-        {
-            get { return owner; }
-        }
-
-        public string SourceFile
-        {
-            get { return sourceFile; }
         }
 
         /// <summary>
@@ -220,11 +99,6 @@ namespace Guncho
         public DateTime WatchdogTime
         {
             get { lock (watchdogLock) return watchdogTime; }
-        }
-
-        public bool IsCondemned
-        {
-            get { return condemned; }
         }
 
         public bool RestartRequested
@@ -253,32 +127,8 @@ namespace Guncho
         }
 
         /// <summary>
-        /// Increments the realm's failure count, and condemns the realm if
-        /// the configured threshold is reached.
+        /// Starts the instance's interpreter, if it isn't already running.
         /// </summary>
-        /// <returns><b>true</b> if the realm has exceeded the allowed number
-        /// of failures and been condemned</returns>
-        public bool IncrementFailureCount()
-        {
-            if (++failureCount > Properties.Settings.Default.RealmFailuresAllowed)
-            {
-                condemned = true;
-                return true;
-            }
-
-            return false;
-        }
-
-        public void CopySettingsFrom(Realm other)
-        {
-            // copy property values (via the property setters)
-            this.RawMode = other.RawMode;
-            this.PrivacyLevel = other.PrivacyLevel;
-            this.AccessList = other.accessList;
-
-            // note: we don't copy IsCondemned, because editing a realm un-condemns it
-        }
-
         public void Activate()
         {
             lock (terpThreadLock)
@@ -297,6 +147,9 @@ namespace Guncho
             }
         }
 
+        /// <summary>
+        /// Terminates the instance's interpreter, if it is running.
+        /// </summary>
         public void Deactivate()
         {
             Thread theThread;
@@ -318,6 +171,14 @@ namespace Guncho
                     // ignore
                 }
             }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether the instance's interpreter is running.
+        /// </summary>
+        public bool IsActive
+        {
+            get { return terpThread != null; }
         }
 
         private void TerpThreadProc()
@@ -362,7 +223,7 @@ namespace Guncho
                             if (p.Connection != null)
                                 p.Connection.FlushOutput();
 
-                    server.RealmFinished(this, abandoned, wasTerminated);
+                    server.InstanceFinished(this, abandoned, wasTerminated);
                 }
             }
             catch (Exception ex)
@@ -395,13 +256,17 @@ namespace Guncho
             Dispose();
         }
 
+        /// <summary>
+        /// Adds a line of text to the instance's input queue.
+        /// </summary>
+        /// <param name="line">The text.</param>
         public void QueueInput(string line)
         {
             io.QueueInput(line);
         }
 
         /// <summary>
-        /// Queues a line of input, waits for the realm to respond to it, and
+        /// Queues a line of input, waits for the instance to respond to it, and
         /// returns the response that was printed.
         /// </summary>
         /// <param name="line">The line of input to send.</param>
@@ -420,6 +285,13 @@ namespace Guncho
             return trans.Response.ToString().Trim();
         }
 
+        /// <summary>
+        /// Adds a player to the instance.
+        /// </summary>
+        /// <param name="player">The player who is joining.</param>
+        /// <param name="position">A string describing the player's location,
+        /// as returned by <see cref="ExportPlayerPositions"/>, or
+        /// <b>null</b>.</param>
         public void AddPlayer(Player player, string position)
         {
             lock (players)
@@ -432,6 +304,10 @@ namespace Guncho
                     position == null ? "" : "," + position));
         }
 
+        /// <summary>
+        /// Removes a player from the instance.
+        /// </summary>
+        /// <param name="player">The player who is leaving.</param>
         public void RemovePlayer(Player player)
         {
             if (!rawMode)
@@ -445,6 +321,10 @@ namespace Guncho
                 players.Remove(player.ID);
         }
 
+        /// <summary>
+        /// Gets a list of all players who are in the instance.
+        /// </summary>
+        /// <returns>An array of players.</returns>
         public Player[] ListPlayers()
         {
             Player[] result;
@@ -483,7 +363,7 @@ namespace Guncho
             foreach (Player p in temp)
             {
                 lock (p)
-                    p.Realm = null;
+                    p.Instance = null;
 
                 string locationStr;
                 try
@@ -734,7 +614,7 @@ namespace Guncho
                     // got </$
                     if (c == 't')
                     {
-                        tagstate=210;
+                        tagstate = 210;
                     }
                     else if (c == 'a')
                     {
@@ -895,43 +775,249 @@ namespace Guncho
             return false;
         }
 
-        public RealmAccessLevel GetAccessLevel(Player player)
-        {
-            if (player != null)
-            {
-                if (player.IsAdmin)
-                    return RealmAccessLevel.ADMIN;
+        #region RealmIO
 
-                if (player == this.Owner)
-                    return RealmAccessLevel.OWNER;
+        private class RealmIO
+        {
+            private readonly Instance instance;
+            private readonly Queue<string> inputQueue = new Queue<string>();
+            private readonly Queue<Transaction> transQueue = new Queue<Transaction>();
+            private readonly Queue<string> specialResponses = new Queue<string>();
+            private readonly AutoResetEvent inputReady = new AutoResetEvent(false);
+            private Transaction curTrans;
+
+            public RealmIO(Instance instance)
+            {
+                this.instance = instance;
             }
 
-            for (int i = 0; i < accessList.Length; i++)
-                if (accessList[i].Player == player)
-                    return accessList[i].Level;
-
-            switch (privacy)
+            public void QueueInput(string line)
             {
-                case RealmPrivacyLevel.Private:
-                    return RealmAccessLevel.Banned;
+                lock (inputQueue)
+                {
+                    inputQueue.Enqueue(line);
 
-                case RealmPrivacyLevel.Hidden:
-                    return RealmAccessLevel.Hidden;
+                    if (inputQueue.Count == 1)
+                        inputReady.Set();
+                }
+            }
 
-                case RealmPrivacyLevel.Public:
-                    return RealmAccessLevel.Visible;
+            public void QueueTransaction(Transaction trans)
+            {
+                lock (transQueue)
+                {
+                    transQueue.Enqueue(trans);
 
-                case RealmPrivacyLevel.Joinable:
-                    return RealmAccessLevel.Invited;
+                    if (transQueue.Count == 1)
+                        inputReady.Set();
+                }
+            }
 
-                case RealmPrivacyLevel.Viewable:
-                    return RealmAccessLevel.ViewSource;
+            private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
 
-                default:
-                    // shouldn't happen
-                    throw new Exception("BUG");
+            private string GetInputLine()
+            {
+                if (specialResponses.Count > 0)
+                    return specialResponses.Dequeue();
+
+                instance.DisableWatchdog();
+
+                try
+                {
+                    instance.prevPlayers.Clear();
+                    instance.FlushAll();
+
+                    if (curTrans is DisambigHelper)
+                        instance.curPlayer = ((DisambigHelper)curTrans).Player;
+                    else if (!instance.rawMode)
+                        instance.curPlayer = null;
+
+                    // is there a previous transaction?
+                    if (curTrans != null)
+                    {
+                        // response has already been collected, so just unblock the waiting thread
+                        lock (curTrans)
+                            Monitor.Pulse(curTrans);
+
+                        curTrans = null;
+                    }
+
+                    do
+                    {
+                        // is there a transaction waiting?
+                        lock (transQueue)
+                        {
+                            if (transQueue.Count > 0)
+                            {
+                                curTrans = transQueue.Dequeue();
+                                instance.server.LogMessage(LogLevel.Spam,
+                                    "Transaction in {0}: {1}",
+                                    instance.name, curTrans.Query);
+                                return curTrans.Query;
+                            }
+                        }
+
+                        // is there a line of player input waiting?
+                        lock (inputQueue)
+                        {
+                            if (inputQueue.Count > 0)
+                            {
+                                string line = inputQueue.Dequeue();
+                                instance.server.LogMessage(LogLevel.Spam,
+                                    "Processing in {0}: {1}",
+                                    instance.name, line);
+
+                                if (!instance.rawMode)
+                                {
+                                    if (line.StartsWith("$silent "))
+                                    {
+                                        // set up a fake transaction so the output will be hidden
+                                        // and the next line's output substituted instead
+                                        line = line.Substring(8);
+                                        curTrans = new DisambigHelper(instance, line);
+                                    }
+                                    else
+                                    {
+                                        Match m = chatRegex.Match(line);
+                                        if (m.Success)
+                                        {
+                                            string id = m.Groups[1].Value;
+                                            string type = m.Groups[2].Value;
+                                            string target = m.Groups[3].Value;
+                                            string msg = m.Groups[4].Value;
+                                            instance.chatTargetRegister = target;
+                                            instance.chatMsgRegister = msg;
+                                            line = id + ":$" + type;
+                                        }
+                                    }
+                                }
+
+                                if (line.Length > MAX_LINE_LENGTH)
+                                    line = line.Substring(0, MAX_LINE_LENGTH);
+
+                                return line;
+                            }
+                        }
+
+                        // wait for input and then continue the loop
+                        inputReady.WaitOne();
+                    } while (true);
+                }
+                finally
+                {
+                    instance.ResetWatchdog();
+                }
+            }
+
+            public void FyreLineWanted(object sender, LineWantedEventArgs e)
+            {
+                e.Line = GetInputLine();
+            }
+
+            public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
+            {
+                string line;
+                do
+                {
+                    line = GetInputLine();
+                }
+                while (line == null || line.Length < 1);
+
+                e.Char = line[0];
+            }
+
+            public void FyreOutputReady(object sender, OutputReadyEventArgs e)
+            {
+                string main;
+                if (e.Package.TryGetValue(OutputChannel.Main, out main) == true)
+                {
+                    if (curTrans != null)
+                        curTrans.Response.Append(main);
+                    else
+                        instance.HandleOutput(main);
+                }
+
+                string special;
+                if (e.Package.TryGetValue(OutputChannel.Conversation, out special) && special.Length > 0)
+                {
+                    string[] parts = special.Split(new char[] { ' ' }, 3);
+                    if (parts.Length > 0)
+                    {
+                        string name = (parts.Length > 1) ? parts[1] : "";
+                        string rest = (parts.Length > 2) ? parts[2] : "";
+                        int word;
+                        int chunkSize;
+                        string str;
+
+                        switch (parts[0])
+                        {
+                            case "getword":
+                                if (instance.TryGetWordRegister(name, out word))
+                                    specialResponses.Enqueue(word.ToString());
+                                else
+                                    specialResponses.Enqueue("-1");
+                                break;
+
+                            case "gettext":
+                                str = instance.GetTextRegister(name) ?? "";
+                                specialResponses.Enqueue(str.Length.ToString());
+                                if (!int.TryParse(rest, out chunkSize))
+                                    chunkSize = str.Length;
+                                for (int offset = 0; offset < str.Length; offset += chunkSize)
+                                    specialResponses.Enqueue(
+                                        str.Substring(offset, Math.Min(chunkSize, str.Length - offset)));
+                                break;
+
+                            case "putword":
+                                if (int.TryParse(rest, out word) && instance.TryPutWordRegister(name, word))
+                                    specialResponses.Enqueue("1");
+                                else
+                                    specialResponses.Enqueue("0");
+                                break;
+
+                            case "puttext":
+                                instance.PutTextRegister(name, rest);
+                                specialResponses.Enqueue("?");
+                                break;
+                        }
+                    }
+                }
             }
         }
+
+        private class Transaction
+        {
+            public Transaction(string query)
+            {
+                this.Query = query;
+            }
+
+            public readonly string Query;
+            public readonly StringBuilder Response = new StringBuilder();
+        }
+
+        private class DisambigHelper : Transaction
+        {
+            /// <summary>
+            /// Constructs a new DisambigHelper.
+            /// </summary>
+            /// <param name="realm">The realm where disambiguation is occurring.</param>
+            /// <param name="line">The command that will need disambiguation, starting with
+            /// the player ID and a colon.</param>
+            public DisambigHelper(Instance instance, string line)
+                : base("")
+            {
+                string[] parts = line.Split(':');
+                int num;
+                if (parts.Length >= 2 && int.TryParse(parts[0], out num))
+                    lock (instance.players)
+                        instance.players.TryGetValue(num, out this.Player);
+            }
+
+            public readonly Player Player;
+        }
+
+        #endregion
 
         #region Server Registers
 
@@ -1073,7 +1159,7 @@ namespace Guncho
                         switch (queriedAttr)
                         {
                             case "accesslevel":
-                                return GetAccessLevel(queriedPlayer).ToString();
+                                return realm.GetAccessLevel(queriedPlayer).ToString();
 
                             case "idletime":
                                 lock (queriedPlayer)
@@ -1092,14 +1178,14 @@ namespace Guncho
                 case "ls_realmval":
                     // value of selected realm storage register
                     if (queriedAttr != null)
-                        return GetRealmStorage(queriedAttr);
+                        return realm.GetRealmStorage(queriedAttr);
                     else
                         return "";
 
                 case "ls_playerval":
                     // value of selected player storage register
                     if (queriedPlayer != null && queriedAttr != null)
-                        return GetPlayerStorage(queriedPlayer, queriedAttr);
+                        return realm.GetPlayerStorage(queriedPlayer, queriedAttr);
                     else
                         return "";
             }
@@ -1130,13 +1216,13 @@ namespace Guncho
                 case "ls_realmval":
                     // change value of selected realm storage register
                     if (queriedAttr != null)
-                        SetRealmStorage(queriedAttr, value);
+                        realm.SetRealmStorage(queriedAttr, value);
                     break;
 
                 case "ls_playerval":
                     // change value of selected player storage register
                     if (queriedPlayer != null && queriedAttr != null)
-                        SetPlayerStorage(queriedPlayer, queriedAttr, value);
+                        realm.SetPlayerStorage(queriedPlayer, queriedAttr, value);
                     break;
             }
         }
@@ -1234,382 +1320,5 @@ namespace Guncho
         }
 
         #endregion
-
-        #region Persistent Storage
-
-        private readonly Dictionary<string, string> localStorage = new Dictionary<string, string>();
-
-        private void LoadStorage()
-        {
-            string filename = Path.Combine(
-                Properties.Settings.Default.RealmDataPath,
-                this.name + ".storage.xml");
-
-            localStorage.Clear();
-
-            if (File.Exists(filename))
-            {
-                XML.realmStorage root;
-
-                XmlSerializer ser = new XmlSerializer(typeof(XML.realmStorage));
-                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read))
-                {
-                    root = (XML.realmStorage)ser.Deserialize(fs);
-                }
-
-                if (root != null)
-                {
-                    if (root.realm.ToLower() != this.name.ToLower())
-                        throw new Exception("Storage file doesn't match this realm");
-
-                    if (root.item != null)
-                        foreach (XML.storageItemType item in root.item)
-                            localStorage.Add(item.key, item.Value);
-
-                    if (root.player != null)
-                        foreach (XML.realmStoragePlayer player in root.player)
-                            if (player.item != null)
-                                foreach (XML.storageItemType item in player.item)
-                                    localStorage.Add(player.name + "\0" + item.key, item.Value);
-                }
-            }
-        }
-
-        private void SaveStorage()
-        {
-            XML.realmStorage root = new Guncho.XML.realmStorage();
-            List<XML.storageItemType> items = new List<XML.storageItemType>();
-            Dictionary<string, List<XML.storageItemType>> playerDict = new Dictionary<string, List<XML.storageItemType>>();
-
-            char[] zero = { '\0' };
-            foreach (KeyValuePair<string, string> pair in localStorage)
-            {
-                string[] parts = pair.Key.Split(zero, 2);
-                if (parts.Length == 0)
-                    continue; // shouldn't happen
-
-                XML.storageItemType item = new XML.storageItemType();
-                item.Value = pair.Value;
-
-                if (parts.Length == 1)
-                {
-                    // realm storage
-                    item.key = pair.Key;
-                    items.Add(item);
-                }
-                else
-                {
-                    // player storage
-                    List<XML.storageItemType> playerItems;
-                    if (playerDict.TryGetValue(parts[0], out playerItems) == false)
-                    {
-                        playerItems = new List<XML.storageItemType>();
-                        playerDict.Add(parts[0], playerItems);
-                    }
-
-                    item.key = parts[1];
-                    playerItems.Add(item);
-                }
-            }
-
-            root.realm = this.name;
-            root.item = items.ToArray();
-
-            List<XML.realmStoragePlayer> players = new List<XML.realmStoragePlayer>();
-            foreach (KeyValuePair<string, List<XML.storageItemType>> pair in playerDict)
-            {
-                XML.realmStoragePlayer player = new Guncho.XML.realmStoragePlayer();
-                player.name = pair.Key;
-                player.item = pair.Value.ToArray();
-                players.Add(player);
-            }
-
-            root.player = players.ToArray();
-
-            string filename = Path.Combine(
-                Properties.Settings.Default.RealmDataPath,
-                this.name + ".storage.xml");
-
-            XmlSerializer ser = new XmlSerializer(typeof(XML.realmStorage));
-            using (FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write))
-            {
-                ser.Serialize(fs, root);
-            }
-        }
-
-        private string GetRealmStorage(string key)
-        {
-            string value;
-            if (localStorage.TryGetValue(key, out value))
-                return value;
-            else
-                return "";
-        }
-
-        private void SetRealmStorage(string key, string value)
-        {
-            if (value == null || value.Length == 0)
-                localStorage.Remove(key);
-            else
-                localStorage[key] = value;
-
-            SaveStorage();
-        }
-
-        private string GetPlayerStorage(Player player, string key)
-        {
-            return GetRealmStorage(player.Name + "\0" + key);
-        }
-
-        private void SetPlayerStorage(Player player, string key, string value)
-        {
-            SetRealmStorage(player.Name + "\0" + key, value);
-        }
-
-        #endregion
-
-        #region RealmIO
-
-        private class RealmIO
-        {
-            private readonly Realm realm;
-            private readonly Queue<string> inputQueue = new Queue<string>();
-            private readonly Queue<Transaction> transQueue = new Queue<Transaction>();
-            private readonly Queue<string> specialResponses = new Queue<string>();
-            private readonly AutoResetEvent inputReady = new AutoResetEvent(false);
-            private Transaction curTrans;
-
-            public RealmIO(Realm realm)
-            {
-                this.realm = realm;
-            }
-
-            public void QueueInput(string line)
-            {
-                lock (inputQueue)
-                {
-                    inputQueue.Enqueue(line);
-
-                    if (inputQueue.Count == 1)
-                        inputReady.Set();
-                }
-            }
-
-            public void QueueTransaction(Transaction trans)
-            {
-                lock (transQueue)
-                {
-                    transQueue.Enqueue(trans);
-
-                    if (transQueue.Count == 1)
-                        inputReady.Set();
-                }
-            }
-
-            private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
-
-            private string GetInputLine()
-            {
-                if (specialResponses.Count > 0)
-                    return specialResponses.Dequeue();
-
-                realm.DisableWatchdog();
-
-                try
-                {
-                    realm.prevPlayers.Clear();
-                    realm.FlushAll();
-
-                    if (curTrans is DisambigHelper)
-                        realm.curPlayer = ((DisambigHelper)curTrans).Player;
-                    else if (!realm.rawMode)
-                        realm.curPlayer = null;
-
-                    // is there a previous transaction?
-                    if (curTrans != null)
-                    {
-                        // response has already been collected, so just unblock the waiting thread
-                        lock (curTrans)
-                            Monitor.Pulse(curTrans);
-
-                        curTrans = null;
-                    }
-
-                    do
-                    {
-                        // is there a transaction waiting?
-                        lock (transQueue)
-                        {
-                            if (transQueue.Count > 0)
-                            {
-                                curTrans = transQueue.Dequeue();
-                                realm.server.LogMessage(LogLevel.Spam,
-                                    "Transaction in {0}: {1}",
-                                    realm.name, curTrans.Query);
-                                return curTrans.Query;
-                            }
-                        }
-
-                        // is there a line of player input waiting?
-                        lock (inputQueue)
-                        {
-                            if (inputQueue.Count > 0)
-                            {
-                                string line = inputQueue.Dequeue();
-                                realm.server.LogMessage(LogLevel.Spam,
-                                    "Processing in {0}: {1}",
-                                    realm.name, line);
-
-                                if (!realm.rawMode)
-                                {
-                                    if (line.StartsWith("$silent "))
-                                    {
-                                        // set up a fake transaction so the output will be hidden
-                                        // and the next line's output substituted instead
-                                        line = line.Substring(8);
-                                        curTrans = new DisambigHelper(realm, line);
-                                    }
-                                    else
-                                    {
-                                        Match m = chatRegex.Match(line);
-                                        if (m.Success)
-                                        {
-                                            string id = m.Groups[1].Value;
-                                            string type = m.Groups[2].Value;
-                                            string target = m.Groups[3].Value;
-                                            string msg = m.Groups[4].Value;
-                                            realm.chatTargetRegister = target;
-                                            realm.chatMsgRegister = msg;
-                                            line = id + ":$" + type;
-                                        }
-                                    }
-                                }
-
-                                if (line.Length > MAX_LINE_LENGTH)
-                                    line = line.Substring(0, MAX_LINE_LENGTH);
-
-                                return line;
-                            }
-                        }
-
-                        // wait for input and then continue the loop
-                        inputReady.WaitOne();
-                    } while (true);
-                }
-                finally
-                {
-                    realm.ResetWatchdog();
-                }
-            }
-
-            public void FyreLineWanted(object sender, LineWantedEventArgs e)
-            {
-                e.Line = GetInputLine();
-            }
-
-            public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
-            {
-                string line;
-                do
-                {
-                    line = GetInputLine();
-                }
-                while (line == null || line.Length < 1);
-
-                e.Char = line[0];
-            }
-
-            public void FyreOutputReady(object sender, OutputReadyEventArgs e)
-            {
-                string main;
-                if (e.Package.TryGetValue(OutputChannel.Main, out main) == true)
-                {
-                    if (curTrans != null)
-                        curTrans.Response.Append(main);
-                    else
-                        realm.HandleOutput(main);
-                }
-
-                string special;
-                if (e.Package.TryGetValue(OutputChannel.Conversation, out special) && special.Length > 0)
-                {
-                    string[] parts = special.Split(new char[] { ' ' }, 3);
-                    if (parts.Length > 0)
-                    {
-                        string name = (parts.Length > 1) ? parts[1] : "";
-                        string rest = (parts.Length > 2) ? parts[2] : "";
-                        int word;
-                        int chunkSize;
-                        string str;
-
-                        switch (parts[0])
-                        {
-                            case "getword":
-                                if (realm.TryGetWordRegister(name, out word))
-                                    specialResponses.Enqueue(word.ToString());
-                                else
-                                    specialResponses.Enqueue("-1");
-                                break;
-
-                            case "gettext":
-                                str = realm.GetTextRegister(name) ?? "";
-                                specialResponses.Enqueue(str.Length.ToString());
-                                if (!int.TryParse(rest, out chunkSize))
-                                    chunkSize = str.Length;
-                                for (int offset = 0; offset < str.Length; offset += chunkSize)
-                                    specialResponses.Enqueue(
-                                        str.Substring(offset, Math.Min(chunkSize, str.Length - offset)));
-                                break;
-
-                            case "putword":
-                                if (int.TryParse(rest, out word) && realm.TryPutWordRegister(name, word))
-                                    specialResponses.Enqueue("1");
-                                else
-                                    specialResponses.Enqueue("0");
-                                break;
-
-                            case "puttext":
-                                realm.PutTextRegister(name, rest);
-                                specialResponses.Enqueue("?");
-                                break;
-                        }
-                    }
-                }
-            }
-        }
-
-        private class Transaction
-        {
-            public Transaction(string query)
-            {
-                this.Query = query;
-            }
-
-            public readonly string Query;
-            public readonly StringBuilder Response = new StringBuilder();
-        }
-
-        private class DisambigHelper : Transaction
-        {
-            /// <summary>
-            /// Constructs a new DisambigHelper.
-            /// </summary>
-            /// <param name="realm">The realm where disambiguation is occurring.</param>
-            /// <param name="line">The command that will need disambiguation, starting with
-            /// the player ID and a colon.</param>
-            public DisambigHelper(Realm realm, string line)
-                : base("")
-            {
-                string[] parts = line.Split(':');
-                int num;
-                if (parts.Length >= 2 && int.TryParse(parts[0], out num))
-                    lock (realm.players)
-                        realm.players.TryGetValue(num, out this.Player);
-            }
-
-            public readonly Player Player;
-        }
-
-#endregion
     }
 }

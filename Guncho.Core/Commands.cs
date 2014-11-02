@@ -77,7 +77,7 @@ namespace Guncho
                                 conn.Player = guest;
 
                             SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
-                            EnterRealm(guest, GetRealm(Properties.Settings.Default.StartRealmName));
+                            EnterInstance(guest, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
                         }
                         else
                         {
@@ -108,7 +108,7 @@ namespace Guncho
                                     player.Connection = conn;
 
                                 SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
-                                EnterRealm(player, GetRealm(Properties.Settings.Default.StartRealmName));
+                                EnterInstance(player, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
                             }
                         }
                         return true;
@@ -236,13 +236,14 @@ namespace Guncho
                 return;
             }
 
-            dest.Activate();
+            Instance inst = GetDefaultInstance(dest);
+            inst.Activate();
 
-            string check = dest.SendAndGet("$knock default");
+            string check = inst.SendAndGet("$knock default");
             switch (check)
             {
                 case "ok":
-                    EnterRealm(player, dest);
+                    EnterInstance(player, inst);
                     break;
 
                 case "full":
