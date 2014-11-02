@@ -202,5 +202,14 @@ namespace Guncho.Properties {
                 return ((string)(this["NiInstallationsPath"]));
             }
         }
+        
+        [global::System.Configuration.ApplicationScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("8014")]
+        public int ControllerPort {
+            get {
+                return ((int)(this["ControllerPort"]));
+            }
+        }
     }
 }

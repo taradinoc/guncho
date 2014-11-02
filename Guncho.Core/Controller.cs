@@ -46,7 +46,6 @@ namespace Guncho
         private static TcpChannel channel;
         private static Server registeredServer;
 
-        private const int CHANNEL_PORT = 8014;
         private const string FACTORY_URI = "ControllerFactory";
 
         public ControllerFactory()
@@ -75,7 +74,7 @@ namespace Guncho
             {
                 System.Collections.IDictionary props = new System.Collections.Hashtable();
                 //props["name"] = channelName;
-                props["port"] = CHANNEL_PORT;
+                props["port"] = Properties.Settings.Default.ControllerPort;
                 props["bindTo"] = "127.0.0.1";
                 props["typeFilterLevel"] = System.Runtime.Serialization.Formatters.TypeFilterLevel.Full;
                 BinaryServerFormatterSinkProvider serverProvider = new BinaryServerFormatterSinkProvider();
