@@ -26,6 +26,10 @@ using System.Security.Cryptography;
 using System.Xml.Serialization;
 using System.Text.RegularExpressions;
 using System.Web;
+using Microsoft.Owin.Hosting;
+using Microsoft.Owin.Hosting.Services;
+using Microsoft.Owin.Hosting.Starter;
+using System.Web.Http.Dependencies;
 
 namespace Guncho
 {
@@ -67,7 +71,7 @@ namespace Guncho
         VMError,
     }
 
-    partial class Server
+    public partial class Server
     {
         private readonly int port;
         private readonly ILogger logger;
@@ -1194,10 +1198,25 @@ namespace Guncho
                 running = true;
                 eventThread.Start();
 
-                while (running)
+                // initialize web api...
+                var url = "http://localhost:4109";
+
+                var services = (ServiceProvider)ServicesFactory.Create();
+                services.AddInstance<IDependencyResolver>(new WebApiDependencyResolver(services));
+                services.AddInstance<Server>(this);
+
+                var options = new StartOptions(url)
                 {
-                    listener.BeginAcceptTcpClient(AcceptClientProc, listener);
-                    mainLoopEvent.WaitOne();
+                    AppStartup = typeof(WebApiStartup).AssemblyQualifiedName,
+                };
+
+                using (services.GetService<IHostingStarter>().Start(options))
+                {
+                    while (running)
+                    {
+                        listener.BeginAcceptTcpClient(AcceptClientProc, listener);
+                        mainLoopEvent.WaitOne();
+                    }
                 }
 
                 eventThread.Join();

@@ -1,2 +1,6 @@
 bin
 obj
+syntax: glob
+*.suo
+*.user
+packages/*/*

@@ -10,7 +10,7 @@ using System.Web;
 
 namespace Guncho
 {
-    abstract class RealmFactory
+    public abstract class RealmFactory
     {
         protected readonly Server server;
         private readonly string name;

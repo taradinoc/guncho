@@ -7,7 +7,7 @@ using System.Threading;
 
 namespace Guncho
 {
-    class Connection
+    public class Connection
     {
         private readonly TcpClient client;
         private readonly StreamReader rdr;

@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace Guncho
 {
-    class Instance
+    public class Instance
     {
         private readonly Server server;
         private readonly Realm realm;

@@ -5,7 +5,7 @@ using System.Net.Sockets;
 
 namespace Guncho
 {
-    class Player
+    public class Player
     {
         private readonly int id;
         private readonly bool isAdmin, isGuest;

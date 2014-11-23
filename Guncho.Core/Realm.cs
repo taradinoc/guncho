@@ -94,7 +94,7 @@ namespace Guncho
         Viewable,
     }
 
-    struct RealmAccessListEntry
+    public struct RealmAccessListEntry
     {
         public readonly Player Player;
         public readonly RealmAccessLevel Level;
@@ -106,7 +106,7 @@ namespace Guncho
         }
     }
 
-    class Realm
+    public class Realm
     {
         private readonly Server server;
         private readonly RealmFactory factory;
