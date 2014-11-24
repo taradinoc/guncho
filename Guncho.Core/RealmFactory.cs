@@ -317,6 +317,7 @@ namespace Guncho
             }
         }
 
+        // TODO: Choose the right executable based on platform, instead of using the first available file.
         private static readonly string[] niBins = { "ni", "ni.exe" };
         private static readonly string[] i6Bins = { "inform-6.31-biplatform", "inform-631.exe" };
 

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using SimpleInjector;
+using System.Web.Http.Dependencies;
+using SimpleInjector.Integration.WebApi;
 
 namespace Guncho
 {
@@ -38,6 +41,9 @@ namespace Guncho
 
         public void Run()
         {
+            var container = new Container();
+
+            // set up server configuration
             Environment.SetEnvironmentVariable("HOME", homeDir);
 
             string idir = Path.Combine(homeDir, "Inform");
@@ -53,9 +59,27 @@ namespace Guncho
                 ownLogger = true;
             }
 
+            var serverConfig = new ServerConfig
+            {
+                Port = port,
+            };
+
+            // configure Simple Injector
+            container.RegisterSingle<Server>();
+            container.RegisterSingle<ServerConfig>(serverConfig);
+            container.RegisterSingle<ILogger>(logger);
+            container.RegisterSingle<IDependencyResolver, SimpleInjectorWebApiDependencyResolver>();
+
+            var webApiLifestyle = new WebApiRequestLifestyle();
+            foreach (var type in Guncho.Server.GetApiControllerTypes())
+            {
+                container.Register(type, type, webApiLifestyle);
+            }
+
+            // run server
             try
             {
-                svr = new Server(port, logger);
+                svr = container.GetInstance<Server>();
                 svr.Run();
                 svr.LogMessage(LogLevel.Notice, "Service terminating.");
             }

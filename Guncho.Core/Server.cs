@@ -30,6 +30,8 @@ using Microsoft.Owin.Hosting;
 using Microsoft.Owin.Hosting.Services;
 using Microsoft.Owin.Hosting.Starter;
 using System.Web.Http.Dependencies;
+using SimpleInjector;
+using SimpleInjector.Integration.WebApi;
 
 namespace Guncho
 {
@@ -75,6 +77,7 @@ namespace Guncho
     {
         private readonly int port;
         private readonly ILogger logger;
+        private readonly IDependencyResolver apiDependencyResolver;
 
         private volatile bool running;
 
@@ -89,13 +92,14 @@ namespace Guncho
         private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
         private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
-        public Server(int port, ILogger logger)
+        public Server(Container container, ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
 
-            this.port = port;
+            this.port = config.Port;
             this.logger = logger;
+            this.apiDependencyResolver = apiDependencyResolver;
 
             try
             {
@@ -1186,6 +1190,24 @@ namespace Guncho
             return ValidateLogIn(name, salt, hash);
         }
 
+        private IDisposable StartWebApi()
+        {
+            var url = "http://localhost:4109";  // TODO: make web api url configurable!
+
+            var services = (ServiceProvider)ServicesFactory.Create();
+            services.AddInstance<IDependencyResolver>(apiDependencyResolver);
+
+            var options = new StartOptions(url);
+            options.AppStartup = typeof(WebApiStartup).AssemblyQualifiedName;
+
+            return services.GetService<IHostingStarter>().Start(options);
+        }
+
+        public static IEnumerable<Type> GetApiControllerTypes()
+        {
+            yield return typeof(FooController);
+        }
+
         public void Run()
         {
             try
@@ -1198,19 +1220,7 @@ namespace Guncho
                 running = true;
                 eventThread.Start();
 
-                // initialize web api...
-                var url = "http://localhost:4109";
-
-                var services = (ServiceProvider)ServicesFactory.Create();
-                services.AddInstance<IDependencyResolver>(new WebApiDependencyResolver(services));
-                services.AddInstance<Server>(this);
-
-                var options = new StartOptions(url)
-                {
-                    AppStartup = typeof(WebApiStartup).AssemblyQualifiedName,
-                };
-
-                using (services.GetService<IHostingStarter>().Start(options))
+                using (StartWebApi())
                 {
                     while (running)
                     {
