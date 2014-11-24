@@ -9,5 +9,6 @@ namespace Guncho.Services
     public interface IRealmsService
     {
         IEnumerable<Realm> GetAllRealms();
+        IEnumerable<RealmFactory> GetRealmFactories();
     }
 }

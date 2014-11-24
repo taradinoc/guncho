@@ -6,7 +6,7 @@ using System.Web.Http.Dependencies;
 
 namespace Guncho.Api
 {
-    public class WebApiStartup
+    public sealed class WebApiStartup
     {
         private readonly IDependencyResolver resolver;
 
@@ -28,6 +28,8 @@ namespace Guncho.Api
             config.EnableSystemDiagnosticsTracing();
 
             config.MapHttpAttributeRoutes();
+
+            config.EnsureInitialized();
 
             appBuilder.UseWebApi(config);
         }
