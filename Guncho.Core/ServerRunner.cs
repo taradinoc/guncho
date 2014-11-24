@@ -72,6 +72,7 @@ namespace Guncho
             var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
             container.AddRegistration(typeof(Server), serverReg);
             container.AddRegistration(typeof(IRealmsService), serverReg);
+            container.AddRegistration(typeof(IPlayersService), serverReg);
 
             container.RegisterSingle<ServerConfig>(serverConfig);
             container.RegisterSingle<ILogger>(logger);

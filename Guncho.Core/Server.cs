@@ -75,7 +75,7 @@ namespace Guncho
         VMError,
     }
 
-    public partial class Server : IRealmsService
+    public partial class Server : IRealmsService, IPlayersService
     {
         private readonly ServerConfig config;
         private readonly ILogger logger;
@@ -292,7 +292,7 @@ namespace Guncho
                 realms.Clear();
                 foreach (XML.realmIndexRealm entry in index.realms)
                 {
-                    Player owner = FindPlayer(entry.owner);
+                    Player owner = GetPlayerByName(entry.owner);
                     try
                     {
                         LoadRealm(entry.name, Path.Combine(dataPath, entry.src),
@@ -338,7 +338,7 @@ namespace Guncho
                             List<RealmAccessListEntry> entries = new List<RealmAccessListEntry>();
                             foreach (XML.realmIndexRealmAccess xent in entry.access)
                             {
-                                Player p = FindPlayer(xent.player);
+                                Player p = GetPlayerByName(xent.player);
                                 if (p == null)
                                 {
                                     logger.LogMessage(LogLevel.Warning,
@@ -666,6 +666,8 @@ namespace Guncho
             return result.ToArray();
         }
 
+        #region IRealmsService
+
         public IEnumerable<Realm> GetAllRealms()
         {
             var result = new List<Realm>();
@@ -680,6 +682,18 @@ namespace Guncho
         {
             return factories.Values;
         }
+
+        public Realm GetRealmByName(string name)
+        {
+            Realm result;
+            lock (realms)
+            {
+                realms.TryGetValue(name, out result);
+            }
+            return result;
+        }
+
+        #endregion
 
         /// <summary>
         /// Renames a realm, moving the source files and players to the new name
@@ -1117,16 +1131,33 @@ namespace Guncho
             }
         }
 
-        public Player FindPlayer(string name)
+        #region IPlayersService
+
+        public IEnumerable<Player> GetAllPlayers()
+        {
+            var result = new List<Player>();
+            lock (players)
+            {
+                result.AddRange(players.Values);
+            }
+            return result;
+        }
+        
+        public Player GetPlayerByName(string name)
         {
             Player result;
-            players.TryGetValue(name.ToLower(), out result);
+            lock (players)
+            {
+                players.TryGetValue(name.ToLower(), out result);
+            }
             return result;
         }
 
+        #endregion
+
         public string GetPasswordSalt(string name)
         {
-            Player who = FindPlayer(name);
+            Player who = GetPlayerByName(name);
             if (who == null)
                 return null;
             else
@@ -1135,7 +1166,7 @@ namespace Guncho
 
         public Player ValidateLogIn(string name, string pwdSalt, string pwdHash)
         {
-            Player player = FindPlayer(name);
+            Player player = GetPlayerByName(name);
             if (player == null || player.IsGuest)
                 return null;
 

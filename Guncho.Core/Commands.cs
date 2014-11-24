@@ -273,7 +273,7 @@ namespace Guncho
                 return;
             }
 
-            Player targetPlayer = FindPlayer(target);
+            Player targetPlayer = GetPlayerByName(target);
             if (targetPlayer == null)
             {
                 conn.WriteLine("No such player.");

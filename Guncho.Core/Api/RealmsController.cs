@@ -9,7 +9,7 @@ using System.Web.Http;
 
 namespace Guncho.Api
 {
-    public class RealmDto
+    public sealed class RealmDto
     {
         public string Name;
         public string Owner;
@@ -18,15 +18,14 @@ namespace Guncho.Api
         public RuntimeOptionsDto Runtime;
     }
 
-    public class CompilerOptionsDto
+    public sealed class CompilerOptionsDto
     {
         public string Language;
         public string Version;
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public IEnumerable<RuntimeOptionsDto> SupportedRuntimes;
     }
 
-    public class RuntimeOptionsDto
+    public sealed class RuntimeOptionsDto
     {
         public string Platform;
     }
@@ -80,7 +79,7 @@ namespace Guncho.Api
         [Route("{name}", Name = "GetRealmByName")]
         public RealmDto GetRealmByName(string name)
         {
-            var realm = realmsService.GetAllRealms().Where(r => r.Name == name).SingleOrDefault();
+            var realm = realmsService.GetRealmByName(name);
 
             if (realm == null)
             {

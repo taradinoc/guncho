@@ -22,8 +22,9 @@ namespace Guncho.Api
             config.DependencyResolver = resolver;
 
             var jsonSettings = config.Formatters.JsonFormatter.SerializerSettings;
-            //jsonSettings.Formatting = Formatting.Indented;
             jsonSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+            //jsonSettings.Formatting = Formatting.Indented;
+            jsonSettings.NullValueHandling = NullValueHandling.Ignore;
 
             config.EnableSystemDiagnosticsTracing();
 

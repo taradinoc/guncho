@@ -187,7 +187,7 @@ namespace Guncho
 
         public string CapitalizePlayerName(string name)
         {
-            Player player = server.FindPlayer(name);
+            Player player = server.GetPlayerByName(name);
             if (player == null)
                 return name;
             else
@@ -196,12 +196,12 @@ namespace Guncho
 
         public bool IsPlayer(string name)
         {
-            return server.FindPlayer(name) != null;
+            return server.GetPlayerByName(name) != null;
         }
 
         public bool IsPlayerAdmin(string name)
         {
-            Player player = server.FindPlayer(name);
+            Player player = server.GetPlayerByName(name);
             if (player == null)
                 return false;
             else
@@ -219,7 +219,7 @@ namespace Guncho
 
         public string GetPlayerAttribute(string playerName, string attrName)
         {
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player == null)
                 return "";
             
@@ -229,7 +229,7 @@ namespace Guncho
 
         public void SetPlayerAttribute(string playerName, string attrName, string newValue)
         {
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player != null)
             {
                 lock (player)
@@ -239,7 +239,7 @@ namespace Guncho
 
         public void ChangePassword(string playerName, string newPassword)
         {
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player != null)
             {
                 string newSalt = GenerateSalt();
@@ -270,7 +270,7 @@ namespace Guncho
 
         public bool CreateRealm(string playerName, string realmName, string factoryName)
         {
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player == null)
                 return false;
             else
@@ -279,7 +279,7 @@ namespace Guncho
 
         public bool DeleteRealm(string playerName, string realmName)
         {
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (playerName == null)
                 return false;
 
@@ -317,7 +317,7 @@ namespace Guncho
             // only admins can edit a condemned realm
             if (oldRealm.IsCondemned)
             {
-                Player player = server.FindPlayer(playerName);
+                Player player = server.GetPlayerByName(playerName);
                 if (player == null || !player.IsAdmin)
                     return RealmEditingOutcome.PermissionDenied;
             }
@@ -397,7 +397,7 @@ namespace Guncho
             if (realmName == null)
                 throw new ArgumentNullException("realmName");
 
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player == null)
                 return RealmAccessLevel.Invalid;
 
@@ -424,7 +424,7 @@ namespace Guncho
             if (realm == null)
                 return false;
 
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player == null)
                 return false;
 
@@ -470,7 +470,7 @@ namespace Guncho
             if (realm == null)
                 return false;
 
-            Player player = server.FindPlayer(playerName);
+            Player player = server.GetPlayerByName(playerName);
             if (player == null)
                 return false;
 
@@ -486,7 +486,7 @@ namespace Guncho
 
             for (int i = 0; i < aclNames.Length; i++)
             {
-                Player victim = server.FindPlayer(aclNames[i]);
+                Player victim = server.GetPlayerByName(aclNames[i]);
                 if (victim == null)
                     throw new ArgumentException("No such player: " + aclNames[i], "aclNames");
                 else if (victim.IsGuest)
