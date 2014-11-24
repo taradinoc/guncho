@@ -9,5 +9,7 @@ namespace Guncho
     public class ServerConfig
     {
         public int Port { get; set; }
+        public string CachePath { get; set; }
+        public string IndexPath { get; set; }
     }
 }

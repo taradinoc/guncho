@@ -105,7 +105,7 @@
     <Compile Include="Commands.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Controller.cs" />
-    <Compile Include="FooController.cs" />
+    <Compile Include="Api\RealmsController.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="Instance.cs" />
     <Compile Include="Player.cs" />
@@ -122,7 +122,8 @@
     <Compile Include="Server.cs" />
     <Compile Include="ServerConfig.cs" />
     <Compile Include="ServerRunner.cs" />
-    <Compile Include="WebApiStartup.cs" />
+    <Compile Include="Api\WebApiStartup.cs" />
+    <Compile Include="Services\IRealmsService.cs" />
     <Compile Include="XML\playerIndex.cs">
       <DependentUpon>playerIndex.xsd</DependentUpon>
     </Compile>

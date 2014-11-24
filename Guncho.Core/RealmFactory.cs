@@ -12,12 +12,10 @@ namespace Guncho
 {
     public abstract class RealmFactory
     {
-        protected readonly Server server;
         private readonly string name;
 
-        protected RealmFactory(Server server, string factoryName)
+        protected RealmFactory(string factoryName)
         {
-            this.server = server;
             this.name = factoryName;
         }
 
@@ -30,15 +28,15 @@ namespace Guncho
         public abstract string GetInitialSourceText(string ownerName, string realmName);
         public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
 
-        public Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
+        public Realm LoadRealm(Server server, string name, string sourceFile, string storyFile, Player owner)
         {
             return new Realm(server, this, name, sourceFile, storyFile, owner);
         }
 
-        public Instance LoadInstance(Realm realm, string name)
+        public Instance LoadInstance(Server server, Realm realm, string name, ILogger logger)
         {
             FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
-            return new Instance(server, realm, stream, name);
+            return new Instance(server, realm, stream, name, logger);
         }
 
         protected static string MakeUUID(string realmName)
@@ -163,18 +161,24 @@ namespace Guncho
 
     class InformRealmFactory : RealmFactory
     {
+        private readonly ILogger logger;
+
         private readonly string niCompilerPath, niExtensionDir;
         private readonly string infCompilerPath, infLibraryDir;
+        private readonly string indexOutputDir;
 
-        public InformRealmFactory(Server server, string name,
+        public InformRealmFactory(ILogger logger, string name,
             string niCompilerPath, string niExtensionDir,
-            string infCompilerPath, string infLibraryDir)
-            : base(server, name)
+            string infCompilerPath, string infLibraryDir,
+            string indexOutputDir)
+            : base(name)
         {
+            this.logger = logger;
             this.niCompilerPath = niCompilerPath;
             this.niExtensionDir = niExtensionDir;
             this.infCompilerPath = infCompilerPath;
             this.infLibraryDir = infLibraryDir;
+            this.indexOutputDir = indexOutputDir;
         }
 
         public override string SourceFileExtension
@@ -219,11 +223,11 @@ namespace Guncho
                 "-package", skeleton,
                 "-extension=ulx");
 
-            if (!Directory.Exists(server.IndexPath))
-                Directory.CreateDirectory(server.IndexPath);
+            if (!Directory.Exists(indexOutputDir))
+                Directory.CreateDirectory(indexOutputDir);
 
             // copy Index
-            string realmIndexPath = Path.Combine(server.IndexPath, realmName);
+            string realmIndexPath = Path.Combine(indexOutputDir, realmName);
 
             CopyDirectory(
                 Path.Combine(skeleton, "Index"),
@@ -241,7 +245,7 @@ namespace Guncho
                     wtr.WriteLine("</font>");
                 }
 
-                server.LogMessage(LogLevel.Warning, "NI hung while compiling '{0}'", realmName);
+                logger.LogMessage(LogLevel.Warning, "NI hung while compiling '{0}'", realmName);
 
                 return RealmEditingOutcome.NiError;
             }
@@ -280,7 +284,7 @@ namespace Guncho
                             wtr.WriteLine("</font>");
                         }
 
-                        server.LogMessage(LogLevel.Warning, "Inform 6 hung while compiling '{0}'", realmName);
+                        logger.LogMessage(LogLevel.Warning, "Inform 6 hung while compiling '{0}'", realmName);
 
                         return RealmEditingOutcome.InfError;
                     }
@@ -321,7 +325,7 @@ namespace Guncho
         private static readonly string[] niBins = { "ni", "ni.exe" };
         private static readonly string[] i6Bins = { "inform-6.31-biplatform", "inform-631.exe" };
 
-        public static bool FindCompilers(string dir, out string nibin, out string i6bin)
+        private static bool FindCompilers(string dir, out string nibin, out string i6bin)
         {
             nibin = i6bin = null;
 
@@ -347,6 +351,33 @@ namespace Guncho
             }
 
             return (nibin != null) && (i6bin != null);
+        }
+
+        internal static InformRealmFactory[] ConstructAll(ILogger logger, string installationsPath, string indexOutputDir)
+        {
+            var result = new List<InformRealmFactory>();
+
+            foreach (string subPath in Directory.GetDirectories(installationsPath))
+            {
+                string nibin, i6bin;
+                if (FindCompilers(Path.Combine(subPath, "Compilers"), out nibin, out i6bin))
+                {
+                    var version = Path.GetFileName(subPath);
+
+                    var factory = new InformRealmFactory(
+                        logger: logger,
+                        name: version,
+                        niCompilerPath: nibin,
+                        niExtensionDir: Path.Combine(subPath, "Inform7", "Extensions"),
+                        infCompilerPath: i6bin,
+                        infLibraryDir: Path.Combine(subPath, "Library", "Natural"),
+                        indexOutputDir: indexOutputDir);
+
+                    result.Add(factory);
+                }
+            }
+
+            return result.ToArray();
         }
     }
 }

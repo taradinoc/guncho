@@ -32,6 +32,8 @@ using Microsoft.Owin.Hosting.Starter;
 using System.Web.Http.Dependencies;
 using SimpleInjector;
 using SimpleInjector.Integration.WebApi;
+using Guncho.Api;
+using Guncho.Services;
 
 namespace Guncho
 {
@@ -73,9 +75,9 @@ namespace Guncho
         VMError,
     }
 
-    public partial class Server
+    public partial class Server : IRealmsService
     {
-        private readonly int port;
+        private readonly ServerConfig config;
         private readonly ILogger logger;
         private readonly IDependencyResolver apiDependencyResolver;
 
@@ -92,12 +94,13 @@ namespace Guncho
         private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
         private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
-        public Server(Container container, ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver)
+        public Server(ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver,
+            IEnumerable<RealmFactory> allRealmFactories)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
 
-            this.port = config.Port;
+            this.config = config;
             this.logger = logger;
             this.apiDependencyResolver = apiDependencyResolver;
 
@@ -107,40 +110,20 @@ namespace Guncho
                 eventThread.Name = "Server Events";
 
                 LoadPlayers();
-                LoadRealms();
+                LoadRealms(allRealmFactories);
 
                 if (GetRealm(Properties.Settings.Default.StartRealmName) == null)
                     throw new InvalidOperationException(
                         string.Format("Couldn't load initial realm '{0}'",
                                         Properties.Settings.Default.StartRealmName));
 
-                ControllerFactory.Register(this);
+                ControllerFactory.Register(this, config, logger);
             }
             catch (Exception ex)
             {
-                LogException(ex);
+                logger.LogException(ex);
                 throw;
             }
-        }
-
-        public string IndexPath
-        {
-            get { return Path.Combine(Properties.Settings.Default.CachePath, "Index"); }
-        }
-
-        public void LogMessage(LogLevel level, string text)
-        {
-            logger.LogMessage(level, text);
-        }
-
-        public void LogMessage(LogLevel level, string format, params object[] args)
-        {
-            logger.LogMessage(level, string.Format(format, args));
-        }
-
-        public void LogException(Exception ex)
-        {
-            logger.LogMessage(LogLevel.Error, ex.ToString());
         }
 
         private void EventThreadProc()
@@ -178,7 +161,7 @@ namespace Guncho
             }
             catch (Exception ex)
             {
-                LogException(ex);
+                logger.LogException(ex);
                 throw;
             }
         }
@@ -274,30 +257,21 @@ namespace Guncho
             }
         }
 
-        private void LoadRealms()
+        private void LoadRealms(IEnumerable<RealmFactory> allRealmFactories)
         {
-            // load factories first
+            // build factories dict first
             string defaultFactory = null;
 
             factories.Clear();
-            foreach (string subPath in Directory.GetDirectories(Properties.Settings.Default.NiInstallationsPath))
+
+            foreach (var factory in allRealmFactories)
             {
-                string nibin, i6bin;
-                if (InformRealmFactory.FindCompilers(Path.Combine(subPath, "Compilers"), out nibin, out i6bin))
-                {
-                    string version = Path.GetFileName(subPath);
+                var name = factory.Name;
 
-                    RealmFactory factory = new InformRealmFactory(this, version,
-                        nibin,
-                        Path.Combine(subPath, "Inform7" + Path.DirectorySeparatorChar + "Extensions"),
-                        i6bin,
-                        Path.Combine(subPath, "Library" + Path.DirectorySeparatorChar + "Natural"));
+                if (defaultFactory == null || name.CompareTo(defaultFactory) < 0)
+                    defaultFactory = name;
 
-                    if (defaultFactory == null || version.CompareTo(defaultFactory) < 0)
-                        defaultFactory = version;
-
-                    factories.Add(version, factory);
-                }
+                factories.Add(name, factory);
             }
 
             // load realm index
@@ -326,7 +300,7 @@ namespace Guncho
                     }
                     catch (RealmLoadingException rle)
                     {
-                        LogMessage(LogLevel.Error,
+                        logger.LogMessage(LogLevel.Error,
                             "Skipping realm '{0}': {1} while loading: {2}",
                             entry.name,
                             rle.InnerException.GetType().Name,
@@ -367,7 +341,7 @@ namespace Guncho
                                 Player p = FindPlayer(xent.player);
                                 if (p == null)
                                 {
-                                    LogMessage(LogLevel.Warning,
+                                    logger.LogMessage(LogLevel.Warning,
                                         "Nonexistent player in '{0}' ACL: '{1}'",
                                         entry.name, xent.player);
                                     continue;
@@ -412,7 +386,7 @@ namespace Guncho
                                         break;
 
                                     default:
-                                        LogMessage(LogLevel.Warning,
+                                        logger.LogMessage(LogLevel.Warning,
                                             "Nonexistent level in '{0}' ACL: '{1}'",
                                             entry.name, xent.level);
                                         continue;
@@ -566,7 +540,7 @@ namespace Guncho
 #else
                 if (!File.Exists(sourceFile))
                 {
-                    LogMessage(LogLevel.Error,
+                    logger.LogMessage(LogLevel.Error,
                         "Skipping realm '{0}': source file '{1}' missing",
                         realmName, sourceFile);
                     return RealmEditingOutcome.Missing;
@@ -593,7 +567,7 @@ namespace Guncho
 
                 if (outcome != RealmEditingOutcome.Success)
                 {
-                    LogMessage(LogLevel.Verbose,
+                    logger.LogMessage(LogLevel.Verbose,
                         "Removing realm '{0}' (failed to compile in LoadRealm).", realmName);
                     realms.Remove(realmName);
                     return outcome;
@@ -603,7 +577,7 @@ namespace Guncho
                 //FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
                 try
                 {
-                    Realm r = factory.LoadRealm(realmName, sourceFile, cachedFile, owner);
+                    Realm r = factory.LoadRealm(this, realmName, sourceFile, cachedFile, owner);
 #if COVERUP
                     r.RawMode = true;
 #endif
@@ -636,7 +610,7 @@ namespace Guncho
             {
                 if (GetInstance(name) != null)
                     throw new ArgumentException("An instance with this name is already loaded", "name");
-                result = realm.Factory.LoadInstance(realm, name);
+                result = realm.Factory.LoadInstance(this, realm, name, logger);
                 instances.Add(name.ToLower(), result);
             }
 
@@ -692,23 +666,19 @@ namespace Guncho
             return result.ToArray();
         }
 
-        public string[] ListRealms()
+        public IEnumerable<Realm> GetAllRealms()
         {
+            var result = new List<Realm>();
             lock (realms)
             {
-                List<string> result = new List<string>(realms.Count);
-                foreach (Realm r in realms.Values)
-                    result.Add(r.Name);
-                return result.ToArray();
+                result.AddRange(realms.Values);
             }
+            return result;
         }
 
-        public string[] ListRealmFactories()
+        public IEnumerable<RealmFactory> GetRealmFactories()
         {
-            List<string> result = new List<string>(factories.Count);
-            foreach (string key in factories.Keys)
-                result.Add(key);
-            return result.ToArray();
+            return factories.Values;
         }
 
         /// <summary>
@@ -732,7 +702,7 @@ namespace Guncho
             if (toName == null)
                 throw new ArgumentNullException("toName");
 
-            LogMessage(LogLevel.Spam, "Renaming realm '{0}' to '{1}'.", fromName, toName);
+            logger.LogMessage(LogLevel.Spam, "Renaming realm '{0}' to '{1}'.", fromName, toName);
 
             if (fromName.ToLower() == toName.ToLower())
                 return;
@@ -780,7 +750,7 @@ namespace Guncho
                         instances.Remove(inst.Name.ToLower());
                     }
 
-                    LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
+                    logger.LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
                     realms.Remove(fromName.ToLower());
                     realms.Remove(toName.ToLower());
 
@@ -802,8 +772,8 @@ namespace Guncho
                     if (File.Exists(fromCached))
                         File.Move(fromCached, toCached);
 
-                    string fromIndex = Path.Combine(IndexPath, fromName);
-                    string toIndex = Path.Combine(IndexPath, toName);
+                    string fromIndex = Path.Combine(config.IndexPath, fromName);
+                    string toIndex = Path.Combine(config.IndexPath, toName);
                     if (Directory.Exists(fromIndex))
                         RealmFactory.CopyDirectory(fromIndex, toIndex);
 
@@ -814,7 +784,7 @@ namespace Guncho
                     {
                         newRealm.CopySettingsFrom(original);
 
-                        LogMessage(LogLevel.Verbose, "Reloaded '{0}'.", newRealm.Name);
+                        logger.LogMessage(LogLevel.Verbose, "Reloaded '{0}'.", newRealm.Name);
 
                         foreach (var instPair in saved)
                         {
@@ -832,7 +802,7 @@ namespace Guncho
                     }
                     else
                     {
-                        LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
+                        logger.LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
                         Instance startInst = GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
                         foreach (Dictionary<Player, string> positions in saved.Values)
@@ -990,7 +960,7 @@ namespace Guncho
                 if (realm == startRealm)
                     return false;
 
-                LogMessage(LogLevel.Notice, "Deleting realm '{0}'", realm.Name);
+                logger.LogMessage(LogLevel.Notice, "Deleting realm '{0}'", realm.Name);
                 realms.Remove(realm.Name.ToLower());
             }
 
@@ -1021,7 +991,7 @@ namespace Guncho
 
             try
             {
-                string index = Path.Combine(IndexPath, realm.Name);
+                string index = Path.Combine(config.IndexPath, realm.Name);
                 Directory.Delete(index, true);
             }
             catch (IOException) { }
@@ -1203,18 +1173,13 @@ namespace Guncho
             return services.GetService<IHostingStarter>().Start(options);
         }
 
-        public static IEnumerable<Type> GetApiControllerTypes()
-        {
-            yield return typeof(FooController);
-        }
-
         public void Run()
         {
             try
             {
-                TcpListener listener = new TcpListener(System.Net.IPAddress.Any, port);
+                TcpListener listener = new TcpListener(System.Net.IPAddress.Any, config.Port);
 
-                LogMessage(LogLevel.Notice, "Listening on port {0}.", port);
+                logger.LogMessage(LogLevel.Notice, "Listening on port {0}.", config.Port);
                 listener.Start();
 
                 running = true;
@@ -1237,7 +1202,7 @@ namespace Guncho
             }
             catch (Exception ex)
             {
-                LogException(ex);
+                logger.LogException(ex);
                 throw;
             }
         }
@@ -1248,7 +1213,7 @@ namespace Guncho
             TcpClient client = listener.EndAcceptTcpClient(ar);
 
             string ip = FormatEndPoint(client.Client.RemoteEndPoint);
-            LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", ip);
+            logger.LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", ip);
 
             Thread clientThread = new Thread(new ParameterizedThreadStart(ClientThreadProc));
             clientThread.IsBackground = true;
@@ -1260,7 +1225,7 @@ namespace Guncho
 
         public void Shutdown(string reason)
         {
-            LogMessage(LogLevel.Notice, "Shutting down: " + reason);
+            logger.LogMessage(LogLevel.Notice, "Shutting down: " + reason);
 
             string msg = "*** The server is shutting down immediately (" + reason + ") ***";
 
@@ -1447,7 +1412,7 @@ namespace Guncho
                     }
                 }
 
-                LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(otherSide));
+                logger.LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(otherSide));
 
                 if (conn.Player != null)
                 {
@@ -1484,7 +1449,7 @@ namespace Guncho
             }
             catch (Exception ex)
             {
-                LogException(ex);
+                logger.LogException(ex);
                 throw;
             }
         }
@@ -1520,14 +1485,14 @@ namespace Guncho
 #else // !COVERUP
             if (wasTerminated && !instance.RestartRequested)
             {
-                LogMessage(LogLevel.Verbose, "Realm terminated: '{0}'", instance.Name);
+                logger.LogMessage(LogLevel.Verbose, "Realm terminated: '{0}'", instance.Name);
             }
             else
             {
                 // TODO: look at how long it's been since the realm was activated, and don't restart it if we suspect it's buggy
 
                 instance.RestartRequested = false;
-                LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", instance.Name);
+                logger.LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", instance.Name);
 
                 instance.Activate();
             }
@@ -1556,11 +1521,11 @@ namespace Guncho
 
             if (isCondemned)
             {
-                LogMessage(LogLevel.Warning, "Realm '{0}' failed too many times and is now condemned", r.Name);
+                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed too many times and is now condemned", r.Name);
             }
             else
             {
-                LogMessage(LogLevel.Warning, "Realm '{0}' failed but will be restarted", r.Name);
+                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed but will be restarted", r.Name);
                 r.RestartRequested = true;
             }
 
@@ -1612,7 +1577,7 @@ namespace Guncho
 
             if (prevRealm != null)
             {
-                LogMessage(LogLevel.Verbose,
+                logger.LogMessage(LogLevel.Verbose,
                     "{0} (#{1}) leaving '{2}'.",
                     player.Name,
                     player.ID,
@@ -1626,7 +1591,7 @@ namespace Guncho
 
             if (instance != null)
             {
-                LogMessage(LogLevel.Verbose,
+                logger.LogMessage(LogLevel.Verbose,
                     "{0} (#{1}) entering '{2}'.",
                     player.Name,
                     player.ID,

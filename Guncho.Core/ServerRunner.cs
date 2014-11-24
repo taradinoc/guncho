@@ -6,6 +6,8 @@ using System.IO;
 using SimpleInjector;
 using System.Web.Http.Dependencies;
 using SimpleInjector.Integration.WebApi;
+using System.Web.Http;
+using Guncho.Services;
 
 namespace Guncho
 {
@@ -62,26 +64,48 @@ namespace Guncho
             var serverConfig = new ServerConfig
             {
                 Port = port,
+                CachePath = Properties.Settings.Default.CachePath,
+                IndexPath = Path.Combine(Properties.Settings.Default.CachePath, "Index"),
             };
 
-            // configure Simple Injector
-            container.RegisterSingle<Server>();
+            // register server classes
+            var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
+            container.AddRegistration(typeof(Server), serverReg);
+            container.AddRegistration(typeof(IRealmsService), serverReg);
+
             container.RegisterSingle<ServerConfig>(serverConfig);
             container.RegisterSingle<ILogger>(logger);
             container.RegisterSingle<IDependencyResolver, SimpleInjectorWebApiDependencyResolver>();
 
+            // register API controller classes
             var webApiLifestyle = new WebApiRequestLifestyle();
-            foreach (var type in Guncho.Server.GetApiControllerTypes())
+            var controllerTypes = from t in typeof(ServerRunner).Assembly.GetTypes()
+                                  where !t.IsAbstract && typeof(ApiController).IsAssignableFrom(t)
+                                  select t;
+            foreach (var type in controllerTypes)
             {
                 container.Register(type, type, webApiLifestyle);
             }
+
+            // register realm factory classes
+            var informRealmFactories = InformRealmFactory.ConstructAll(
+                logger: logger,
+                installationsPath: Properties.Settings.Default.NiInstallationsPath,
+                indexOutputDir: serverConfig.IndexPath);
+            container.RegisterAll<InformRealmFactory>(informRealmFactories);
+
+            var allRealmFactories = new List<RealmFactory>();
+            allRealmFactories.AddRange(informRealmFactories);
+            container.RegisterAll<RealmFactory>(allRealmFactories);
+
+            container.Verify();
 
             // run server
             try
             {
                 svr = container.GetInstance<Server>();
                 svr.Run();
-                svr.LogMessage(LogLevel.Notice, "Service terminating.");
+                logger.LogMessage(LogLevel.Notice, "Service terminating.");
             }
             finally
             {

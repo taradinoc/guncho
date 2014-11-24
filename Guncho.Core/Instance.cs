@@ -16,6 +16,7 @@ namespace Guncho
         private readonly Stream zfile;
         private readonly RealmIO io;
         private readonly string name;
+        private readonly ILogger logger;
 
         private Engine vm;
 
@@ -46,12 +47,14 @@ namespace Guncho
         /// <param name="realm">The realm to instantiate.</param>
         /// <param name="zfile">The compiled realm file.</param>
         /// <param name="name">The unique name of the instance.</param>
-        public Instance(Server server, Realm realm, Stream zfile, string name)
+        /// <param name="logger">The logger.</param>
+        public Instance(Server server, Realm realm, Stream zfile, string name, ILogger logger)
         {
             this.server = server;
             this.realm = realm;
             this.zfile = zfile;
             this.name = name;
+            this.logger = logger;
 
             this.io = new RealmIO(this);
             this.vm = new Engine(zfile);
@@ -142,7 +145,7 @@ namespace Guncho
 
                     activationTime = DateTime.Now;
 
-                    server.LogMessage(LogLevel.Verbose, "Activating realm '{0}'", name);
+                    logger.LogMessage(LogLevel.Verbose, "Activating realm '{0}'", name);
                 }
             }
         }
@@ -228,7 +231,7 @@ namespace Guncho
             }
             catch (Exception ex)
             {
-                server.LogException(ex);
+                logger.LogException(ex);
                 throw;
             }
         }
@@ -736,7 +739,7 @@ namespace Guncho
         {
             if (curPlayer == Announcer || curPlayer == null)
             {
-                server.LogMessage(LogLevel.Warning,
+                logger.LogMessage(LogLevel.Warning,
                     "Illegal transfer (curPlayer is {0}) attempted from {1} to {2}.",
                     curPlayer == Announcer ? "Announcer" : "null",
                     name, spec);
@@ -751,7 +754,7 @@ namespace Guncho
         {
             if (curPlayer == Announcer || curPlayer == null)
             {
-                server.LogMessage(LogLevel.Warning,
+                logger.LogMessage(LogLevel.Warning,
                     "Illegal (curPlayer is {0}) disambiguation mode request.",
                     curPlayer == Announcer ? "Announcer" : "null");
             }
@@ -850,7 +853,7 @@ namespace Guncho
                             if (transQueue.Count > 0)
                             {
                                 curTrans = transQueue.Dequeue();
-                                instance.server.LogMessage(LogLevel.Spam,
+                                instance.logger.LogMessage(LogLevel.Spam,
                                     "Transaction in {0}: {1}",
                                     instance.name, curTrans.Query);
                                 return curTrans.Query;
@@ -863,7 +866,7 @@ namespace Guncho
                             if (inputQueue.Count > 0)
                             {
                                 string line = inputQueue.Dequeue();
-                                instance.server.LogMessage(LogLevel.Spam,
+                                instance.logger.LogMessage(LogLevel.Spam,
                                     "Processing in {0}: {1}",
                                     instance.name, line);
 

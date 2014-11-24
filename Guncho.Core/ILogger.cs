@@ -20,6 +20,19 @@ namespace Guncho
         void LogMessage(LogLevel level, string text);
     }
 
+    public static class LoggerExtensions
+    {
+        public static void LogMessage(this ILogger logger, LogLevel level, string format, params object[] args)
+        {
+            logger.LogMessage(level, string.Format(format, args));
+        }
+
+        public static void LogException(this ILogger logger, Exception ex)
+        {
+            logger.LogMessage(LogLevel.Error, ex.ToString());
+        }
+    }
+
     public class ConsoleLogger : ILogger
     {
         private object myLock = new object();

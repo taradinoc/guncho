@@ -6,6 +6,7 @@ using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting;
 using System.IO;
 using System.Security.Cryptography;
+using System.Linq;
 
 namespace Guncho
 {
@@ -45,6 +46,8 @@ namespace Guncho
     {
         private static TcpChannel channel;
         private static Server registeredServer;
+        private static ServerConfig registeredConfig;
+        private static ILogger registeredLogger;
 
         private const string FACTORY_URI = "ControllerFactory";
 
@@ -60,7 +63,7 @@ namespace Guncho
             return null;
         }
 
-        internal static void Register(Server server)
+        internal static void Register(Server server, ServerConfig config, ILogger logger)
         {
             if (server == null)
                 throw new ArgumentNullException("server");
@@ -69,6 +72,8 @@ namespace Guncho
                 throw new InvalidOperationException("A server has already been registered");
 
             registeredServer = server;
+            registeredConfig = config;
+            registeredLogger = logger;
 
             if (channel == null)
             {
@@ -88,7 +93,7 @@ namespace Guncho
                 typeof(ControllerFactory),
                 FACTORY_URI,
                 WellKnownObjectMode.Singleton);
-            server.LogMessage(LogLevel.Verbose, "Remote control URI is {0}", channel.GetUrlsForUri(FACTORY_URI)[0]);
+            logger.LogMessage(LogLevel.Verbose, "Remote control URI is {0}", channel.GetUrlsForUri(FACTORY_URI)[0]);
         }
 
         public IController GetController()
@@ -96,7 +101,7 @@ namespace Guncho
             if (registeredServer == null)
                 throw new InvalidOperationException("Factory was created incorrectly");
 
-            return new Controller(registeredServer);
+            return new Controller(registeredServer, registeredConfig, registeredLogger);
         }
     }
 
@@ -153,10 +158,14 @@ namespace Guncho
         #endregion
 
         private readonly Server server;
+        private readonly ServerConfig config;
+        private readonly ILogger logger;
 
-        internal Controller(Server server)
+        internal Controller(Server server, ServerConfig config, ILogger logger)
         {
             this.server = server;
+            this.config = config;
+            this.logger = logger;
         }
 
         public bool LogIn(string name, string password)
@@ -168,11 +177,11 @@ namespace Guncho
             Player newPlayer = server.ValidateLogIn(name, salt, HashPassword(salt, password));
             if (newPlayer == null)
             {
-                server.LogMessage(LogLevel.Notice, "CP: Failed login attempt for {0}.", name);
+                logger.LogMessage(LogLevel.Notice, "CP: Failed login attempt for {0}.", name);
                 return false;
             }
 
-            server.LogMessage(LogLevel.Verbose, "CP: {0} logged in.", newPlayer.Name);
+            logger.LogMessage(LogLevel.Verbose, "CP: {0} logged in.", newPlayer.Name);
             return true;
         }
 
@@ -251,12 +260,12 @@ namespace Guncho
 
         public string[] ListRealms()
         {
-            return server.ListRealms();
+            return server.GetAllRealms().Select(r => r.Name).ToArray();
         }
 
         public string[] ListRealmFactories()
         {
-            return server.ListRealmFactories();
+            return server.GetRealmFactories().Select(f => f.Name).ToArray();
         }
 
         public bool CreateRealm(string playerName, string realmName, string factoryName)
@@ -291,7 +300,7 @@ namespace Guncho
             if (realm == null)
                 throw new ArgumentException("No such realm", "name");
 
-            server.LogMessage(LogLevel.Spam, "CP: getting source of '{0}'.", name);
+            logger.LogMessage(LogLevel.Spam, "CP: getting source of '{0}'.", name);
             factoryName = realm.Factory.Name;
             return File.ReadAllText(realm.SourceFile);
         }
@@ -315,7 +324,7 @@ namespace Guncho
 
             if (GetAccessLevel(playerName, realmName) >= RealmAccessLevel.EditSource)
             {
-                server.LogMessage(LogLevel.Verbose, "CP: changing source of '{0}'.", oldRealm.Name);
+                logger.LogMessage(LogLevel.Verbose, "CP: changing source of '{0}'.", oldRealm.Name);
 
                 string previewName = realmName + ".preview";
 
@@ -361,7 +370,7 @@ namespace Guncho
             if (realm == null)
                 throw new ArgumentException("No such realm", "name");
 
-            string result = Path.Combine(server.IndexPath, realm.Name);
+            string result = Path.Combine(config.IndexPath, realm.Name);
             if (Directory.Exists(result))
                 return Path.GetFullPath(result);
             else

@@ -1,8 +1,10 @@
-﻿using Owin;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using Owin;
 using System.Web.Http;
 using System.Web.Http.Dependencies;
 
-namespace Guncho
+namespace Guncho.Api
 {
     public class WebApiStartup
     {
@@ -19,13 +21,13 @@ namespace Guncho
             HttpConfiguration config = new HttpConfiguration();
             config.DependencyResolver = resolver;
 
+            var jsonSettings = config.Formatters.JsonFormatter.SerializerSettings;
+            //jsonSettings.Formatting = Formatting.Indented;
+            jsonSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+
             config.EnableSystemDiagnosticsTracing();
 
-            config.Routes.MapHttpRoute(
-                name: "DefaultApi",
-                routeTemplate: "api/{controller}/{id}",
-                defaults: new { id = RouteParameter.Optional }
-            );
+            config.MapHttpAttributeRoutes();
 
             appBuilder.UseWebApi(config);
         }
