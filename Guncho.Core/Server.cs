@@ -688,7 +688,7 @@ namespace Guncho
             Realm result;
             lock (realms)
             {
-                realms.TryGetValue(name, out result);
+                realms.TryGetValue(name.ToLower(), out result);
             }
             return result;
         }
