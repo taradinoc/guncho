@@ -34,6 +34,7 @@ using SimpleInjector;
 using SimpleInjector.Integration.WebApi;
 using Guncho.Api;
 using Guncho.Services;
+using System.Threading.Tasks;
 
 namespace Guncho
 {
@@ -602,6 +603,12 @@ namespace Guncho
             return RealmEditingOutcome.Success;
         }
 
+        public Task<RealmEditingOutcome> LoadRealmAsync(string realmName, string sourceFile, string factoryName,
+            Player owner)
+        {
+            return Task.Run(() => LoadRealm(realmName, sourceFile, factoryName, owner));
+        }
+
         private Instance LoadInstance(Realm realm, string name)
         {
             Instance result;
@@ -691,6 +698,44 @@ namespace Guncho
                 realms.TryGetValue(name.ToLower(), out result);
             }
             return result;
+        }
+
+        public async Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream newSource)
+        {
+            // TODO: enforce access controls (ownership, condemned realms)
+            // TODO: record the player name
+
+            logger.LogMessage(LogLevel.Verbose, "CP: changing source of '{0}'.", realm.Name);
+
+            string previewName = realm.Name + ".preview";
+
+            string tempFile = Path.GetTempFileName();
+            try
+            {
+                using (var tempStream = File.OpenWrite(tempFile))
+                {
+                    await newSource.CopyToAsync(tempStream);
+                }
+                try
+                {
+                    var outcome = await LoadRealmAsync(previewName, tempFile, realm.Factory.Name, realm.Owner);
+
+                    if (outcome != RealmEditingOutcome.Success)
+                        return outcome;
+                }
+                catch (RealmLoadingException)
+                {
+                    return RealmEditingOutcome.VMError;
+                }
+
+                // successfully changed
+                ReplaceRealm(previewName, realm.Name);
+                return RealmEditingOutcome.Success;
+            }
+            finally
+            {
+                File.Delete(tempFile);
+            }
         }
 
         #endregion

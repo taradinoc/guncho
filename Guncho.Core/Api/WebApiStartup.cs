@@ -20,18 +20,22 @@ namespace Guncho.Api
             // Configure Web API for self-host. 
             HttpConfiguration config = new HttpConfiguration();
             config.DependencyResolver = resolver;
+            config.MessageHandlers.Add(new HeadHandler());
 
+            // Configure JSON formatting.
             var jsonSettings = config.Formatters.JsonFormatter.SerializerSettings;
             jsonSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
             //jsonSettings.Formatting = Formatting.Indented;
             jsonSettings.NullValueHandling = NullValueHandling.Ignore;
 
-            config.EnableSystemDiagnosticsTracing();
-
+            // Configure routing.
             config.MapHttpAttributeRoutes();
 
-            config.EnsureInitialized();
+            // Configure tracing.
+            config.EnableSystemDiagnosticsTracing();
 
+            // Ready to go.
+            config.EnsureInitialized();
             appBuilder.UseWebApi(config);
         }
     }

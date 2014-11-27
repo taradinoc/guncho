@@ -16,6 +16,7 @@ namespace Guncho.Api
         public string Uri;
         public CompilerOptionsDto Compiler;
         public RuntimeOptionsDto Runtime;
+        public string Assets;
     }
 
     public sealed class CompilerOptionsDto
@@ -46,12 +47,13 @@ namespace Guncho.Api
             {
                 Name = r.Name,
                 Owner = r.Owner.Name,
-                Uri = Url.Link("GetRealmByName", new { name = r.Name }),
+                Uri = Url.Link("GetRealmByName", new { realmName = r.Name }),
                 Compiler = MakeDto(r.Factory),
                 Runtime = new RuntimeOptionsDto
                 {
                     Platform = "Glulx",
-                }
+                },
+                Assets = Url.Link("GetRealmAssetManifest", new { realmName = r.Name }),
             };
         }
 
@@ -76,10 +78,10 @@ namespace Guncho.Api
             return realmsService.GetAllRealms().Select(r => MakeDto(r));
         }
 
-        [Route("{name}", Name = "GetRealmByName")]
-        public RealmDto GetRealmByName(string name)
+        [Route("{realmName}", Name = "GetRealmByName")]
+        public RealmDto GetRealmByName(string realmName)
         {
-            var realm = realmsService.GetRealmByName(name);
+            var realm = realmsService.GetRealmByName(realmName);
 
             if (realm == null)
             {

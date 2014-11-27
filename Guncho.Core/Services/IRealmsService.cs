@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,6 +14,7 @@ namespace Guncho.Services
     {
         IEnumerable<Realm> GetAllRealms();
         Realm GetRealmByName(string name);
+        Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream);
 
         IEnumerable<RealmFactory> GetRealmFactories();
     }
@@ -35,6 +38,14 @@ namespace Guncho.Services
         {
             Contract.Ensures(Contract.Result<IEnumerable<RealmFactory>>() != null);
             return default(IEnumerable<RealmFactory>);
+        }
+
+        public Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream)
+        {
+            Contract.Requires(realm != null);
+            Contract.Requires(bodyStream != null);
+            Contract.Ensures(Contract.Result<Task<RealmEditingOutcome>>() != null);
+            return default(Task<RealmEditingOutcome>);
         }
     }
 }

@@ -38,7 +38,7 @@ namespace Guncho.Api
         }
 
         [Route("{name}", Name = "GetUserByName")]
-        public UserDto GetByName(string name)
+        public UserDto GetUserByName(string name)
         {
             var player = playersService.GetPlayerByName(name);
 

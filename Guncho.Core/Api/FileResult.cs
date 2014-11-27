@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -15,23 +16,45 @@ namespace Guncho.Api
 {
     public sealed class FileResult : IHttpActionResult
     {
-        private readonly string path, contentType;
+        public HttpRequestMessage Request { get; private set; }
+        public string Path { get; private set; }
+        public string ContentType { get; private set; }
 
-        public FileResult(string path, string contentType = null)
+        public FileResult(HttpRequestMessage request, string path, string contentType = null)
         {
-            this.path = path;
-            this.contentType = contentType;
+            Contract.Requires(request != null);
+            Contract.Requires(path != null);
+            Contract.Ensures(this.Request == request);
+            Contract.Ensures(this.Path == path);
+
+            this.Request = request;
+            this.Path = path;
+            this.ContentType = contentType ?? MimeMapping.GetMimeMapping(path);
+        }
+
+        [ContractInvariantMethod]
+        private void ContractInvariant()
+        {
+            Contract.Invariant(Request != null);
+            Contract.Invariant(Path != null);
+            Contract.Invariant(ContentType != null);
         }
 
         public Task<HttpResponseMessage> ExecuteAsync(CancellationToken cancellationToken)
         {
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StreamContent(File.OpenRead(path)),
-            };
+            var stream = File.OpenRead(Path);
 
-            var contentType = this.contentType ?? MimeMapping.GetMimeMapping(path);
-            response.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            var response = new HttpResponseMessage(HttpStatusCode.OK);
+
+            if (Request.Headers.Range != null)
+            {
+                response.Content = new ByteRangeStreamContent(stream, Request.Headers.Range, ContentType);
+            }
+            else
+            {
+                response.Content = new StreamContent(stream);
+                response.Content.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
+            }
 
             return Task.FromResult(response);
         }

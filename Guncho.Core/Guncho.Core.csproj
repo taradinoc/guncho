@@ -150,6 +150,7 @@
     <Compile Include="Api\AssetsController.cs" />
     <Compile Include="Api\ContentTypes.cs" />
     <Compile Include="Api\FileResult.cs" />
+    <Compile Include="Api\HeadHandler.cs" />
     <Compile Include="Api\InstancesController.cs" />
     <Compile Include="Api\UsersController.cs" />
     <Compile Include="Commands.cs" />
