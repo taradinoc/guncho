@@ -37,6 +37,7 @@ using Guncho.Services;
 using System.Threading.Tasks;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 using System.Linq;
+using Guncho.Api.Security;
 
 namespace Guncho
 {
@@ -83,7 +84,6 @@ namespace Guncho
         private readonly ServerConfig config;
         private readonly ILogger logger;
         private readonly IDependencyResolver apiDependencyResolver;
-        private readonly IResourceAuthorizationManager resourceAuth;
 
         private volatile bool running;
 
@@ -98,8 +98,10 @@ namespace Guncho
         private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
         private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
+        public IResourceAuthorizationManager ResourceAuthorizationManager { get; set; }
+
         public Server(ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver,
-            IEnumerable<RealmFactory> allRealmFactories, IResourceAuthorizationManager resourceAuth)
+            IEnumerable<RealmFactory> allRealmFactories)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
@@ -107,7 +109,6 @@ namespace Guncho
             this.config = config;
             this.logger = logger;
             this.apiDependencyResolver = apiDependencyResolver;
-            this.resourceAuth = resourceAuth;
 
             try
             {
@@ -1255,7 +1256,7 @@ namespace Guncho
 
             var services = (ServiceProvider)ServicesFactory.Create();
             services.AddInstance<IDependencyResolver>(apiDependencyResolver);
-            services.AddInstance<IResourceAuthorizationManager>(resourceAuth);
+            services.AddInstance<IResourceAuthorizationManager>(ResourceAuthorizationManager);
 
             //XXX
             // TODO: break this ugly dependency

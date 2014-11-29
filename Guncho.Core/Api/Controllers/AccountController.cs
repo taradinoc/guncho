@@ -6,8 +6,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.AspNet.Identity;
+using Guncho.Api.Security;
 
-namespace Guncho.Api
+namespace Guncho.Api.Controllers
 {
     public class RegistrationDto
     {

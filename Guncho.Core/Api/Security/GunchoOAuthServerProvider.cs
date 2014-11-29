@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Security.Claims;
 
-namespace Guncho.Api
+namespace Guncho.Api.Security
 {
     public sealed class GunchoOAuthServerProvider : OAuthAuthorizationServerProvider
     {
@@ -28,7 +28,12 @@ namespace Guncho.Api
         {
             //context.OwinContext.Response.Headers.Add("Access-Control-Allow-Origin", new[] { "*" });
 
-            var user = await userManager.FindAsync(context.UserName, context.Password);
+            ApiUser user = null;
+
+            if (context.UserName != null && context.Password != null)
+            {
+                user = await userManager.FindAsync(context.UserName, context.Password);
+            }
 
             if (user == null)
             {

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Guncho.Api
+namespace Guncho.Api.Security
 {
     public class ApiUser : IUser<int>
     {

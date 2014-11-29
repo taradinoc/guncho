@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 
-namespace Guncho.Api
+namespace Guncho.Api.Controllers
 {
     public abstract class GunchoApiController : ApiController
     {

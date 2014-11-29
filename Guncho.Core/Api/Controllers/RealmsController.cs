@@ -5,9 +5,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Http;
 using System.Web.Http;
+using Thinktecture.IdentityModel.WebApi;
+using Guncho.Api.Security;
 
-namespace Guncho.Api
+namespace Guncho.Api.Controllers
 {
     public sealed class RealmDto
     {
@@ -32,7 +35,7 @@ namespace Guncho.Api
     }
 
     [RoutePrefix("api/realms")]
-    public sealed class RealmsController : ApiController
+    public sealed class RealmsController : GunchoApiController
     {
         private readonly IRealmsService realmsService;
 
@@ -75,23 +78,41 @@ namespace Guncho.Api
         [Route("")]
         public IEnumerable<RealmDto> Get()
         {
-            return realmsService.GetAllRealms().Select(r => MakeDto(r));
+            return from r in realmsService.GetAllRealms()
+                   where Request.CheckAccess(GunchoResources.RealmActions.ListRealm, r.Name)
+                   select MakeDto(r);
+        }
+
+        [Route("my")]
+        public IEnumerable<RealmDto> GetMy()
+        {
+            return from r in realmsService.GetAllRealms()
+                   where r.Owner.Name == User.Identity.Name
+                   where Request.CheckAccess(GunchoResources.RealmActions.ListRealm, r.Name)
+                   select MakeDto(r);
         }
 
         [Route("{realmName}", Name = "GetRealmByName")]
-        public RealmDto GetRealmByName(string realmName)
+        public IHttpActionResult GetRealmByName(string realmName)
         {
             var realm = realmsService.GetRealmByName(realmName);
 
             if (realm == null)
             {
+                return NotFound();
                 throw new HttpResponseException(System.Net.HttpStatusCode.NotFound);
             }
 
-            return MakeDto(realm);
+            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewDetails, realmName))
+            {
+                return Forbidden();
+            }
+
+            return Ok(MakeDto(realm));
         }
 
         [Route("compilers")]
+        [AllowAnonymous]
         public IEnumerable<CompilerOptionsDto> GetCompilers()
         {
             return realmsService.GetRealmFactories().Select(f => MakeDto(f, details: true));

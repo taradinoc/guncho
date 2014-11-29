@@ -5,10 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Guncho.Api
+namespace Guncho.Api.Security
 {
     class OldTimeyUserStore : IUserStore<ApiUser, int>, IUserPasswordStore<ApiUser, int>,
-        IUserRoleStore<ApiUser, int>, IUserClaimStore<ApiUser, int>
+        IUserRoleStore<ApiUser, int>
     {
         private readonly Server server;
 
@@ -95,41 +95,49 @@ namespace Guncho.Api
 
         public Task AddToRoleAsync(ApiUser user, string roleName)
         {
-            throw new NotImplementedException();
+            // roles are read-only at runtime
+            return Task.FromResult(false);
         }
 
         public Task<IList<string>> GetRolesAsync(ApiUser user)
         {
-            throw new NotImplementedException();
+            var player = server.GetPlayerByName(user.UserName);
+            IList<string> roles;
+            if (player.IsGuest)
+            {
+                roles = new[] { GunchoRoles.Guest };
+            }
+            else if (player.IsAdmin)
+            {
+                roles = new[] { GunchoRoles.User, GunchoRoles.Admin };
+            }
+            else
+            {
+                roles = new[] { GunchoRoles.User };
+            }
+            return Task.FromResult(roles);
         }
 
         public Task<bool> IsInRoleAsync(ApiUser user, string roleName)
         {
-            throw new NotImplementedException();
+            var player = server.GetPlayerByName(user.UserName);
+            switch (roleName)
+            {
+                case GunchoRoles.Guest:
+                    return Task.FromResult(player.IsGuest);
+                case GunchoRoles.Admin:
+                    return Task.FromResult(player.IsAdmin);
+                case GunchoRoles.User:
+                    return Task.FromResult(!player.IsGuest);
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         public Task RemoveFromRoleAsync(ApiUser user, string roleName)
         {
-            throw new NotImplementedException();
-        }
-
-        #endregion
-
-        #region IUserClaimStore<ApiUser,int> Members
-
-        public Task AddClaimAsync(ApiUser user, System.Security.Claims.Claim claim)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IList<System.Security.Claims.Claim>> GetClaimsAsync(ApiUser user)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task RemoveClaimAsync(ApiUser user, System.Security.Claims.Claim claim)
-        {
-            throw new NotImplementedException();
+            // roles are read-only at runtime
+            return Task.FromResult(false);
         }
 
         #endregion

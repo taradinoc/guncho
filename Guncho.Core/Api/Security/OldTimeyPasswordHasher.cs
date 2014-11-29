@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Guncho.Api
+namespace Guncho.Api.Security
 {
-    // c.f. implementation at http://stackoverflow.com/questions/20621950/asp-net-identity-default-password-hasher-how-does-it-work-and-is-it-secure
+    // see default implementation at http://stackoverflow.com/questions/20621950/asp-net-identity-default-password-hasher-how-does-it-work-and-is-it-secure
     public class OldTimeyPasswordHasher : IPasswordHasher
     {
         public string HashPassword(string password)

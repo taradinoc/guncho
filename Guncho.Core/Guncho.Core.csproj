@@ -179,27 +179,30 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Api\AccountController.cs" />
-    <Compile Include="Api\ApiUser.cs" />
-    <Compile Include="Api\ArtifactsController.cs" />
-    <Compile Include="Api\AssetsController.cs" />
+    <Compile Include="Api\Controllers\AccountController.cs" />
+    <Compile Include="Api\Security\ApiUser.cs" />
+    <Compile Include="Api\Controllers\ArtifactsController.cs" />
+    <Compile Include="Api\Controllers\AssetsController.cs" />
     <Compile Include="Api\ContentTypes.cs" />
     <Compile Include="Api\FileResult.cs" />
     <Compile Include="Api\ForbiddenResult.cs" />
-    <Compile Include="Api\GunchoApiController.cs" />
-    <Compile Include="Api\GunchoOAuthServerProvider.cs" />
-    <Compile Include="Api\GunchoResourceAuthorization.cs" />
+    <Compile Include="Api\Controllers\GunchoApiController.cs" />
+    <Compile Include="Api\Security\GunchoOAuthServerProvider.cs" />
+    <Compile Include="Api\Security\GunchoResourceAuthorization.cs" />
     <Compile Include="Api\HeadHandler.cs" />
-    <Compile Include="Api\InstancesController.cs" />
-    <Compile Include="Api\OldTimeyPasswordHasher.cs" />
-    <Compile Include="Api\OldTimeyUserStore.cs" />
+    <Compile Include="Api\Controllers\InstancesController.cs" />
+    <Compile Include="Api\Security\GunchoRoles.cs" />
+    <Compile Include="Api\Security\OldTimeyPasswordHasher.cs" />
+    <Compile Include="Api\Security\OldTimeyUserStore.cs" />
+    <Compile Include="Api\Security\GunchoResources.cs" />
+    <Compile Include="Api\Security\IResourceAuthorizationManagerFactory.cs" />
     <Compile Include="Api\UnprocessableEntityResult.cs" />
     <Compile Include="Api\UnsupportedMediaTypeResult.cs" />
-    <Compile Include="Api\UsersController.cs" />
+    <Compile Include="Api\Controllers\UsersController.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="Controller.cs" />
-    <Compile Include="Api\RealmsController.cs" />
+    <Compile Include="Api\Controllers\RealmsController.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="Instance.cs" />
     <Compile Include="Player.cs" />

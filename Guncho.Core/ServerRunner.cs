@@ -11,6 +11,7 @@ using Guncho.Services;
 using Guncho.Api;
 using Microsoft.AspNet.Identity;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
+using Guncho.Api.Security;
 
 namespace Guncho
 {
@@ -87,6 +88,12 @@ namespace Guncho
             container.AddRegistration(typeof(Server), serverReg);
             container.AddRegistration(typeof(IRealmsService), serverReg);
             container.AddRegistration(typeof(IPlayersService), serverReg);
+            container.RegisterInitializer<Server>(
+                s =>
+                {
+                    // ugly
+                    s.ResourceAuthorizationManager = new GunchoResourceAuthorization(s, s);
+                });
 
             container.RegisterSingle<ServerConfig>(serverConfig);
             container.RegisterSingle<ILogger>(logger);
