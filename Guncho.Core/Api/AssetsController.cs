@@ -40,7 +40,7 @@ namespace Guncho.Api
     }
 
     [RoutePrefix("api/assets")]
-    public sealed class AssetsController : ApiController
+    public sealed class AssetsController : GunchoApiController
     {
         private readonly IRealmsService realmsService;
 
@@ -113,7 +113,7 @@ namespace Guncho.Api
             // TODO: return other assets
             if (path == "story.ni")
             {
-                return new FileResult(Request, realm.SourceFile, contentType: ContentTypes.Inform7Source);
+                return File(Request, realm.SourceFile, contentType: ContentTypes.Inform7Source);
             }
 
             return NotFound();
@@ -135,7 +135,7 @@ namespace Guncho.Api
                 var contentType = Request.Content.Headers.ContentType;
                 if (contentType.MediaType != ContentTypes.Inform7Source)
                 {
-                    return StatusCode(HttpStatusCode.UnsupportedMediaType);
+                    return UnsupportedMediaType();
                 }
 
                 // TODO: include the user id in this call
@@ -154,16 +154,16 @@ namespace Guncho.Api
                         });
 
                     case RealmEditingOutcome.PermissionDenied:
-                        return StatusCode(HttpStatusCode.Forbidden);
+                        return Forbidden();
 
                     case RealmEditingOutcome.Missing:
                         // shouldn't get here...?
-                        return StatusCode(HttpStatusCode.BadRequest);
+                        return BadRequest();
 
                     case RealmEditingOutcome.NiError:
                     case RealmEditingOutcome.InfError:
                     case RealmEditingOutcome.VMError:
-                        return StatusCode((HttpStatusCode)422);  // Unprocessable Entity
+                        return UnprocessableEntity();
                 }
             }
 

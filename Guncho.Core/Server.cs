@@ -35,6 +35,8 @@ using SimpleInjector.Integration.WebApi;
 using Guncho.Api;
 using Guncho.Services;
 using System.Threading.Tasks;
+using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
+using System.Linq;
 
 namespace Guncho
 {
@@ -81,6 +83,7 @@ namespace Guncho
         private readonly ServerConfig config;
         private readonly ILogger logger;
         private readonly IDependencyResolver apiDependencyResolver;
+        private readonly IResourceAuthorizationManager resourceAuth;
 
         private volatile bool running;
 
@@ -96,7 +99,7 @@ namespace Guncho
         private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
         public Server(ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver,
-            IEnumerable<RealmFactory> allRealmFactories)
+            IEnumerable<RealmFactory> allRealmFactories, IResourceAuthorizationManager resourceAuth)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
@@ -104,6 +107,7 @@ namespace Guncho
             this.config = config;
             this.logger = logger;
             this.apiDependencyResolver = apiDependencyResolver;
+            this.resourceAuth = resourceAuth;
 
             try
             {
@@ -1198,6 +1202,15 @@ namespace Guncho
             return result;
         }
 
+        public Player GetPlayerById(int id)
+        {
+            // TODO: optimize GetPlayerById
+            lock (players)
+            {
+                return players.Values.Where(p => p.ID == id).FirstOrDefault();
+            }
+        }
+
         #endregion
 
         public string GetPasswordSalt(string name)
@@ -1242,6 +1255,16 @@ namespace Guncho
 
             var services = (ServiceProvider)ServicesFactory.Create();
             services.AddInstance<IDependencyResolver>(apiDependencyResolver);
+            services.AddInstance<IResourceAuthorizationManager>(resourceAuth);
+
+            //XXX
+            // TODO: break this ugly dependency
+            services.AddInstance<Microsoft.Owin.Security.OAuth.IOAuthAuthorizationServerProvider>(
+                new GunchoOAuthServerProvider(
+                    new Microsoft.AspNet.Identity.UserManager<ApiUser, int>(new OldTimeyUserStore(this))
+                    {
+                        PasswordHasher = new OldTimeyPasswordHasher(),
+                    }));
 
             var options = new StartOptions(url);
             options.AppStartup = typeof(WebApiStartup).AssemblyQualifiedName;

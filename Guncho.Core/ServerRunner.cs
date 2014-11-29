@@ -8,6 +8,9 @@ using System.Web.Http.Dependencies;
 using SimpleInjector.Integration.WebApi;
 using System.Web.Http;
 using Guncho.Services;
+using Guncho.Api;
+using Microsoft.AspNet.Identity;
+using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 
 namespace Guncho
 {
@@ -67,6 +70,17 @@ namespace Guncho
                 CachePath = Properties.Settings.Default.CachePath,
                 IndexPath = Path.Combine(Properties.Settings.Default.CachePath, "Index"),
             };
+
+            // register auth classes
+            container.Register<IUserStore<ApiUser, int>, OldTimeyUserStore>();
+            container.RegisterSingle<IPasswordHasher, OldTimeyPasswordHasher>();
+            container.Register<UserManager<ApiUser, int>>();
+            container.RegisterInitializer<UserManager<ApiUser, int>>(
+                um =>
+                {
+                    um.PasswordHasher = container.GetInstance<IPasswordHasher>();
+                });
+            container.RegisterSingle<IResourceAuthorizationManager, GunchoResourceAuthorization>();
 
             // register server classes
             var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);

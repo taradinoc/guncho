@@ -12,6 +12,7 @@ namespace Guncho.Services
     {
         IEnumerable<Player> GetAllPlayers();
         Player GetPlayerByName(string name);
+        Player GetPlayerById(int id);
     }
 
     [ContractClassFor(typeof(IPlayersService))]
@@ -28,5 +29,7 @@ namespace Guncho.Services
             Contract.Requires(name != null);
             return default(Player);
         }
+
+        public abstract Player GetPlayerById(int id);
     }
 }
