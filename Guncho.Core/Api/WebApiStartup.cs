@@ -37,6 +37,7 @@ namespace Guncho.Api
             // Configure authorization.
             ConfigureOAuth(appBuilder);
             appBuilder.UseResourceAuthorization(resourceAuth);
+            appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
 
             // Configure JSON formatting.
             ConfigureJson(config);

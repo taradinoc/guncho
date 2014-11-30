@@ -18,6 +18,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoConsole", "GunchoCons
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Core", "Guncho.Core\Guncho.Core.csproj", "{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Site", "Guncho.Site\Guncho.Site.csproj", "{566757E1-9BE4-4086-9BE8-02C914E01062}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{99324823-78CB-4BD5-A14B-D6811F1796AF}"
+	ProjectSection(SolutionItems) = preProject
+		WebEssentials-Settings.json = WebEssentials-Settings.json
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +51,10 @@ Global
 		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{566757E1-9BE4-4086-9BE8-02C914E01062}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{566757E1-9BE4-4086-9BE8-02C914E01062}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{566757E1-9BE4-4086-9BE8-02C914E01062}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{566757E1-9BE4-4086-9BE8-02C914E01062}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
