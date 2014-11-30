@@ -1,0 +1,38 @@
+﻿<div class="row">
+    <div class="col-md-2">
+        &nbsp;
+    </div>
+    <div class="col-md-8">
+        <table class="table table-striped table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>Realm Name</th>
+                    <th>Owner</th>
+                    <th>Language</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-ng-repeat="realm in realms">
+                    <td>
+                        {{ realm.name }}
+                    </td>
+                    <td>
+                        {{ realm.owner }}
+                    </td>
+                    <td>
+                        <div ng-hide="!realm.compiler">{{ realm.compiler.language }} ({{ realm.compiler.version }})</div>
+                    </td>
+                    <td>
+                        <a href="#/play/{{ realm.name }}" class="btn btn-primary btn-xs" ng-click="">Play Now</a>
+                        <a href="#/realms/{{ realm.name }}" class="btn btn-primary btn-xs" ng-click="">Edit</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="col-md-2">
+        &nbsp;
+    </div>
+</div>

@@ -18,10 +18,12 @@
     <IISExpressUseClassicPipelineMode />
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="app\views\editRealm.html" />
     <Content Include="app\views\home.html" />
+    <Content Include="app\views\listRealms.html" />
     <Content Include="app\views\login.html" />
-    <Content Include="content\css\app.css" />
-    <Content Include="content\css\loading-bar.css" />
+    <Content Include="content\css\bootstrap.min.css" />
+    <Content Include="content\css\site.css" />
     <Content Include="content\css\loading-bar.min.css" />
     <Content Include="index.html" />
     <Content Include="scripts\angular-local-storage.min.js" />
@@ -31,9 +33,12 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="app\app.ts" />
+    <TypeScriptCompile Include="app\controllers\editRealmController.ts" />
     <TypeScriptCompile Include="app\controllers\homeController.ts" />
     <TypeScriptCompile Include="app\controllers\indexController.ts" />
     <TypeScriptCompile Include="app\controllers\loginController.ts" />
+    <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
+    <TypeScriptCompile Include="app\globals.ts" />
     <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
     <TypeScriptCompile Include="app\services\authService.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />

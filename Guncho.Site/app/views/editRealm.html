@@ -1,0 +1,25 @@
+﻿<form>
+    <div class="form-group">
+        <label for="realmName">Name:</label>
+        <input id="realmName" type="text" ng-model="realm.name" />
+    </div>
+    <div class="form-group">
+        <label for="compiler">Compiler:</label>
+        <select id="compiler" class="form-control" ng-model="realm.compiler"
+                ng-options="compiler as compiler.version group by compiler.language for compiler in compilers | orderBy:'version'"></select>
+    </div>
+    <button class="btn btn-primary" ng-click="saveSettings()">Save Settings</button>
+</form>
+<form>
+    <div class="form-group">
+        <label for="asset">Asset:</label>
+        <select id="asset" class="form-control" ng-model="selectedAsset"
+                ng-options="asset as asset.path for asset in assets | orderBy:'path'"
+                ng-change="loadSelectedAsset()"></select>
+    </div>
+    <div class="form-group">
+        <label for="sourceCode">Source code ({{ selectedAsset.contentType }}):</label>
+        <textarea id="sourceCode" class="form-control" cols="100">{{ selectedAsset.data }}</textarea>
+    </div>
+    <button class="btn btn-primary" ng-click="saveAssets()">Save Assets</button>
+</form>

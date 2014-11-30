@@ -61,7 +61,7 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewAssets, realmName))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.View, GunchoResources.Realm, realmName))
             {
                 return Forbidden();
             }
@@ -92,7 +92,7 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewAssets, realmName))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewHistory, GunchoResources.Realm, realmName))
             {
                 return Forbidden();
             }
@@ -122,7 +122,7 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewAssets, realmName, path))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.View, GunchoResources.Realm, realmName, GunchoResources.Asset, path))
             {
                 return Forbidden();
             }
@@ -146,7 +146,7 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.EditAssets, realmName, path))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.Edit, GunchoResources.Realm, realmName, GunchoResources.Asset, path))
             {
                 return Forbidden();
             }
@@ -202,7 +202,7 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewAssets, realmName, path))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewHistory, GunchoResources.Realm, realmName, GunchoResources.Asset, path))
             {
                 return Forbidden();
             }

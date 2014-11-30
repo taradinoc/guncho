@@ -17,7 +17,6 @@ module app {
     }
 
     export interface IAuthService {
-        serviceBase: string;
         authentication: IAuthentication;
         saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}>;
         login(loginData: ILoginData): ng.IPromise<{}>;
@@ -33,11 +32,10 @@ module app {
         constructor(private $http: ng.IHttpService, private $q: ng.IQService,
             private localStorageService: ng.localStorage.ILocalStorageService) { }
 
-        serviceBase = 'http://localhost:4109/api/';
         authentication = { isAuth: false, userName: "" };
 
         saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}> {
-            return this.$http.post(this.serviceBase + 'account/register', registration)
+            return this.$http.post(serviceBase + 'account/register', registration)
                 .then(response => {
                     return response;
                 });
@@ -49,7 +47,7 @@ module app {
             var deferred = this.$q.defer();
 
             this.$http.post(
-                this.serviceBase + 'token',
+                serviceBase + 'token',
                 data,
                 {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }

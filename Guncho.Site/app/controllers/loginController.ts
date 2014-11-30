@@ -20,7 +20,7 @@ module app {
             $scope.login = () => {
                 authService.login($scope.loginData).then(
                     response => {
-                        $location.path('/orders');
+                        $location.path('/realms/my');
                     },
                     err => {
                         $scope.message = err.error_description;

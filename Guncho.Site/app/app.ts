@@ -1,8 +1,10 @@
-﻿/// <reference path="services/authService.ts" />
+﻿/// <reference path="globals.ts" />
+/// <reference path="services/authService.ts" />
 /// <reference path="services/authInterceptorService.ts" />
 /// <reference path="controllers/homeController.ts" />
 /// <reference path="controllers/indexController.ts" />
 /// <reference path="controllers/loginController.ts" />
+/// <reference path="controllers/listRealmsController.ts" />
 module app {
     function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         $routeProvider.when("/home", {
@@ -18,12 +20,28 @@ module app {
         /*$routeProvider.when("/signup", {
             controller: "signupController",
             templateUrl: "/app/views/signup.html"
+        });*/
+
+        $routeProvider.when("/realms", {
+            controller: "listRealmsController",
+            templateUrl: "/app/views/listRealms.html",
+            resolve: {
+                filter: (): IListRealmsFilter => ({})
+            }
         });
 
-        $routeProvider.when("/orders", {
-            controller: "ordersController",
-            templateUrl: "/app/views/orders.html"
-        });*/
+        $routeProvider.when("/realms/my", {
+            controller: "listRealmsController",
+            templateUrl: "/app/views/listRealms.html",
+            resolve: {
+                filter: (): IListRealmsFilter => ({ ownedByActor: true })
+            }
+        });
+
+        $routeProvider.when("/realms/:realmName", {
+            controller: "editRealmController",
+            templateUrl: "/app/views/editRealm.html"
+        });
 
         $routeProvider.otherwise({ redirectTo: "/home" });
     }
@@ -38,6 +56,8 @@ module app {
         .controller('loginController', LoginController)
         .controller('indexController', IndexController)
         .controller('homeController', HomeController)
+        .controller('listRealmsController', ListRealmsController)
+        .controller('editRealmController', EditRealmController)
         .config(configureRoutes)
         .config(configureAuthInterceptor)
         .run(['authService', function (authService: IAuthService) {

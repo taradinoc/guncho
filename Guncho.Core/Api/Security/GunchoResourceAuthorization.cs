@@ -41,8 +41,6 @@ namespace Guncho.Api.Security
 
         private Task<bool> CheckRealmAccessAsync(ResourceAuthorizationContext context)
         {
-            var action = context.Action.First().Value;
-
             var realmName = context.Resource.Skip(1).Take(1).Single().Value;
             var realm = realmsService.GetRealmByName(realmName);
             if (realm == null)
@@ -50,20 +48,90 @@ namespace Guncho.Api.Security
                 return Nok();
             }
 
+            var nextResource = context.Resource.Skip(2).FirstOrDefault();
+            if (nextResource != null && nextResource.Value == GunchoResources.Asset)
+            {
+                var asset = context.Resource.Skip(3).First().Value;
+                return CheckRealmAssetAccessAsync(context, realm, asset);
+            }
+
+            var action = context.Action.First().Value;
+
             switch (action)
             {
-                case GunchoResources.RealmActions.EditAssets:
+                case GunchoResources.RealmActions.Create:
+                    return CheckRealmCreateAccessAsync(context, realm);
+
+                case GunchoResources.RealmActions.EnableDisable:
+                    return CheckRealmEnableDisableAccessAsync(context, realm);
+
+                case GunchoResources.RealmActions.Edit:
                     return CheckRealmEditAssetsAccessAsync(context, realm);
 
-                case GunchoResources.RealmActions.ViewAssets:
+                case GunchoResources.RealmActions.Join:
+                    return CheckRealmJoinAccessAsync(context, realm);
+
+                case GunchoResources.RealmActions.ListAssets:
                     return CheckRealmViewAssetsAccessAsync(context, realm);
 
-                case GunchoResources.RealmActions.ListRealm:
-                case GunchoResources.RealmActions.ViewDetails:
+                case GunchoResources.RealmActions.Teleport:
+                    return CheckRealmTeleportAccessAsync(context, realm);
+
+                case GunchoResources.RealmActions.List:
+                case GunchoResources.RealmActions.View:
+                case GunchoResources.RealmActions.ViewHistory:
                     return CheckRealmVisibilityAccessAsync(context, realm);
             }
 
             return Nok();
+        }
+
+        private Task<bool> CheckRealmAssetAccessAsync(ResourceAuthorizationContext context, Realm realm, string path)
+        {
+            var action = context.Action.First().Value;
+
+            switch (action)
+            {
+                case GunchoResources.AssetActions.Create:
+                case GunchoResources.AssetActions.Import:
+                    //XXX
+                    return Nok();
+
+                case GunchoResources.AssetActions.Delete:
+                case GunchoResources.AssetActions.Edit:
+                    return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.EditSource));
+
+                case GunchoResources.AssetActions.Share:
+                    return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.EditAccess));
+
+                case GunchoResources.AssetActions.View:
+                case GunchoResources.AssetActions.ViewHistory:
+                    return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.ViewSource));
+            }
+
+            return Nok();
+        }
+
+        private Task<bool> CheckRealmTeleportAccessAsync(ResourceAuthorizationContext context, Realm realm)
+        {
+            return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.Invited));
+        }
+
+        private Task<bool> CheckRealmJoinAccessAsync(ResourceAuthorizationContext context, Realm realm)
+        {
+            return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.Banned + 1));
+        }
+
+        private Task<bool> CheckRealmEnableDisableAccessAsync(ResourceAuthorizationContext context, Realm realm)
+        {
+            var actor = GetActor(context);
+            return Eval(actor != null && (actor == realm.Owner || actor.IsAdmin));
+        }
+
+        private Task<bool> CheckRealmCreateAccessAsync(ResourceAuthorizationContext context, Realm realm)
+        {
+            var actor = GetActor(context);
+            return Eval(actor != null && !actor.IsGuest);
         }
 
         private bool HasRealmAccessLevel(ResourceAuthorizationContext context, Realm realm, RealmAccessLevel level)
@@ -110,17 +178,29 @@ namespace Guncho.Api.Security
 
             switch (action)
             {
+                case GunchoResources.UserActions.ChangePassword:
+                case GunchoResources.UserActions.Create:
                 case GunchoResources.UserActions.EditProfile:
                     return CheckUserEditProfileAccessAsync(context, victim);
+
+                case GunchoResources.UserActions.EditName:
+                case GunchoResources.UserActions.EnableDisable:
+                    return CheckUserEditInternals(context, victim);
             }
 
             return Nok();
         }
 
+        private Task<bool> CheckUserEditInternals(ResourceAuthorizationContext context, Player victim)
+        {
+            var actor = GetActor(context);
+            return Eval(actor != null && actor.IsAdmin);
+        }
+
         private Task<bool> CheckUserEditProfileAccessAsync(ResourceAuthorizationContext context, Player victim)
         {
             var actor = GetActor(context);
-            return Eval(actor == victim || actor.IsAdmin);
+            return Eval(actor == victim || (actor != null && actor.IsAdmin));
         }
 
         private Player GetActor(ResourceAuthorizationContext context)

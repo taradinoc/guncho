@@ -79,7 +79,7 @@ namespace Guncho.Api.Controllers
         public IEnumerable<RealmDto> Get()
         {
             return from r in realmsService.GetAllRealms()
-                   where Request.CheckAccess(GunchoResources.RealmActions.ListRealm, r.Name)
+                   where Request.CheckAccess(GunchoResources.RealmActions.List, GunchoResources.Realm, r.Name)
                    select MakeDto(r);
         }
 
@@ -88,7 +88,7 @@ namespace Guncho.Api.Controllers
         {
             return from r in realmsService.GetAllRealms()
                    where r.Owner.Name == User.Identity.Name
-                   where Request.CheckAccess(GunchoResources.RealmActions.ListRealm, r.Name)
+                   where Request.CheckAccess(GunchoResources.RealmActions.List, GunchoResources.Realm, r.Name)
                    select MakeDto(r);
         }
 
@@ -103,7 +103,7 @@ namespace Guncho.Api.Controllers
                 throw new HttpResponseException(System.Net.HttpStatusCode.NotFound);
             }
 
-            if (!Request.CheckAccess(GunchoResources.RealmActions.ViewDetails, realmName))
+            if (!Request.CheckAccess(GunchoResources.RealmActions.View, GunchoResources.Realm, realmName))
             {
                 return Forbidden();
             }
