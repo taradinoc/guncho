@@ -35,7 +35,7 @@ module app {
         authentication = { isAuth: false, userName: "" };
 
         saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}> {
-            return this.$http.post(serviceBase + 'account/register', registration)
+            return this.$http.post(globals.serviceBase + 'account/register', registration)
                 .then(response => {
                     return response;
                 });
@@ -47,7 +47,7 @@ module app {
             var deferred = this.$q.defer();
 
             this.$http.post(
-                serviceBase + 'token',
+                globals.serviceBase + 'token',
                 data,
                 {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }

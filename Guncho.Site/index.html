@@ -34,11 +34,14 @@
         </div>
     </div>
     <hr />
-    <div id="footer">
+    <div id="footer" data-ng-controller="indexController">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <p class="text-muted">Created by Jesse McGrew.</p>
+                    <p class="text-muted">
+                        Guncho web client version {{ globals.clientVersion }}.<br />
+                        Powered by <a href="#/credits">vaporware</a>.
+                    </p>
                 </div>
             </div>
         </div>
@@ -49,6 +52,7 @@
     <script src="scripts/angular-local-storage.min.js"></script>
     <script src="scripts/loading-bar.min.js"></script>
     <script src="scripts/ui-utils.min.js"></script>
+    <script src="scripts/ui-bootstrap-tpls-0.12.0.min.js"></script>
     <!-- Load globals -->
     <script src="app/globals.js"></script>
     <!-- Load services -->

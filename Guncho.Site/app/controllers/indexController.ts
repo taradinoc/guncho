@@ -1,13 +1,16 @@
 ﻿'use strict';
 module app {
     export interface IIndexControllerScope extends ng.IScope {
-        logOut(): void;
         authentication: IAuthentication;
+        globals: any;
+
+        logOut(): void;
     }
 
     export class IndexController {
-        constructor(private $scope: IIndexControllerScope, private $location: ng.ILocationService, private authService: IAuthService) {
+        constructor($scope: IIndexControllerScope, $location: ng.ILocationService, authService: IAuthService) {
             $scope.authentication = authService.authentication;
+            $scope.globals = globals;
 
             $scope.logOut = () => {
                 authService.logout();

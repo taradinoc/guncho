@@ -17,6 +17,8 @@ module app {
         saveSettings(): void;
         saveAssets(): void;
         loadSelectedAsset(): void;
+        isSettingsFormDirty(): boolean;
+        isAssetsFormDirty(): boolean;
     }
 
     export interface IAsset {
@@ -44,8 +46,8 @@ module app {
             $routeParams: ng.route.IRouteParamsService) {
 
             $scope.settingsForm = {
-                realmName: '...',
-                compiler: { language: 'ZIL', version: '1978' },
+                realmName: '',
+                compiler: { language: '', version: '' },
             };
             $scope.assetsForm = {
                 selectedAsset: null,
@@ -63,21 +65,58 @@ module app {
                 }
             };
 
-            var realmName = $routeParams['realmName'];
+            $scope.saveAssets = () => {
+                angular.forEach(
+                    $scope.assets,
+                    (asset: IEditingAsset, key: number) => {
+                        if (asset.dirty) {
+                            $http.put(asset.uri, asset.data, { headers: { 'Content-Type': asset.contentType } }).then(
+                                response => {
+                                    asset.dirty = false;
+                                },
+                                error => {
+                                    // TODO: better error reporting
+                                    alert("Failed PUT to " + asset.uri + ": " + error.status + " " + error.statusText);
+                                });
+                        }
+                    });
+            };
 
-            $http.get(app.serviceBase + 'realms/' + realmName).then(
+            $scope.saveSettings = () => {
+                // TODO: code me
+            };
+
+            $scope.isSettingsFormDirty = () => {
+                var form = $scope.settingsForm;
+                return (form.realmName != $scope.realm.name ||
+                    form.compiler.language != $scope.realm.compiler.language ||
+                    form.compiler.version != $scope.realm.compiler.version);
+            };
+
+            $scope.isAssetsFormDirty = () => {
+                for (var i = 0; i < $scope.assets.length; i++) {
+                    if ((<IEditingAsset>$scope.assets[i]).dirty) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            var realmName = $routeParams['realmName'];
+            
+            $http.get(globals.serviceBase + 'realms/' + encodeURIComponent(realmName)).then(
                 (response: ng.IHttpPromiseCallbackArg<IRealm>) => {
                     $scope.realm = response.data;
                     $scope.settingsForm.realmName = $scope.realm.name;
-                    $scope.settingsForm.compiler = $scope.realm.compiler;
+                    $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
                 });
 
-            $http.get(app.serviceBase + 'realms/compilers').then(
+            $http.get(globals.serviceBase + 'realms/compilers').then(
                 (response: ng.IHttpPromiseCallbackArg<ICompilerOptions[]>) => {
                     $scope.compilers = response.data;
                 });
 
-            $http.get(app.serviceBase + 'assets/realm/' + realmName).then(
+            $http.get(globals.serviceBase + 'assets/realm/' + encodeURIComponent(realmName)).then(
                 (response: ng.IHttpPromiseCallbackArg<IAssetManifest>) => {
                     $scope.assets = response.data.assets;
                     if ($scope.assets.length) {

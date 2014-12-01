@@ -5,43 +5,46 @@
 </div>
 <div class="row">
     <div class="col-md-10 col-md-offset-1">
-        <h2>Settings</h2>
-        <form>
-            <div class="form-group">
-                <label for="realmName">Name:</label>
-                <input id="realmName" type="text" ng-model="settingsForm.realmName" ng-disabled="!realm" />
-            </div>
-            <div class="form-group">
-                <label for="compilerLanguage">Language:</label>
-                <select id="compilerLanguage" class="form-control" ng-model="settingsForm.compiler.language"
-                        ng-options="compiler.language as compiler.language for compiler in compilers | unique:'language'"
-                        ng-disabled="!realm"></select>
-            </div>
-            <div class="form-group">
-                <label for="compilerVersion">Version:</label>
-                <select id="compilerVersion" class="form-control" ng-model="settingsForm.compiler.version"
-                        ng-options="compiler.version as compiler.version for compiler in compilers | filter:{language:settingsForm.compiler.language}:true"
-                        ng-disabled="!realm"></select>
-            </div>
-            <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!realm">Save Settings</button>
-        </form>
-    </div>
-</div>
-<div class="row">
-    <div class="col-md-10 col-md-offset-1">
-        <h2>Source Code &amp; Assets</h2>
-        <form>
-            <div class="form-group">
-                <label for="asset">Asset path:</label>
-                <select id="asset" class="form-control" ng-model="assetsForm.selectedAsset"
-                        ng-options="asset as asset.path for asset in assets | orderBy:'path'"
-                        ng-change="loadSelectedAsset()" ng-disabled="!assets"></select>
-            </div>
-            <div class="form-group">
-                <label for="sourceCode">Asset content ({{ assetsForm.selectedAsset.contentType }}):</label>
-                <textarea id="sourceCode" class="form-control" rows="30" cols="100" ng-disabled="!assetsForm.selectedAsset">{{ assetsForm.selectedAsset.data }}</textarea>
-            </div>
-            <button class="btn btn-primary" ng-click="saveAssets()" ng-disabled="!assetsForm.selectedAsset">Save Assets</button>
-        </form>
+        <tabset>
+            <tab>
+                <tab-heading>Settings<span ng-hide="!realm || !isSettingsFormDirty()">*</span></tab-heading>
+                <form>
+                    <div class="form-group">
+                        <label for="realmName">Name:</label>
+                        <input id="realmName" type="text" ng-model="settingsForm.realmName" ng-disabled="!realm"/>
+                    </div>
+                    <div class="form-group">
+                        <label for="compilerLanguage">Language:</label>
+                        <select id="compilerLanguage" class="form-control" ng-model="settingsForm.compiler.language"
+                                ng-options="compiler.language as compiler.language for compiler in compilers | unique:'language'"
+                                ng-disabled="!realm || !compilers"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="compilerVersion">Version:</label>
+                        <select id="compilerVersion" class="form-control" ng-model="settingsForm.compiler.version"
+                                ng-options="compiler.version as compiler.version for compiler in compilers | filter:{language:settingsForm.compiler.language}:true"
+                                ng-disabled="!realm || !compilers"></select>
+                    </div>
+                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!realm">Save Settings</button>
+                </form>
+            </tab>
+            <tab>
+                <tab-heading>Source Code &amp; Assets<span ng-hide="!assets || !isAssetsFormDirty()">*</span></tab-heading>
+                <form>
+                    <div class="form-group">
+                        <label for="asset">Asset path:</label>
+                        <select id="asset" class="form-control" ng-model="assetsForm.selectedAsset"
+                                ng-options="asset as asset.path for asset in assets | orderBy:'path'"
+                                ng-change="loadSelectedAsset()" ng-disabled="!assets"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sourceCode">Asset content ({{ assetsForm.selectedAsset.contentType }}<span ng-hide="!assetsForm.selectedAsset.dirty">, dirty</span>):</label>
+                        <textarea id="sourceCode" class="form-control" rows="30" cols="100" ng-model="assetsForm.selectedAsset.data"
+                                  ng-disabled="!assetsForm.selectedAsset" ng-change="assetsForm.selectedAsset.dirty = true"></textarea>
+                    </div>
+                    <button class="btn btn-primary" ng-click="saveAssets()" ng-disabled="!assetsForm.selectedAsset">Save Assets</button>
+                </form>
+            </tab>
+        </tabset>
     </div>
 </div>

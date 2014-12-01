@@ -2,7 +2,6 @@
 module app {
     export interface IListRealmsControllerScope {
         heading: string;
-        loaded: boolean;
         realms: IRealm[];
     }
 
@@ -34,10 +33,9 @@ module app {
             $http: ng.IHttpService, filter: IListRealmsFilter) {
 
             $scope.heading = "All Realms";
-            $scope.loaded = false;
             $scope.realms = [];
 
-            var url = app.serviceBase + "realms";
+            var url = globals.serviceBase + "realms";
             if (filter && filter.ownedByActor) {
                 url += "/my";
                 $scope.heading = "My Realms";
@@ -45,7 +43,6 @@ module app {
             $http.get(url).then(
                 (response: ng.IHttpPromiseCallbackArg<IRealm[]>) => {
                     $scope.realms = response.data;
-                    $scope.loaded = true;
                 });
         }
     }
