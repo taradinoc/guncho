@@ -50,7 +50,7 @@ module app {
         $httpProvider.interceptors.push('authInterceptorService');
     }
 
-    angular.module('GunchoApp', ['ngRoute', 'LocalStorageModule', 'angular-loading-bar'])
+    angular.module('GunchoApp', ['ngRoute', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique'])
         .service('authService', AuthService)
         .service('authInterceptorService', AuthInterceptorService)
         .controller('loginController', LoginController)

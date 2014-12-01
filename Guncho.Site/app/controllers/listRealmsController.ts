@@ -1,7 +1,9 @@
 ﻿'use strict';
 module app {
     export interface IListRealmsControllerScope {
-        realms: any[];
+        heading: string;
+        loaded: boolean;
+        realms: IRealm[];
     }
 
     export interface IListRealmsFilter {
@@ -31,15 +33,19 @@ module app {
         constructor($scope: IListRealmsControllerScope,
             $http: ng.IHttpService, filter: IListRealmsFilter) {
 
+            $scope.heading = "All Realms";
+            $scope.loaded = false;
             $scope.realms = [];
 
             var url = app.serviceBase + "realms";
             if (filter && filter.ownedByActor) {
                 url += "/my";
+                $scope.heading = "My Realms";
             }
             $http.get(url).then(
                 (response: ng.IHttpPromiseCallbackArg<IRealm[]>) => {
                     $scope.realms = response.data;
+                    $scope.loaded = true;
                 });
         }
     }

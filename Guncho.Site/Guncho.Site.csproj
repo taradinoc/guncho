@@ -29,6 +29,7 @@
     <Content Include="scripts\angular-local-storage.min.js" />
     <Content Include="scripts\loading-bar.js" />
     <Content Include="scripts\loading-bar.min.js" />
+    <Content Include="scripts\ui-utils.min.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -57,6 +58,7 @@
     <Content Include="scripts\loading-bar.min.js.map">
       <DependentUpon>loading-bar.min.js</DependentUpon>
     </Content>
+    <Content Include="content\fonts\glyphicons-halflings-regular.woff" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

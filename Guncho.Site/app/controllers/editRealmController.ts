@@ -1,10 +1,18 @@
 ﻿'use strict';
 module app {
-    export interface IEditRealmControllerScope {
-        realm: IRealm;
+    export interface IEditRealmControllerScope extends ng.IScope {
+        settingsForm: {
+            realmName: string;
+            compiler: ICompilerOptions;
+        };
+
+        assetsForm: {
+            selectedAsset: IEditingAsset;
+        };
+
         compilers: ICompilerOptions[];
+        realm: IRealm;
         assets: IAsset[];
-        selectedAsset: IEditingAsset;
 
         saveSettings(): void;
         saveAssets(): void;
@@ -35,8 +43,16 @@ module app {
         constructor($scope: IEditRealmControllerScope, $http: ng.IHttpService,
             $routeParams: ng.route.IRouteParamsService) {
 
+            $scope.settingsForm = {
+                realmName: '...',
+                compiler: { language: 'ZIL', version: '1978' },
+            };
+            $scope.assetsForm = {
+                selectedAsset: null,
+            };
+
             $scope.loadSelectedAsset = () => {
-                var asset = $scope.selectedAsset;
+                var asset = $scope.assetsForm.selectedAsset;
                 if (!asset.loaded) {
                     $http.get(asset.uri).then(
                         (response: ng.IHttpPromiseCallbackArg<string>) => {
@@ -52,6 +68,8 @@ module app {
             $http.get(app.serviceBase + 'realms/' + realmName).then(
                 (response: ng.IHttpPromiseCallbackArg<IRealm>) => {
                     $scope.realm = response.data;
+                    $scope.settingsForm.realmName = $scope.realm.name;
+                    $scope.settingsForm.compiler = $scope.realm.compiler;
                 });
 
             $http.get(app.serviceBase + 'realms/compilers').then(
@@ -62,6 +80,10 @@ module app {
             $http.get(app.serviceBase + 'assets/realm/' + realmName).then(
                 (response: ng.IHttpPromiseCallbackArg<IAssetManifest>) => {
                     $scope.assets = response.data.assets;
+                    if ($scope.assets.length) {
+                        $scope.assetsForm.selectedAsset = $scope.assets[0];
+                        $scope.loadSelectedAsset();
+                    }
                 });
         }
     }
