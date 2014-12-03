@@ -39,7 +39,7 @@
             <div class="row">
                 <div class="col-md-6">
                     <p class="text-muted">
-                        Guncho web client version {{ globals.clientVersion }}.<br />
+                        Guncho web client version {{ gunchoClientVersion }}.<br />
                         Powered by <a href="#/credits">vaporware</a>.
                     </p>
                 </div>
@@ -50,6 +50,7 @@
     <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular-route.min.js"></script>
     <script src="scripts/angular-local-storage.min.js"></script>
+    <script src="scripts/angular-resource.min.js"></script>
     <script src="scripts/loading-bar.min.js"></script>
     <script src="scripts/ui-utils.min.js"></script>
     <script src="scripts/ui-bootstrap-tpls-0.12.0.min.js"></script>
@@ -58,6 +59,7 @@
     <!-- Load services -->
     <script src="app/services/authInterceptorService.js"></script>
     <script src="app/services/authService.js"></script>
+    <script src="app/services/realmResource.js"></script>
     <!-- Load controllers -->
     <script src="app/controllers/indexController.js"></script>
     <script src="app/controllers/homeController.js"></script>

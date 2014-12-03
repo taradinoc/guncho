@@ -1,6 +1,6 @@
-﻿/// <reference path="globals.ts" />
-/// <reference path="services/authService.ts" />
+﻿/// <reference path="services/authService.ts" />
 /// <reference path="services/authInterceptorService.ts" />
+/// <reference path="services/realmResource.ts" />
 /// <reference path="controllers/homeController.ts" />
 /// <reference path="controllers/indexController.ts" />
 /// <reference path="controllers/loginController.ts" />
@@ -50,17 +50,22 @@ module app {
         $httpProvider.interceptors.push('authInterceptorService');
     }
 
-    angular.module('GunchoApp', ['ngRoute', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap'])
+    angular.module('GunchoApp', ['ngRoute', 'ngResource', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap'])
+        .constant('gunchoClientVersion', '1.1')
+        .constant('serviceBase', 'http://localhost:4109/api/') 
+        .config(configureRoutes)
+        .config(configureAuthInterceptor)
         .service('authService', AuthService)
         .service('authInterceptorService', AuthInterceptorService)
+        .factory('Realm', RealmResourceFactory)
         .controller('loginController', LoginController)
         .controller('indexController', IndexController)
         .controller('homeController', HomeController)
         .controller('listRealmsController', ListRealmsController)
         .controller('editRealmController', EditRealmController)
-        .config(configureRoutes)
-        .config(configureAuthInterceptor)
         .run(['authService', function (authService: IAuthService) {
             authService.fillAuthData();
         }]);
 }
+
+(() => { })();

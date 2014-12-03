@@ -27,6 +27,12 @@
     <Content Include="content\css\loading-bar.min.css" />
     <Content Include="index.html" />
     <Content Include="scripts\angular-local-storage.min.js" />
+    <None Include="scripts\jquery-1.6.4-vsdoc.js" />
+    <Content Include="scripts\angular-resource.min.js" />
+    <Content Include="scripts\jquery-1.6.4.js" />
+    <Content Include="scripts\jquery-1.6.4.min.js" />
+    <Content Include="scripts\jquery.signalR-2.1.2.js" />
+    <Content Include="scripts\jquery.signalR-2.1.2.min.js" />
     <Content Include="scripts\loading-bar.js" />
     <Content Include="scripts\loading-bar.min.js" />
     <Content Include="scripts\ui-bootstrap-tpls-0.12.0.min.js" />
@@ -40,9 +46,9 @@
     <TypeScriptCompile Include="app\controllers\indexController.ts" />
     <TypeScriptCompile Include="app\controllers\loginController.ts" />
     <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
-    <TypeScriptCompile Include="app\globals.ts" />
     <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
     <TypeScriptCompile Include="app\services\authService.ts" />
+    <TypeScriptCompile Include="app\services\realmResource.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-mocks.d.ts" />

@@ -34,6 +34,9 @@ namespace Guncho.Api
             config.Filters.Add(new AuthorizeAttribute());
             config.MessageHandlers.Add(new HeadHandler());
 
+            // Configure SignalR.
+            appBuilder.MapSignalR();
+
             // Configure authorization.
             ConfigureOAuth(appBuilder);
             appBuilder.UseResourceAuthorization(resourceAuth);

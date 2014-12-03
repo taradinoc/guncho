@@ -42,8 +42,11 @@ module app {
     }
 
     export class EditRealmController {
+        public static $inject: string[] = [
+            '$scope', '$http', '$routeParams', 'serviceBase'
+        ];
         constructor($scope: IEditRealmControllerScope, $http: ng.IHttpService,
-            $routeParams: ng.route.IRouteParamsService) {
+            $routeParams: ng.route.IRouteParamsService, serviceBase: string) {
 
             $scope.settingsForm = {
                 realmName: '',
@@ -104,19 +107,19 @@ module app {
 
             var realmName = $routeParams['realmName'];
             
-            $http.get(globals.serviceBase + 'realms/' + encodeURIComponent(realmName)).then(
+            $http.get(serviceBase + 'realms/' + encodeURIComponent(realmName)).then(
                 (response: ng.IHttpPromiseCallbackArg<IRealm>) => {
                     $scope.realm = response.data;
                     $scope.settingsForm.realmName = $scope.realm.name;
                     $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
                 });
 
-            $http.get(globals.serviceBase + 'realms/compilers').then(
+            $http.get(serviceBase + 'realms/compilers').then(
                 (response: ng.IHttpPromiseCallbackArg<ICompilerOptions[]>) => {
                     $scope.compilers = response.data;
                 });
 
-            $http.get(globals.serviceBase + 'assets/realm/' + encodeURIComponent(realmName)).then(
+            $http.get(serviceBase + 'assets/realm/' + encodeURIComponent(realmName)).then(
                 (response: ng.IHttpPromiseCallbackArg<IAssetManifest>) => {
                     $scope.assets = response.data.assets;
                     if ($scope.assets.length) {

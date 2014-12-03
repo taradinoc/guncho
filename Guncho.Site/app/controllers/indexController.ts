@@ -2,15 +2,16 @@
 module app {
     export interface IIndexControllerScope extends ng.IScope {
         authentication: IAuthentication;
-        globals: any;
+        gunchoClientVersion: string;
 
         logOut(): void;
     }
 
     export class IndexController {
-        constructor($scope: IIndexControllerScope, $location: ng.ILocationService, authService: IAuthService) {
+        constructor($scope: IIndexControllerScope, $location: ng.ILocationService, authService: IAuthService,
+                gunchoClientVersion: string) {
             $scope.authentication = authService.authentication;
-            $scope.globals = globals;
+            $scope.gunchoClientVersion = gunchoClientVersion;
 
             $scope.logOut = () => {
                 authService.logout();
