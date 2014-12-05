@@ -48,7 +48,7 @@
     <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
     <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
     <TypeScriptCompile Include="app\services\authService.ts" />
-    <TypeScriptCompile Include="app\services\realmResource.ts" />
+    <TypeScriptCompile Include="app\services\resources.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-mocks.d.ts" />

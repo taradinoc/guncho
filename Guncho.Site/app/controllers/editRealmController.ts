@@ -4,6 +4,10 @@ module app {
         settingsForm: {
             realmName: string;
             compiler: ICompilerOptions;
+
+            loaded?: boolean;
+            realmLoaded?: boolean;
+            compilersLoaded?: boolean;
         };
 
         assetsForm: {
@@ -11,7 +15,8 @@ module app {
         };
 
         compilers: ICompilerOptions[];
-        realm: IRealm;
+        realm: IRealmResource;
+        manifest: IRealmAssetManifestResource;
         assets: IAsset[];
 
         saveSettings(): void;
@@ -21,13 +26,6 @@ module app {
         isAssetsFormDirty(): boolean;
     }
 
-    export interface IAsset {
-        version: number;
-        path: string;
-        uri: string;
-        history: string;
-        contentType: string;
-    }
 
     export interface IEditingAsset extends IAsset {
         loaded?: boolean;
@@ -35,18 +33,15 @@ module app {
         data?: string;
     }
 
-    export interface IAssetManifest {
-        version: number;
-        history: string;
-        assets: IAsset[];
-    }
-
     export class EditRealmController {
         public static $inject: string[] = [
-            '$scope', '$http', '$routeParams', 'serviceBase'
+            '$scope', '$http', '$routeParams', 'serviceBase',
+            'Realm', 'RealmAssetManifest'
         ];
         constructor($scope: IEditRealmControllerScope, $http: ng.IHttpService,
-            $routeParams: ng.route.IRouteParamsService, serviceBase: string) {
+            $routeParams: ng.route.IRouteParamsService, serviceBase: string,
+            Realm: IRealmResourceClass,
+            RealmAssetManifest: IRealmAssetManifestResourceClass) {
 
             $scope.settingsForm = {
                 realmName: '',
@@ -106,22 +101,30 @@ module app {
             };
 
             var realmName = $routeParams['realmName'];
-            
-            $http.get(serviceBase + 'realms/' + encodeURIComponent(realmName)).then(
-                (response: ng.IHttpPromiseCallbackArg<IRealm>) => {
-                    $scope.realm = response.data;
+
+            var updateLoaded = () => {
+                var f = $scope.settingsForm;
+                f.loaded = f.realmLoaded && f.compilersLoaded;
+            };
+
+            $scope.realm = Realm.get({ name: realmName },
+                () => {
                     $scope.settingsForm.realmName = $scope.realm.name;
                     $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
+                    $scope.settingsForm.realmLoaded = true;
+                    updateLoaded();
                 });
 
             $http.get(serviceBase + 'realms/compilers').then(
                 (response: ng.IHttpPromiseCallbackArg<ICompilerOptions[]>) => {
                     $scope.compilers = response.data;
+                    $scope.settingsForm.compilersLoaded = true;
+                    updateLoaded();
                 });
 
-            $http.get(serviceBase + 'assets/realm/' + encodeURIComponent(realmName)).then(
-                (response: ng.IHttpPromiseCallbackArg<IAssetManifest>) => {
-                    $scope.assets = response.data.assets;
+            $scope.manifest = RealmAssetManifest.get({ realmName: realmName },
+                () => {
+                    $scope.assets = $scope.manifest.assets;
                     if ($scope.assets.length) {
                         $scope.assetsForm.selectedAsset = $scope.assets[0];
                         $scope.loadSelectedAsset();

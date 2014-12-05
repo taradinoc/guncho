@@ -11,21 +11,21 @@
                 <form>
                     <div class="form-group">
                         <label for="realmName">Name:</label>
-                        <input id="realmName" type="text" ng-model="settingsForm.realmName" ng-disabled="!realm"/>
+                        <input id="realmName" type="text" ng-model="settingsForm.realmName" ng-disabled="!settingsForm.loaded" />
                     </div>
                     <div class="form-group">
                         <label for="compilerLanguage">Language:</label>
                         <select id="compilerLanguage" class="form-control" ng-model="settingsForm.compiler.language"
                                 ng-options="compiler.language as compiler.language for compiler in compilers | unique:'language'"
-                                ng-disabled="!realm || !compilers"></select>
+                                ng-disabled="!settingsForm.loaded"></select>
                     </div>
                     <div class="form-group">
                         <label for="compilerVersion">Version:</label>
                         <select id="compilerVersion" class="form-control" ng-model="settingsForm.compiler.version"
                                 ng-options="compiler.version as compiler.version for compiler in compilers | filter:{language:settingsForm.compiler.language}:true"
-                                ng-disabled="!realm || !compilers"></select>
+                                ng-disabled="!settingsForm.loaded"></select>
                     </div>
-                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!realm">Save Settings</button>
+                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!settingsForm.loaded">Save Settings</button>
                 </form>
             </tab>
             <tab>

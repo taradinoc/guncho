@@ -1,6 +1,6 @@
 ﻿/// <reference path="services/authService.ts" />
 /// <reference path="services/authInterceptorService.ts" />
-/// <reference path="services/realmResource.ts" />
+/// <reference path="services/resources.ts" />
 /// <reference path="controllers/homeController.ts" />
 /// <reference path="controllers/indexController.ts" />
 /// <reference path="controllers/loginController.ts" />
@@ -58,6 +58,8 @@ module app {
         .service('authService', AuthService)
         .service('authInterceptorService', AuthInterceptorService)
         .factory('Realm', RealmResourceFactory)
+        .factory('RealmAsset', RealmAssetResourceFactory)
+        .factory('RealmAssetManifest', RealmAssetManifestResourceFactory)
         .controller('loginController', LoginController)
         .controller('indexController', IndexController)
         .controller('homeController', HomeController)
