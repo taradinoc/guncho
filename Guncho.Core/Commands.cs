@@ -33,7 +33,7 @@ namespace Guncho
 
                 case "quit":
                     conn.WriteLine("Goodbye.");
-                    conn.Terminate();
+                    conn.Terminate(wait: false);
                     return true;
             }
 
@@ -100,8 +100,7 @@ namespace Guncho
                                 if (oldConn != null)
                                 {
                                     oldConn.WriteLine("*** Connection superseded ***");
-                                    oldConn.Terminate();
-                                    oldConn.ClientThread.Join();
+                                    oldConn.Terminate(wait: true);
                                 }
 
                                 lock (player)

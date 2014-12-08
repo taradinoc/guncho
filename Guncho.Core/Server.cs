@@ -1400,7 +1400,7 @@ namespace Guncho
             try
             {
                 TcpClient client = (TcpClient)clientObj;
-                Connection conn = new Connection(client);
+                Connection conn = new TcpConnection(client);
 
                 EndPoint otherSide = client.Client.RemoteEndPoint;
 
