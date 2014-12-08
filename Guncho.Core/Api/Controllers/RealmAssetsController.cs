@@ -15,7 +15,7 @@ namespace Guncho.Api.Controllers
     public class AssetManifestDto
     {
         public int Version;
-        public string History;
+        public string HistoryUri;
         public IEnumerable<AssetRefDto> Assets;
     }
 
@@ -25,7 +25,7 @@ namespace Guncho.Api.Controllers
         public int Version;
         public string Uri;
         public string ContentType;
-        public string History;
+        public string HistoryUri;
     }
 
     public class HistoryDto
@@ -41,17 +41,17 @@ namespace Guncho.Api.Controllers
         public string Creator;
     }
 
-    [RoutePrefix("api/assets")]
-    public sealed class AssetsController : GunchoApiController
+    [RoutePrefix("api/realms/{realmName}")]
+    public sealed class RealmAssetsController : GunchoApiController
     {
         private readonly IRealmsService realmsService;
 
-        public AssetsController(IRealmsService realmsService)
+        public RealmAssetsController(IRealmsService realmsService)
         {
             this.realmsService = realmsService;
         }
 
-        [Route("realm/{realmName}", Name = "GetRealmAssetManifest")]
+        [Route("manifest", Name = "GetRealmAssetManifest")]
         public IHttpActionResult GetRealmAssetManifest(string realmName)
         {
             var realm = realmsService.GetRealmByName(realmName);
@@ -69,20 +69,20 @@ namespace Guncho.Api.Controllers
             return Ok(new AssetManifestDto
             {
                 Version = 1,
-                History = Url.Link("GetRealmAssetManifestHistory", new { realmName = realmName }),
+                HistoryUri = Url.Link("GetRealmAssetManifestHistory", new { realmName = realmName }),
                 Assets = new[] {
                     new AssetRefDto {
                         Path = "/story.ni",
                         Version = 1,
                         Uri = Url.Link("GetRealmAssetByPath", new { realmName = realmName, path = "story.ni" }),
                         ContentType = ContentTypes.Inform7Source,
-                        History = Url.Link("GetRealmAssetHistoryByPath", new { realmName = realmName, path = "story.ni" }),
+                        HistoryUri = Url.Link("GetRealmAssetHistoryByPath", new { realmName = realmName, path = "story.ni" }),
                     },
                 },
             });
         }
 
-        [Route("history/realm/{realmName}", Name = "GetRealmAssetManifestHistory")]
+        [Route("history/manifest", Name = "GetRealmAssetManifestHistory")]
         public IHttpActionResult GetRealmAssetManifestHistory(string realmName)
         {
             var realm = realmsService.GetRealmByName(realmName);
@@ -112,7 +112,7 @@ namespace Guncho.Api.Controllers
             });
         }
 
-        [Route("realm/{realmName}/{*path}", Name = "GetRealmAssetByPath")]
+        [Route("asset/{*path}", Name = "GetRealmAssetByPath")]
         public IHttpActionResult GetRealmAssetByPath(string realmName, string path)
         {
             var realm = realmsService.GetRealmByName(realmName);
@@ -136,7 +136,7 @@ namespace Guncho.Api.Controllers
             return NotFound();
         }
 
-        [Route("realm/{realmName}/{*path}", Name = "PutRealmAssetByPath")]
+        [Route("asset/{*path}", Name = "PutRealmAssetByPath")]
         public async Task<IHttpActionResult> PutRealmAssetByPath(string realmName, string path)
         {
             var realm = realmsService.GetRealmByName(realmName);
@@ -192,7 +192,7 @@ namespace Guncho.Api.Controllers
             return NotFound();
         }
 
-        [Route("history/realm/{realmName}/{*path}", Name = "GetRealmAssetHistoryByPath")]
+        [Route("history/asset/{*path}", Name = "GetRealmAssetHistoryByPath")]
         public IHttpActionResult GetRealmAssetHistoryByPath(string realmName, string path)
         {
             var realm = realmsService.GetRealmByName(realmName);

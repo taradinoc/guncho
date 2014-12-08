@@ -4,6 +4,13 @@ module app {
         settingsForm: {
             realmName: string;
             compiler: ICompilerOptions;
+            privacy: string;
+            acl: Array<{
+                user: string; access: string;
+            }>;
+
+            newAclEntryUser?: string;
+            newAclEntryAccess?: string;
 
             loaded?: boolean;
             realmLoaded?: boolean;
@@ -15,17 +22,21 @@ module app {
         };
 
         compilers: ICompilerOptions[];
+        privacyLevels: string[];
+        accessLevels: string[];
+
         realm: IRealmResource;
         manifest: IRealmAssetManifestResource;
-        assets: IAsset[];
+        assets: IEditingAsset[];
 
         saveSettings(): void;
         saveAssets(): void;
         loadSelectedAsset(): void;
+        deleteAclEntry(index: number): void;
+        addAclEntry(): void;
         isSettingsFormDirty(): boolean;
         isAssetsFormDirty(): boolean;
     }
-
 
     export interface IEditingAsset extends IAsset {
         loaded?: boolean;
@@ -35,8 +46,10 @@ module app {
 
     export class EditRealmController {
         public static $inject: string[] = [
-            '$scope', '$http', '$routeParams', 'serviceBase',
-            'Realm', 'RealmAssetManifest'
+            '$scope', '$http',
+            '$routeParams', 'serviceBase',
+            'Realm',
+            'RealmAssetManifest'
         ];
         constructor($scope: IEditRealmControllerScope, $http: ng.IHttpService,
             $routeParams: ng.route.IRouteParamsService, serviceBase: string,
@@ -46,11 +59,22 @@ module app {
             $scope.settingsForm = {
                 realmName: '',
                 compiler: { language: '', version: '' },
+                privacy: '',
+                acl: [],
             };
             $scope.assetsForm = {
                 selectedAsset: null,
             };
 
+            $scope.privacyLevels = [
+                'private', 'hidden', 'public', 'joinable', 'viewable'
+            ];
+            $scope.accessLevels = [
+                'visible', 'invited', 'viewSource',
+                'editSource', 'editSettings', 'editAccess', 'safetyOff',
+            ];
+
+            // TODO: use $resource for assets
             $scope.loadSelectedAsset = () => {
                 var asset = $scope.assetsForm.selectedAsset;
                 if (!asset.loaded) {
@@ -66,7 +90,7 @@ module app {
             $scope.saveAssets = () => {
                 angular.forEach(
                     $scope.assets,
-                    (asset: IEditingAsset, key: number) => {
+                    (asset, key) => {
                         if (asset.dirty) {
                             $http.put(asset.uri, asset.data, { headers: { 'Content-Type': asset.contentType } }).then(
                                 response => {
@@ -81,7 +105,21 @@ module app {
             };
 
             $scope.saveSettings = () => {
-                // TODO: code me
+                // TODO: implement saveSettings
+                alert('FIXME');
+            };
+
+            $scope.deleteAclEntry = index => {
+                $scope.settingsForm.acl.splice(index, 1);
+            };
+
+            $scope.addAclEntry = () => {
+                $scope.settingsForm.acl.push({
+                    user: $scope.settingsForm.newAclEntryUser,
+                    access: $scope.settingsForm.newAclEntryAccess,
+                });
+                $scope.settingsForm.newAclEntryUser = null;
+                $scope.settingsForm.newAclEntryAccess = null;
             };
 
             $scope.isSettingsFormDirty = () => {
@@ -93,7 +131,7 @@ module app {
 
             $scope.isAssetsFormDirty = () => {
                 for (var i = 0; i < $scope.assets.length; i++) {
-                    if ((<IEditingAsset>$scope.assets[i]).dirty) {
+                    if ($scope.assets[i].dirty) {
                         return true;
                     }
                 }
@@ -111,10 +149,13 @@ module app {
                 () => {
                     $scope.settingsForm.realmName = $scope.realm.name;
                     $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
+                    $scope.settingsForm.privacy = $scope.realm.privacy;
+                    $scope.settingsForm.acl = angular.copy($scope.realm.acl);
                     $scope.settingsForm.realmLoaded = true;
                     updateLoaded();
                 });
 
+            // TODO: use $resource for compilers
             $http.get(serviceBase + 'realms/compilers').then(
                 (response: ng.IHttpPromiseCallbackArg<ICompilerOptions[]>) => {
                     $scope.compilers = response.data;

@@ -2,6 +2,7 @@
 using Microsoft.Owin;
 using Microsoft.Owin.Security.OAuth;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Owin;
 using System;
@@ -34,13 +35,13 @@ namespace Guncho.Api
             config.Filters.Add(new AuthorizeAttribute());
             config.MessageHandlers.Add(new HeadHandler());
 
-            // Configure SignalR.
-            appBuilder.MapSignalR();
-
             // Configure authorization.
+            appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
             ConfigureOAuth(appBuilder);
             appBuilder.UseResourceAuthorization(resourceAuth);
-            appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
+
+            // Configure SignalR.
+            appBuilder.MapSignalR();
 
             // Configure JSON formatting.
             ConfigureJson(config);
@@ -76,6 +77,7 @@ namespace Guncho.Api
             jsonSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
             //jsonSettings.Formatting = Formatting.Indented;
             jsonSettings.NullValueHandling = NullValueHandling.Ignore;
+            jsonSettings.Converters.Add(new StringEnumConverter { CamelCaseText = true });
         }
     }
 }

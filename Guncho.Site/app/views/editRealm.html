@@ -7,42 +7,101 @@
     <div class="col-md-10 col-md-offset-1">
         <tabset>
             <tab>
-                <tab-heading>Settings<span ng-hide="!realm || !isSettingsFormDirty()">*</span></tab-heading>
-                <form>
-                    <div class="form-group">
-                        <label for="realmName">Name:</label>
-                        <input id="realmName" type="text" ng-model="settingsForm.realmName" ng-disabled="!settingsForm.loaded" />
-                    </div>
-                    <div class="form-group">
-                        <label for="compilerLanguage">Language:</label>
-                        <select id="compilerLanguage" class="form-control" ng-model="settingsForm.compiler.language"
-                                ng-options="compiler.language as compiler.language for compiler in compilers | unique:'language'"
-                                ng-disabled="!settingsForm.loaded"></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="compilerVersion">Version:</label>
-                        <select id="compilerVersion" class="form-control" ng-model="settingsForm.compiler.version"
-                                ng-options="compiler.version as compiler.version for compiler in compilers | filter:{language:settingsForm.compiler.language}:true"
-                                ng-disabled="!settingsForm.loaded"></select>
-                    </div>
-                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!settingsForm.loaded">Save Settings</button>
+                <tab-heading>Settings<span ng-hide="!settingsForm.loaded || !isSettingsFormDirty()">*</span></tab-heading>
+                <form class="form-horizontal" novalidate>
+                    <fieldset>
+                        <legend>General</legend>
+                        <div class="form-group">
+                            <label for="realmName" class="col-sm-2 control-label">Name:</label>
+                            <div class="col-sm-6">
+                                <input id="realmName" class="form-control" type="text" ng-model="settingsForm.realmName" ng-disabled="!settingsForm.loaded" required />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Build</legend>
+                        <div class="form-group">
+                            <label for="compilerLanguage" class="col-sm-2 control-label">Compiler:</label>
+                            <div class="col-sm-6">
+                                <select id="compilerLanguage" class="form-control" ng-model="settingsForm.compiler.language"
+                                        ng-options="compiler.language as compiler.language for compiler in compilers | unique:'language'"
+                                        ng-disabled="!settingsForm.loaded" required></select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="compilerVersion" class="col-sm-2 control-label">Version:</label>
+                            <div class="col-sm-2">
+                                <select id="compilerVersion" class="form-control" ng-model="settingsForm.compiler.version"
+                                        ng-options="compiler.version as compiler.version for compiler in compilers | filter:{language:settingsForm.compiler.language}:true"
+                                        ng-disabled="!settingsForm.loaded" required></select>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Access control</legend>
+                        <div class="form-group">
+                            <label for="privacyLevel" class="col-sm-2 control-label">Privacy level:</label>
+                            <div class="col-sm-2">
+                                <select id="privacyLevel" class="form-control" ng-model="settingsForm.privacy"
+                                        ng-options="level for level in privacyLevels"
+                                        ng-disabled="!settingsForm.loaded" required></select>
+                            </div>
+                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th class="col-md-8">User name</th>
+                                    <th class="col-md-3">Access level</th>
+                                    <th class="col-md-1">&nbsp;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input class="form-control" ng-readonly="true" value="{{ realm.owner }}" /></td>
+                                    <td><p class="form-control-static">Owner</p></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr ng-repeat="entry in settingsForm.acl">
+                                    <td><input class="form-control" ng-model="entry.user" ng-readonly="true" /></td>
+                                    <td><select class="form-control" ng-model="entry.access" ng-options="level for level in accessLevels"></select></td>
+                                    <td><a title="Delete ACL entry" ng-click="deleteAclEntry($index)" class="btn btn-danger btn-sm"><span class="glyphicon glyphicon-remove"></span></a></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr ng-form="newAclEntry">
+                                    <td><input id="newAclEntryUser" class="form-control" ng-model="settingsForm.newAclEntryUser" placeholder="User name" required /></td>
+                                    <td><select id="newAclEntryAccess" class="form-control" ng-model="settingsForm.newAclEntryAccess" ng-options="level for level in accessLevels" required></select></td>
+                                    <td><a title="Add ACL entry" ng-click="addAclEntry()" class="btn btn-success btn-sm" ng-disabled="newAclEntry.$invalid"><span class="glyphicon glyphicon-plus"></span></a></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </fieldset>
+                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!settingsForm.loaded">Save settings</button>
                 </form>
+
             </tab>
             <tab>
-                <tab-heading>Source Code &amp; Assets<span ng-hide="!assets || !isAssetsFormDirty()">*</span></tab-heading>
-                <form>
+                <tab-heading>Source code &amp; assets<span ng-hide="!assets || !isAssetsFormDirty()">*</span></tab-heading>
+
+                <form novalidate>
                     <div class="form-group">
-                        <label for="asset">Asset path:</label>
-                        <select id="asset" class="form-control" ng-model="assetsForm.selectedAsset"
+                        <label for="assetPath">Asset path:</label>
+                        <select id="assetPath" class="form-control" ng-model="assetsForm.selectedAsset"
                                 ng-options="asset as asset.path for asset in assets | orderBy:'path'"
                                 ng-change="loadSelectedAsset()" ng-disabled="!assets"></select>
                     </div>
                     <div class="form-group">
-                        <label for="sourceCode">Asset content ({{ assetsForm.selectedAsset.contentType }}<span ng-hide="!assetsForm.selectedAsset.dirty">, dirty</span>):</label>
+                        <label for="assetContentType">Content type:</label>
+                        <span class="form-control-static" ng-model="assetsForm.selectedAsset.contentType"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="sourceCode">Asset content<span ng-hide="!assetsForm.selectedAsset.dirty"> (dirty)</span>:</label>
                         <textarea id="sourceCode" class="form-control" rows="30" cols="100" ng-model="assetsForm.selectedAsset.data"
                                   ng-disabled="!assetsForm.selectedAsset" ng-change="assetsForm.selectedAsset.dirty = true"></textarea>
                     </div>
-                    <button class="btn btn-primary" ng-click="saveAssets()" ng-disabled="!assetsForm.selectedAsset">Save Assets</button>
+                    <button class="btn btn-primary" ng-click="saveAssets()" ng-disabled="!assetsForm.selectedAsset">Save assets</button>
                 </form>
             </tab>
         </tabset>

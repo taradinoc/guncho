@@ -26,6 +26,9 @@ module app {
 
     interface IAccessTokenResponse {
         access_token: string;
+        expires_in: number;
+        token_type: string;
+        username: string;
     }
 
     export class AuthService implements IAuthService {
@@ -42,7 +45,8 @@ module app {
         }
 
         login(loginData: ILoginData): ng.IPromise<{}> {
-            var data = "grant_type=password&username=" + loginData.userName + "&password=" + loginData.password;
+            var data = "grant_type=password&username=" + encodeURIComponent(loginData.userName) +
+                "&password=" + encodeURIComponent(loginData.password);
 
             var deferred = this.$q.defer();
 
@@ -54,10 +58,10 @@ module app {
                 })
                 .success(
                     (response: IAccessTokenResponse) => {
-                        this.localStorageService.set('authorizationData', { token: response.access_token, userName: loginData.userName });
+                        this.localStorageService.set('authorizationData', { token: response.access_token, userName: response.username });
 
                         this.authentication.isAuth = true;
-                        this.authentication.userName = loginData.userName;
+                        this.authentication.userName = response.username;
 
                         deferred.resolve(response);
                     })

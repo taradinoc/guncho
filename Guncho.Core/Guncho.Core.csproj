@@ -195,7 +195,7 @@
     <Compile Include="Api\Hubs\PlayHub.cs" />
     <Compile Include="Api\Security\ApiUser.cs" />
     <Compile Include="Api\Controllers\ArtifactsController.cs" />
-    <Compile Include="Api\Controllers\AssetsController.cs" />
+    <Compile Include="Api\Controllers\RealmAssetsController.cs" />
     <Compile Include="Api\ContentTypes.cs" />
     <Compile Include="Api\FileResult.cs" />
     <Compile Include="Api\ForbiddenResult.cs" />

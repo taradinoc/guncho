@@ -25,8 +25,11 @@
     <Content Include="content\css\bootstrap.min.css" />
     <Content Include="content\css\site.css" />
     <Content Include="content\css\loading-bar.min.css" />
+    <Content Include="content\fonts\glyphicons-halflings-regular.svg" />
     <Content Include="index.html" />
     <Content Include="scripts\angular-local-storage.min.js" />
+    <Content Include="content\fonts\glyphicons-halflings-regular.eot" />
+    <Content Include="content\fonts\glyphicons-halflings-regular.ttf" />
     <None Include="scripts\jquery-1.6.4-vsdoc.js" />
     <Content Include="scripts\angular-resource.min.js" />
     <Content Include="scripts\jquery-1.6.4.js" />

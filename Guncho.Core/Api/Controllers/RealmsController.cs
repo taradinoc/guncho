@@ -1,14 +1,12 @@
-﻿using Guncho.Services;
+﻿using Guncho.Api.Security;
+using Guncho.Services;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Net.Http;
 using System.Web.Http;
-using Thinktecture.IdentityModel.WebApi;
-using Guncho.Api.Security;
 
 namespace Guncho.Api.Controllers
 {
@@ -19,7 +17,15 @@ namespace Guncho.Api.Controllers
         public string Uri;
         public CompilerOptionsDto Compiler;
         public RuntimeOptionsDto Runtime;
-        public string Assets;
+        public string ManifestUri;
+        public RealmPrivacyLevel Privacy;
+        public IEnumerable<RealmAclEntryDto> Acl;
+    }
+
+    public sealed class RealmAclEntryDto
+    {
+        public string User;
+        public RealmAccessLevel Access;
     }
 
     public sealed class CompilerOptionsDto
@@ -44,20 +50,25 @@ namespace Guncho.Api.Controllers
             this.realmsService = realmsService;
         }
 
-        private RealmDto MakeDto(Realm r)
+        private RealmDto MakeDto(Realm r, bool details = false)
         {
-            return new RealmDto
+            var result = new RealmDto
             {
                 Name = r.Name,
                 Owner = r.Owner.Name,
                 Uri = Url.Link("GetRealmByName", new { realmName = r.Name }),
                 Compiler = MakeDto(r.Factory),
-                Runtime = new RuntimeOptionsDto
-                {
-                    Platform = "Glulx",
-                },
-                Assets = Url.Link("GetRealmAssetManifest", new { realmName = r.Name }),
+                Privacy = r.PrivacyLevel,
             };
+
+            if (details)
+            {
+                result.Runtime = new RuntimeOptionsDto { Platform = "Glulx", };
+                result.ManifestUri = Url.Link("GetRealmAssetManifest", new { realmName = r.Name });
+                result.Acl = Array.ConvertAll(r.AccessList, e => new RealmAclEntryDto { User = e.Player.Name, Access = e.Level });
+            }
+
+            return result;
         }
 
         private CompilerOptionsDto MakeDto(RealmFactory f, bool details = false)
@@ -80,7 +91,7 @@ namespace Guncho.Api.Controllers
         {
             return from r in realmsService.GetAllRealms()
                    where Request.CheckAccess(GunchoResources.RealmActions.List, GunchoResources.Realm, r.Name)
-                   select MakeDto(r);
+                   select MakeDto(r, details: false);
         }
 
         [Route("my")]
@@ -89,7 +100,7 @@ namespace Guncho.Api.Controllers
             return from r in realmsService.GetAllRealms()
                    where r.Owner.Name == User.Identity.Name
                    where Request.CheckAccess(GunchoResources.RealmActions.List, GunchoResources.Realm, r.Name)
-                   select MakeDto(r);
+                   select MakeDto(r, details: false);
         }
 
         [Route("{realmName}", Name = "GetRealmByName")]
@@ -108,7 +119,7 @@ namespace Guncho.Api.Controllers
                 return Forbidden();
             }
 
-            return Ok(MakeDto(realm));
+            return Ok(MakeDto(realm, details: true));
         }
 
         [Route("compilers")]

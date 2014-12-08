@@ -13,3 +13,8 @@
 .nav-tabs {
     margin-bottom: 0;
 }
+
+.form-inline .form-group {
+    margin-left: 0;
+    margin-right: 0;
+}

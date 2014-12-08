@@ -6,7 +6,9 @@ module app {
         uri: string;
         compiler?: ICompilerOptions;
         runtime?: IRuntimeOptions;
-        assets?: string;
+        manifestUri?: string;
+        privacy: string;
+        acl?: Array<{ user: string; access: string; }>;
     }
 
     export interface ICompilerOptions {
@@ -76,7 +78,7 @@ module app {
 
     export function RealmAssetResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
         return <IRealmAssetResourceClass>$resource(
-            serviceBase + 'assets/realm/:realmName/:path',
+            serviceBase + 'realms/:realmName/asset/:path',
             { path: '@path' },
             {
                 update: {
@@ -96,6 +98,6 @@ module app {
 
     export function RealmAssetManifestResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
         return <IRealmAssetManifestResourceClass>$resource(
-            serviceBase + 'assets/realm/:realmName');
+            serviceBase + 'realms/:realmName/manifest');
     }
 }

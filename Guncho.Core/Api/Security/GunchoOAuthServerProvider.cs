@@ -26,7 +26,9 @@ namespace Guncho.Api.Security
 
         public override async Task GrantResourceOwnerCredentials(OAuthGrantResourceOwnerCredentialsContext context)
         {
-            context.OwinContext.Response.Headers.Add("Access-Control-Allow-Origin", new[] { "*" });
+            //context.OwinContext.Response.Headers.Add("Access-Control-Allow-Origin", new[] { "*" });
+
+            // TODO: rate limiting?
 
             ApiUser user = null;
 
@@ -47,6 +49,12 @@ namespace Guncho.Api.Security
             // XXX include Admin role: identity.AddClaim(new Claim(ClaimTypes.Role, ...));
 
             context.Validated(identity);
+        }
+
+        public override Task TokenEndpoint(OAuthTokenEndpointContext context)
+        {
+            context.AdditionalResponseParameters.Add("username", context.Identity.Name);
+            return Task.FromResult(0);
         }
     }
 }
