@@ -51,7 +51,7 @@ module app {
             var deferred = this.$q.defer();
 
             this.$http.post(
-                this.serviceBase + 'token',
+                this.serviceBase + '/token',
                 data,
                 {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }

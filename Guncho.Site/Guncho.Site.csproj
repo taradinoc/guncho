@@ -22,6 +22,7 @@
     <Content Include="app\views\home.html" />
     <Content Include="app\views\listRealms.html" />
     <Content Include="app\views\login.html" />
+    <Content Include="app\views\play.html" />
     <Content Include="content\css\bootstrap.min.css" />
     <Content Include="content\css\site.css" />
     <Content Include="content\css\loading-bar.min.css" />
@@ -30,10 +31,10 @@
     <Content Include="scripts\angular-local-storage.min.js" />
     <Content Include="content\fonts\glyphicons-halflings-regular.eot" />
     <Content Include="content\fonts\glyphicons-halflings-regular.ttf" />
-    <None Include="scripts\jquery-1.6.4-vsdoc.js" />
     <Content Include="scripts\angular-resource.min.js" />
-    <Content Include="scripts\jquery-1.6.4.js" />
-    <Content Include="scripts\jquery-1.6.4.min.js" />
+    <None Include="scripts\jquery-2.1.1.intellisense.js" />
+    <Content Include="scripts\jquery-2.1.1.js" />
+    <Content Include="scripts\jquery-2.1.1.min.js" />
     <Content Include="scripts\jquery.signalR-2.1.2.js" />
     <Content Include="scripts\jquery.signalR-2.1.2.min.js" />
     <Content Include="scripts\loading-bar.js" />
@@ -49,8 +50,10 @@
     <TypeScriptCompile Include="app\controllers\indexController.ts" />
     <TypeScriptCompile Include="app\controllers\loginController.ts" />
     <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
+    <TypeScriptCompile Include="app\controllers\playController.ts" />
     <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
     <TypeScriptCompile Include="app\services\authService.ts" />
+    <TypeScriptCompile Include="app\services\playService.ts" />
     <TypeScriptCompile Include="app\services\resources.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />
@@ -62,6 +65,7 @@
     <TypeScriptCompile Include="scripts\typings\angularjs\angular.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularLocalStorage\angularLocalStorage.d.ts" />
     <TypeScriptCompile Include="scripts\typings\jquery\jquery.d.ts" />
+    <TypeScriptCompile Include="scripts\typings\signalr\signalr.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
@@ -69,6 +73,7 @@
       <DependentUpon>loading-bar.min.js</DependentUpon>
     </Content>
     <Content Include="content\fonts\glyphicons-halflings-regular.woff" />
+    <Content Include="scripts\jquery-2.1.1.min.map" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

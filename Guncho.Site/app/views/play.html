@@ -1,0 +1,17 @@
+﻿<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <h1>Play Now</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <ul ng-repeat="line in lines track by $index">
+            <li>{{ line }}</li>
+        </ul>
+    </div>
+</div>
+<form class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <input type="text" class="form-control" placeholder="Enter command" ng-model="command" ng-keypress="keyPress($event)" />
+    </div>
+</form>

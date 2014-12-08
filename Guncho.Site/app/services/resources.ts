@@ -40,7 +40,7 @@ module app {
 
     export function RealmResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
         return <IRealmResourceClass>$resource(
-            serviceBase + 'realms/:name',
+            serviceBase + '/realms/:name',
             { name: '@name' },
             {
                 update: { method: 'PUT' },
@@ -78,7 +78,7 @@ module app {
 
     export function RealmAssetResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
         return <IRealmAssetResourceClass>$resource(
-            serviceBase + 'realms/:realmName/asset/:path',
+            serviceBase + '/realms/:realmName/asset/:path',
             { path: '@path' },
             {
                 update: {
@@ -98,6 +98,6 @@ module app {
 
     export function RealmAssetManifestResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
         return <IRealmAssetManifestResourceClass>$resource(
-            serviceBase + 'realms/:realmName/manifest');
+            serviceBase + '/realms/:realmName/manifest');
     }
 }

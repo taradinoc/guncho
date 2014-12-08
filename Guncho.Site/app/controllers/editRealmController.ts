@@ -156,7 +156,7 @@ module app {
                 });
 
             // TODO: use $resource for compilers
-            $http.get(serviceBase + 'realms/compilers').then(
+            $http.get(serviceBase + '/realms/compilers').then(
                 (response: ng.IHttpPromiseCallbackArg<ICompilerOptions[]>) => {
                     $scope.compilers = response.data;
                     $scope.settingsForm.compilersLoaded = true;

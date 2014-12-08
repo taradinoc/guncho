@@ -43,6 +43,11 @@ module app {
             templateUrl: "/app/views/editRealm.html"
         });
 
+        $routeProvider.when("/play", {
+            controller: "playController",
+            templateUrl: "/app/views/play.html",
+        });
+
         $routeProvider.otherwise({ redirectTo: "/home" });
     }
 
@@ -52,11 +57,14 @@ module app {
 
     angular.module('GunchoApp', ['ngRoute', 'ngResource', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap'])
         .constant('gunchoClientVersion', '1.1')
-        .constant('serviceBase', 'http://localhost:4109/api/') 
+        .constant('serviceBase', 'http://localhost:4109/api')
+        .constant('signalrBase', 'http://localhost:4109/signalr')
         .config(configureRoutes)
         .config(configureAuthInterceptor)
+        .value('hubConnection', $.hubConnection)
         .service('authService', AuthService)
         .service('authInterceptorService', AuthInterceptorService)
+        .service('playService', PlayService)
         .factory('Realm', RealmResourceFactory)
         .factory('RealmAsset', RealmAssetResourceFactory)
         .factory('RealmAssetManifest', RealmAssetManifestResourceFactory)
@@ -65,6 +73,7 @@ module app {
         .controller('homeController', HomeController)
         .controller('listRealmsController', ListRealmsController)
         .controller('editRealmController', EditRealmController)
+        .controller('playController', PlayController)
         .run(['authService', function (authService: IAuthService) {
             authService.fillAuthData();
         }]);
