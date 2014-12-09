@@ -1,3 +1,4 @@
+/* tslint:disable */
 // Type definitions for AngularLocalStorage 0.1.7
 // Project: https://github.com/agrublev/angularLocalStorage
 // Definitions by: Horiuchi_H <https://github.com/horiuchi/>

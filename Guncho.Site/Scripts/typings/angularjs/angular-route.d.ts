@@ -1,3 +1,4 @@
+/* tslint:disable */
 // Type definitions for Angular JS 1.3 (ngRoute module)
 // Project: http://angularjs.org
 // Definitions by: Jonathan Park <https://github.com/park9140>

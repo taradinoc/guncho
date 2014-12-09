@@ -1,3 +1,4 @@
+/* tslint:disable */
 // Type definitions for Angular JS 1.3 (ngSanitize module)
 // Project: http://angularjs.org
 // Definitions by: Diego Vilar <http://github.com/diegovilar>

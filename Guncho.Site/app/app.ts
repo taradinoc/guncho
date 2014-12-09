@@ -5,6 +5,7 @@
 /// <reference path="controllers/indexController.ts" />
 /// <reference path="controllers/loginController.ts" />
 /// <reference path="controllers/listRealmsController.ts" />
+'use strict';
 module app {
     function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         $routeProvider.when("/home", {
@@ -45,7 +46,7 @@ module app {
 
         $routeProvider.when("/play", {
             controller: "playController",
-            templateUrl: "/app/views/play.html",
+            templateUrl: "/app/views/play.html"
         });
 
         $routeProvider.otherwise({ redirectTo: "/home" });
