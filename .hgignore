@@ -1,6 +1,10 @@
+syntax: glob
 bin
 obj
-syntax: glob
 *.suo
 *.user
 packages/*/*
+RealmData/*.storage.xml
+
+syntax: regexp
+Guncho.Site/app/.*\.js(\.map)?

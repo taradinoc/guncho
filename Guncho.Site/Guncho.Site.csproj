@@ -23,7 +23,9 @@
     <Content Include="app\views\listRealms.html" />
     <Content Include="app\views\login.html" />
     <Content Include="app\views\play.html" />
+    <Content Include="content\css\bootstrap.css" />
     <Content Include="content\css\bootstrap.min.css" />
+    <Content Include="content\css\loading-bar.css" />
     <Content Include="content\css\site.css" />
     <Content Include="content\css\loading-bar.min.css" />
     <Content Include="content\fonts\glyphicons-halflings-regular.svg" />
