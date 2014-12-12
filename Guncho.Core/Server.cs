@@ -14,30 +14,25 @@
 
 // TODO: use reader/writer locks instead of lock() where appropriate
 
-using System;
-using System.Collections.Generic;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.IO;
-using System.Net;
-using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Xml.Serialization;
-using System.Text.RegularExpressions;
-using System.Web;
+using Guncho.Api;
+using Guncho.Api.Security;
+using Guncho.Connections;
+using Guncho.Services;
 using Microsoft.Owin.Hosting;
 using Microsoft.Owin.Hosting.Services;
 using Microsoft.Owin.Hosting.Starter;
-using System.Web.Http.Dependencies;
-using SimpleInjector;
-using SimpleInjector.Integration.WebApi;
-using Guncho.Api;
-using Guncho.Services;
-using System.Threading.Tasks;
-using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using Guncho.Api.Security;
+using System.Net;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Http.Dependencies;
+using System.Xml.Serialization;
+using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 
 namespace Guncho
 {
@@ -86,6 +81,7 @@ namespace Guncho
         private readonly IDependencyResolver apiDependencyResolver;
 
         private volatile bool running;
+        private TaskCompletionSource<bool> whenShutDown;
 
         private readonly List<Connection> connections = new List<Connection>();
         private readonly Dictionary<string, Player> players = new Dictionary<string, Player>();
@@ -96,7 +92,7 @@ namespace Guncho
         private readonly Thread eventThread;
         private readonly PriorityQueue<TimedEvent> timedEvents = new PriorityQueue<TimedEvent>();
         private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
-        private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
+        //private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
         public IResourceAuthorizationManager ResourceAuthorizationManager { get; set; }
 
@@ -1273,7 +1269,7 @@ namespace Guncho
             return services.GetService<IHostingStarter>().Start(options);
         }
 
-        public void Run()
+        /*public void Run()
         {
             try
             {
@@ -1305,22 +1301,58 @@ namespace Guncho
                 logger.LogException(ex);
                 throw;
             }
-        }
+        }*/
 
-        private void AcceptClientProc(IAsyncResult ar)
+        public void Run()
         {
-            TcpListener listener = (TcpListener)ar.AsyncState;
-            TcpClient client = listener.EndAcceptTcpClient(ar);
+            try
+            {
+                var cancellation = new CancellationTokenSource();
 
-            string ip = FormatEndPoint(client.Client.RemoteEndPoint);
-            logger.LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", ip);
+                running = true;
+                whenShutDown = new TaskCompletionSource<bool>();
+                eventThread.Start();
 
-            Thread clientThread = new Thread(new ParameterizedThreadStart(ClientThreadProc));
-            clientThread.IsBackground = true;
-            clientThread.Name = "Client: " + ip;
-            clientThread.Start(client);
+                var openConnections = new ConcurrentDictionary<Connection, Task>();
+                
+                TcpConnectionManager manager = new TcpConnectionManager(System.Net.IPAddress.Any, config.Port);
+                manager.ConnectionAccepted += (sender, e) =>
+                {
+                    logger.LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
+                    var connTask = HandleConnection(e.Connection, cancellation.Token);
+                    openConnections.TryAdd(e.Connection, connTask);
+                };
+                manager.ConnectionClosed += (sender, e) =>
+                {
+                    logger.LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(e.Connection.OtherSide));
+                    Task dummy;
+                    openConnections.TryRemove(e.Connection, out dummy);
+                };
 
-            mainLoopEvent.Set();
+                logger.LogMessage(LogLevel.Notice, "Listening on port {0}.", config.Port);
+
+                using (StartWebApi())
+                {
+                    var tcpListenTask = manager.Run(cancellation.Token);
+                    Task.WaitAny(tcpListenTask, whenShutDown.Task);
+                }
+
+                eventThread.Join();
+
+                lock (realms)
+                    foreach (Instance r in instances.Values)
+                        r.PolitelyDispose();
+
+                foreach (var connection in openConnections.Keys)
+                {
+                    connection.Terminate(wait: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogException(ex);
+                throw;
+            }
         }
 
         public void Shutdown(string reason)
@@ -1337,7 +1369,8 @@ namespace Guncho
                 }
 
             running = false;
-            mainLoopEvent.Set();
+            whenShutDown.TrySetResult(true);
+            //mainLoopEvent.Set();
         }
 
         private static string FormatEndPoint(EndPoint endPoint)
@@ -1395,162 +1428,134 @@ namespace Guncho
         }
 #endif
 
-        private void ClientThreadProc(object clientObj)
+        private static string RewriteChatCommandsIfNeeded(string line)
         {
-            try
+            string lower = line.ToLower();
+
+            // handle special forms
+            if (line.StartsWith("\""))
+                line = "$say " + Sanitize(line.Substring(1));
+            else if (lower.StartsWith("say "))
+                line = "$say " + Sanitize(line.Substring(4));
+            else if (line.StartsWith(":"))
+                line = "$emote " + Sanitize(line.Substring(1));
+            else if (lower.StartsWith("pose "))
+                line = "$emote " + Sanitize(line.Substring(5));
+            else if (lower.StartsWith("emote "))
+                line = "$emote " + Sanitize(line.Substring(6));
+            else if (line.StartsWith(".."))
             {
-                TcpClient client = (TcpClient)clientObj;
-                Connection conn = new TcpConnection(client);
+                string[] parts = line.Substring(2).Split(new char[] { ' ' }, 2);
+                if (parts.Length < 2)
+                    line = Sanitize(line);
+                else if (parts[1].StartsWith(":"))
+                    line = "$emote >" + parts[0] + " " + Sanitize(parts[1].Substring(1));
+                else
+                    line = "$say >" + parts[0] + " " + Sanitize(parts[1]);
+            }
+            else
+                line = Sanitize(line);
+            return line;
+        }
 
-                EndPoint otherSide = client.Client.RemoteEndPoint;
+        private static string TrimAndHandleBackspace(string line)
+        {
+            // strip control characters and leading/trailing whitespace, and handle backspace
+            StringBuilder sb = new StringBuilder(line.Length);
+            foreach (char c in line)
+            {
+                if (char.IsWhiteSpace(c) && sb.Length == 0)
+                    continue;
 
-                lock (connections)
-                    connections.Add(conn);
+                if (c == 8 && sb.Length > 0)
+                    sb.Remove(sb.Length - 1, 1);
+                else if (c >= 32)
+                    sb.Append(c);
+            }
+            while (sb.Length > 0 && char.IsWhiteSpace(sb[sb.Length - 1]))
+                sb.Length--;
+            return sb.ToString();
+        }
 
-#if COVERUP
-            conn.Player = MakeNewGuest();
-            conn.Player.Connection = conn;
-            Realm newRealm = MakeNewRealm();
-            EnterRealm(conn.Player, newRealm);
-#else
-                GreetClient(conn);
-#endif
+        private async Task HandleConnection(Connection conn, CancellationToken cancellationToken)
+        {
+            GreetClient(conn);
 
-                string line;
-                while ((line = conn.ReadLine()) != null)
-                {
-                    // strip control characters and leading/trailing whitespace, and handle backspace
-                    StringBuilder sb = new StringBuilder(line.Length);
-                    foreach (char c in line)
-                    {
-                        if (char.IsWhiteSpace(c) && sb.Length == 0)
-                            continue;
+            string line;
+            while ((line = await conn.ReadLineAsync(cancellationToken)) != null)
+            {
+                line = TrimAndHandleBackspace(line);
 
-                        if (c == 8 && sb.Length > 0)
-                            sb.Remove(sb.Length - 1, 1);
-                        else if (c >= 32)
-                            sb.Append(c);
-                    }
-                    while (sb.Length > 0 && char.IsWhiteSpace(sb[sb.Length - 1]))
-                        sb.Length--;
-                    line = sb.ToString();
-
-                    Instance instance = null;
-                    if (conn.Player != null)
-                        lock (conn.Player)
-                            instance = conn.Player.Instance;
-
-                    if (instance == null)
-                    {
-#if COVERUP
-                    conn.WriteLine("Unknown command.");
-#else
-                        // only handle out-of-realm commands (connect, create, quit, who)
-                        if (!HandleSystemCommand(conn, ref line))
-                        {
-                            conn.WriteLine("Unknown command.");
-                            conn.WriteLine();
-                            GreetClient(conn);
-                        }
-#endif
-                    }
-#if !COVERUP
-                    else if (HandleSystemCommand(conn, ref line))
-                    {
-                        // go on to the next line
-                        continue;
-                    }
-#endif
-                    else
-                    {
-                        string dabString;
-                        lock (conn.Player)
-                        {
-                            dabString = conn.Player.Disambiguating;
-                            conn.Player.Disambiguating = null;
-                        }
-                        if (dabString != null)
-                        {
-                            // repeat the previous command, but hide its output (the disambiguation question)
-                            instance.QueueInput(MakeInputLine(conn, dabString, true));
-                            // provide the answer
-                            instance.QueueInput(line);
-                        }
-                        else
-                        {
-#if !COVERUP
-                            string lower = line.ToLower();
-
-                            // handle special forms
-                            if (line.StartsWith("\""))
-                                line = "$say " + Sanitize(line.Substring(1));
-                            else if (lower.StartsWith("say "))
-                                line = "$say " + Sanitize(line.Substring(4));
-                            else if (line.StartsWith(":"))
-                                line = "$emote " + Sanitize(line.Substring(1));
-                            else if (lower.StartsWith("pose "))
-                                line = "$emote " + Sanitize(line.Substring(5));
-                            else if (lower.StartsWith("emote "))
-                                line = "$emote " + Sanitize(line.Substring(6));
-                            else if (line.StartsWith(".."))
-                            {
-                                string[] parts = line.Substring(2).Split(new char[] { ' ' }, 2);
-                                if (parts.Length < 2)
-                                    line = Sanitize(line);
-                                else if (parts[1].StartsWith(":"))
-                                    line = "$emote >" + parts[0] + " " + Sanitize(parts[1].Substring(1));
-                                else
-                                    line = "$say >" + parts[0] + " " + Sanitize(parts[1]);
-                            }
-                            else
-                                line = Sanitize(line);
-#endif
-
-                            // pass the line into the realm
-                            instance.QueueInput(MakeInputLine(conn, line, false));
-                        }
-                    }
-                }
-
-                logger.LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(otherSide));
-
+                Instance instance = null;
                 if (conn.Player != null)
                 {
                     lock (conn.Player)
-                        conn.Player.Connection = null;
-
-#if COVERUP
-                Realm realm;
-                lock (conn.Player)
-                    realm = conn.Player.Realm;
-
-                if (realm != null)
-                    realm.Deactivate();
-#else
-                    EnterInstance(conn.Player, null);
-#endif
-
-#if COVERUP
-                    lock (players)
-                        players.Remove(conn.Player.Name.ToLower());
-#else
-                    if (conn.Player.IsGuest)
-                        lock (players)
-                            players.Remove(conn.Player.Name.ToLower());
-#endif
-
-                    conn.Player = null;
+                    {
+                        instance = conn.Player.Instance;
+                    }
                 }
 
-                lock (connections)
-                    connections.Remove(conn);
+                if (instance == null)
+                {
+                    // only handle out-of-realm commands (connect, create, quit, who)
+                    if (!HandleSystemCommand(conn, ref line))
+                    {
+                        await conn.WriteLineAsync("Unknown command.");
+                        await conn.WriteLineAsync();
+                        await GreetClientAsync(conn);
+                    }
+                }
+                else if (HandleSystemCommand(conn, ref line))
+                {
+                    // go on to the next line
+                    continue;
+                }
+                else
+                {
+                    string dabString;
 
-                client.Close();
+                    lock (conn.Player)
+                    {
+                        dabString = conn.Player.Disambiguating;
+                        conn.Player.Disambiguating = null;
+                    }
+
+                    if (dabString != null)
+                    {
+                        // repeat the previous command, but hide its output (the disambiguation question)
+                        instance.QueueInput(MakeInputLine(conn, dabString, true));
+                        // provide the answer
+                        instance.QueueInput(line);
+                    }
+                    else
+                    {
+                        line = RewriteChatCommandsIfNeeded(line);
+
+                        // pass the line into the realm
+                        instance.QueueInput(MakeInputLine(conn, line, false));
+                    }
+                }
             }
-            catch (Exception ex)
+
+            // connection lost
+            if (conn.Player != null)
             {
-                logger.LogException(ex);
-                throw;
+                lock (conn.Player)
+                {
+                    conn.Player.Connection = null;
+                }
+
+                EnterInstance(conn.Player, null);
+
+                if (conn.Player.IsGuest)
+                {
+                    lock (players)
+                    {
+                        players.Remove(conn.Player.Name.ToLower());
+                    }
+                }
+
+                conn.Player = null;
             }
         }
 
@@ -1967,6 +1972,36 @@ namespace Guncho
             conn.WriteLine("Welcome to the server!");
             conn.WriteLine("Type \"connect <name> <password>\" to connect.");
             conn.WriteLine("To create a new character, use the web site: " + Properties.Settings.Default.WebAddress);
+        }
+
+        private async Task GreetClientAsync(Connection conn)
+        {
+            var file = Path.Combine(
+                Properties.Settings.Default.RealmDataPath,
+                Properties.Settings.Default.GreetingFileName);
+
+            if (File.Exists(file))
+            {
+                try
+                {
+                    // TODO: use SendTextFile?
+                    string greeting;
+                    using (var rdr = File.OpenText(file))
+                    {
+                        greeting = await rdr.ReadToEndAsync();
+                    }
+                    await conn.WriteAsync(greeting);
+                    return;
+                }
+                catch (IOException)
+                {
+                    // fall through to default greeting
+                }
+            }
+
+            await conn.WriteLineAsync("Welcome to the server!");
+            await conn.WriteLineAsync("Type \"connect <name> <password>\" to connect.");
+            await conn.WriteLineAsync("To create a new character, use the web site: " + Properties.Settings.Default.WebAddress);
         }
 
         private void SendTextFile(Connection conn, string playerName, string fileName)

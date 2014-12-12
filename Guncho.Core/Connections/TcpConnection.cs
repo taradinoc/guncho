@@ -1,60 +1,16 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Net.Sockets;
+using System.Diagnostics.Contracts;
 using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
-namespace Guncho
+namespace Guncho.Connections
 {
-    public abstract class Connection
-    {
-        public Connection()
-        {
-            this.Started = this.LastActivity = DateTime.Now;
-        }
-
-        public Player Player { get; set; }
-        public DateTime Started { get; set; }
-        public DateTime LastActivity { get; set; }
-
-        public TimeSpan ConnectedTime
-        {
-            get { return DateTime.Now - Started; }
-        }
-
-        public TimeSpan IdleTime
-        {
-            get { return DateTime.Now - LastActivity; }
-        }
-
-        public abstract string ReadLine();
-
-        public abstract void Write(string text);
-
-        public abstract void Write(char c);
-
-        public virtual void WriteLine(string text)
-        {
-            Write(text);
-            WriteLine();
-        }
-
-        public virtual void WriteLine(string format, params object[] args)
-        {
-            WriteLine(string.Format(format, args));
-        }
-
-        public virtual void WriteLine()
-        {
-            WriteLine("");
-        }
-
-        public abstract void Terminate(bool wait);
-
-        public abstract void FlushOutput();
-    }
-
     public sealed class TcpConnection : Connection
     {
         private readonly TcpClient client;
@@ -62,16 +18,27 @@ namespace Guncho
         private readonly StreamWriter wtr;
         private readonly StringBuilder outputBuffer = new StringBuilder();
         private readonly Thread clientThread;
+        private readonly TaskCompletionSource<bool> whenClosed = new TaskCompletionSource<bool>();
 
         public TcpConnection(TcpClient client)
         {
+            Contract.Requires(client != null);
+
             this.client = client;
+            this.OtherSide = client.Client.RemoteEndPoint;
 
             NetworkStream stream = client.GetStream();
             this.rdr = new StreamReader(stream);
             this.wtr = new StreamWriter(stream);
 
             this.clientThread = Thread.CurrentThread;
+        }
+
+        public EndPoint OtherSide { get; private set; }
+
+        public override Task WhenClosed()
+        {
+            return whenClosed.Task;
         }
 
         /// <summary>
@@ -92,6 +59,23 @@ namespace Guncho
             }
             catch (IOException)
             {
+                whenClosed.TrySetResult(true);
+                return null;
+            }
+        }
+
+        public async override Task<string> ReadLineAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                await FlushOutputAsync();
+                var str = await rdr.ReadLineAsync().WithCancellation(cancellationToken);
+                LastActivity = DateTime.Now;
+                return str;
+            }
+            catch (IOException)
+            {
+                whenClosed.TrySetResult(true);
                 return null;
             }
         }
@@ -101,14 +85,32 @@ namespace Guncho
             outputBuffer.Append(text);
         }
 
+        public override Task WriteAsync(string text)
+        {
+            outputBuffer.Append(text);
+            return Task.FromResult(0);
+        }
+        
         public override void Write(char c)
         {
             outputBuffer.Append(c);
         }
 
+        public override Task WriteAsync(char c)
+        {
+            outputBuffer.Append(c);
+            return Task.FromResult(0);
+        }
+
         public override void WriteLine(string text)
         {
             outputBuffer.AppendLine(text);
+        }
+
+        public override Task WriteLineAsync(string text)
+        {
+            outputBuffer.AppendLine(text);
+            return Task.FromResult(0);
         }
 
         public override void WriteLine(string format, params object[] args)
@@ -128,9 +130,9 @@ namespace Guncho
             client.Client.Shutdown(SocketShutdown.Both);
             client.Client.Close();
 
-            if (wait && Thread.CurrentThread != clientThread)
+            if (wait)
             {
-                clientThread.Join();
+                whenClosed.Task.Wait();
             }
         }
 
@@ -148,6 +150,22 @@ namespace Guncho
             }
             outputBuffer.Length = 0;
             wtr.Flush();
+        }
+
+        public async override Task FlushOutputAsync()
+        {
+            // trim leading and trailing newlines
+            string line = outputBuffer.ToString().Trim(new char[] { '\r', '\n' });
+            if (line.Length > 0)
+            {
+                string rawLine = Server.Desanitize(line);
+                if (rawLine.EndsWith("\n>"))
+                    await wtr.WriteAsync(rawLine);
+                else
+                    await wtr.WriteLineAsync(rawLine);
+            }
+            outputBuffer.Length = 0;
+            await wtr.FlushAsync();
         }
     }
 }

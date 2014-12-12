@@ -1,3 +1,5 @@
+using Guncho.Connections;
+
 namespace Guncho
 {
     partial class Server

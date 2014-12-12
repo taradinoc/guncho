@@ -213,7 +213,7 @@
     <Compile Include="Api\UnsupportedMediaTypeResult.cs" />
     <Compile Include="Api\Controllers\UsersController.cs" />
     <Compile Include="Commands.cs" />
-    <Compile Include="Connection.cs" />
+    <Compile Include="Connections\Connection.cs" />
     <Compile Include="Controller.cs" />
     <Compile Include="Api\Controllers\RealmsController.cs" />
     <Compile Include="ILogger.cs" />
@@ -235,6 +235,9 @@
     <Compile Include="Api\WebApiStartup.cs" />
     <Compile Include="Services\IRealmsService.cs" />
     <Compile Include="Services\IPlayersService.cs" />
+    <Compile Include="TaskExtensions.cs" />
+    <Compile Include="Connections\TcpConnection.cs" />
+    <Compile Include="Connections\TcpConnectionManager.cs" />
     <Compile Include="XML\playerIndex.cs">
       <DependentUpon>playerIndex.xsd</DependentUpon>
     </Compile>
