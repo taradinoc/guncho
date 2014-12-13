@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNet.Identity;
+using Microsoft.AspNet.SignalR;
 using Microsoft.Owin;
 using Microsoft.Owin.Security.OAuth;
 using Newtonsoft.Json;
@@ -10,19 +11,26 @@ using System.Web.Http;
 using System.Web.Http.Dependencies;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 
+using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
+using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
+
 namespace Guncho.Api
 {
     public sealed class WebApiStartup
     {
-        private readonly IDependencyResolver resolver;
+        private readonly IWebDependencyResolver webResolver;
+        private readonly ISignalRDependencyResolver sigrResolver;
         private readonly IResourceAuthorizationManager resourceAuth;
         private readonly IOAuthAuthorizationServerProvider oauthServerProvider;
 
-        public WebApiStartup(IDependencyResolver resolver,
+        public WebApiStartup(
+            IWebDependencyResolver webResolver,
+            ISignalRDependencyResolver sigrResolver,
             IResourceAuthorizationManager resourceAuth,
             IOAuthAuthorizationServerProvider oauthServerProvider)
         {
-            this.resolver = resolver;
+            this.webResolver = webResolver;
+            this.sigrResolver = sigrResolver;
             this.resourceAuth = resourceAuth;
             this.oauthServerProvider = oauthServerProvider;
         }
@@ -31,17 +39,14 @@ namespace Guncho.Api
         {
             // Configure Web API for self-host. 
             HttpConfiguration config = new HttpConfiguration();
-            config.DependencyResolver = resolver;
-            config.Filters.Add(new AuthorizeAttribute());
+            config.DependencyResolver = webResolver;
+            config.Filters.Add(new System.Web.Http.AuthorizeAttribute());
             config.MessageHandlers.Add(new HeadHandler());
 
             // Configure authorization.
             appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
             ConfigureOAuth(appBuilder);
             appBuilder.UseResourceAuthorization(resourceAuth);
-
-            // Configure SignalR.
-            appBuilder.MapSignalR();
 
             // Configure JSON formatting.
             ConfigureJson(config);
@@ -52,9 +57,13 @@ namespace Guncho.Api
             // Configure tracing.
             config.EnableSystemDiagnosticsTracing();
 
-            // Ready to go.
+            // Map Web API.
             config.EnsureInitialized();
             appBuilder.UseWebApi(config);
+
+            // Map SignalR.
+            GlobalHost.DependencyResolver = sigrResolver;
+            appBuilder.MapSignalR();
         }
 
         private void ConfigureOAuth(IAppBuilder app)

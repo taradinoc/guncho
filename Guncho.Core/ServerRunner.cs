@@ -13,6 +13,11 @@ using Microsoft.AspNet.Identity;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 using Guncho.Api.Security;
 
+using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
+using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
+using Guncho.Api.Hubs;
+using Guncho.Connections;
+
 namespace Guncho
 {
     public class ServerRunner
@@ -97,7 +102,8 @@ namespace Guncho
 
             container.RegisterSingle<ServerConfig>(serverConfig);
             container.RegisterSingle<ILogger>(logger);
-            container.RegisterSingle<IDependencyResolver, SimpleInjectorWebApiDependencyResolver>();
+            container.RegisterSingle<IWebDependencyResolver, SimpleInjectorWebApiDependencyResolver>();
+            container.RegisterSingle<ISignalRDependencyResolver, SimpleInjectorSignalRDependencyResolver>();
 
             // register API controller classes
             var webApiLifestyle = new WebApiRequestLifestyle();
@@ -108,6 +114,10 @@ namespace Guncho
             {
                 container.Register(type, type, webApiLifestyle);
             }
+
+            // register SignalR hub and utility classes
+            container.RegisterSingle<ISignalRConnectionManager, SignalRConnectionManager>();
+            container.Register<PlayHub>();
 
             // register realm factory classes
             var informRealmFactories = InformRealmFactory.ConstructAll(

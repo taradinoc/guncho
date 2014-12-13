@@ -10,12 +10,7 @@ using System.Threading.Tasks;
 
 namespace Guncho.Connections
 {
-    class TcpConnectionEventArgs : EventArgs
-    {
-        public TcpConnection Connection { get; set; }
-    }
-
-    internal sealed class TcpConnectionManager
+    internal sealed class TcpConnectionManager : IConnectionManager<TcpConnection>
     {
         private readonly TcpListener listener;
         private readonly ConcurrentDictionary<int, Task> activeConnections = new ConcurrentDictionary<int, Task>();
@@ -28,8 +23,8 @@ namespace Guncho.Connections
             this.ConnectionClosed = delegate { };
         }
 
-        public event EventHandler<TcpConnectionEventArgs> ConnectionAccepted;
-        public event EventHandler<TcpConnectionEventArgs> ConnectionClosed;
+        public event EventHandler<ConnectionAcceptedEventArgs<TcpConnection>> ConnectionAccepted;
+        public event EventHandler<ConnectionEventArgs<TcpConnection>> ConnectionClosed;
 
         public async Task Run(CancellationToken cancellationToken)
         {
@@ -62,7 +57,7 @@ namespace Guncho.Connections
             try
             {
                 var tcpConnection = new TcpConnection(tcpClient);
-                ConnectionAccepted(this, new TcpConnectionEventArgs { Connection = tcpConnection });
+                ConnectionAccepted(this, new ConnectionAcceptedEventArgs<TcpConnection> { Connection = tcpConnection, AuthenticatedUserName = null });
 
                 try
                 {
@@ -70,7 +65,7 @@ namespace Guncho.Connections
                 }
                 finally
                 {
-                    ConnectionClosed(this, new TcpConnectionEventArgs { Connection = tcpConnection });
+                    ConnectionClosed(this, new ConnectionEventArgs<TcpConnection> { Connection = tcpConnection });
                 }
             }
             finally

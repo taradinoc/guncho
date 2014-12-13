@@ -30,9 +30,11 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Http.Dependencies;
 using System.Xml.Serialization;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
+
+using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
+using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
 
 namespace Guncho
 {
@@ -78,7 +80,9 @@ namespace Guncho
     {
         private readonly ServerConfig config;
         private readonly ILogger logger;
-        private readonly IDependencyResolver apiDependencyResolver;
+        private readonly IWebDependencyResolver apiDependencyResolver;
+        private readonly ISignalRDependencyResolver sigrDependencyResolver;
+        private readonly ISignalRConnectionManager sigrManager;
 
         private volatile bool running;
         private TaskCompletionSource<bool> whenShutDown;
@@ -96,7 +100,10 @@ namespace Guncho
 
         public IResourceAuthorizationManager ResourceAuthorizationManager { get; set; }
 
-        public Server(ServerConfig config, ILogger logger, IDependencyResolver apiDependencyResolver,
+        public Server(ServerConfig config, ILogger logger,
+            IWebDependencyResolver apiDependencyResolver,
+            ISignalRDependencyResolver sigrDependencyResolver,
+            ISignalRConnectionManager sigrManager,
             IEnumerable<RealmFactory> allRealmFactories)
         {
             if (logger == null)
@@ -105,6 +112,8 @@ namespace Guncho
             this.config = config;
             this.logger = logger;
             this.apiDependencyResolver = apiDependencyResolver;
+            this.sigrDependencyResolver = sigrDependencyResolver;
+            this.sigrManager = sigrManager;
 
             try
             {
@@ -1251,8 +1260,10 @@ namespace Guncho
             var url = "http://localhost:4109";  // TODO: make web api url configurable!
 
             var services = (ServiceProvider)ServicesFactory.Create();
-            services.AddInstance<IDependencyResolver>(apiDependencyResolver);
+            services.AddInstance<IWebDependencyResolver>(apiDependencyResolver);
+            services.AddInstance<ISignalRDependencyResolver>(sigrDependencyResolver);
             services.AddInstance<IResourceAuthorizationManager>(ResourceAuthorizationManager);
+            services.AddInstance<ISignalRConnectionManager>(sigrManager);
 
             //XXX
             // TODO: break this ugly dependency
@@ -1314,27 +1325,35 @@ namespace Guncho
                 eventThread.Start();
 
                 var openConnections = new ConcurrentDictionary<Connection, Task>();
-                
-                TcpConnectionManager manager = new TcpConnectionManager(System.Net.IPAddress.Any, config.Port);
-                manager.ConnectionAccepted += (sender, e) =>
+
+                // TCP connections
+                //XXX break dependency
+                var tcpManager = new TcpConnectionManager(System.Net.IPAddress.Any, config.Port);
+                tcpManager.ConnectionAccepted += (sender, e) =>
                 {
                     logger.LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
                     var connTask = HandleConnection(e.Connection, cancellation.Token);
                     openConnections.TryAdd(e.Connection, connTask);
                 };
-                manager.ConnectionClosed += (sender, e) =>
+                tcpManager.ConnectionClosed += (sender, e) =>
                 {
                     logger.LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(e.Connection.OtherSide));
                     Task dummy;
                     openConnections.TryRemove(e.Connection, out dummy);
                 };
 
-                logger.LogMessage(LogLevel.Notice, "Listening on port {0}.", config.Port);
+                logger.LogMessage(LogLevel.Notice, "TCP: Listening on port {0}.", config.Port);
+                var tcpListenTask = tcpManager.Run(cancellation.Token);
 
+                // SignalR connections
                 using (StartWebApi())
                 {
-                    var tcpListenTask = manager.Run(cancellation.Token);
                     Task.WaitAny(tcpListenTask, whenShutDown.Task);
+
+                    foreach (var connection in openConnections.Keys)
+                    {
+                        connection.Terminate(wait: false);
+                    }
                 }
 
                 eventThread.Join();
@@ -1342,11 +1361,6 @@ namespace Guncho
                 lock (realms)
                     foreach (Instance r in instances.Values)
                         r.PolitelyDispose();
-
-                foreach (var connection in openConnections.Keys)
-                {
-                    connection.Terminate(wait: false);
-                }
             }
             catch (Exception ex)
             {

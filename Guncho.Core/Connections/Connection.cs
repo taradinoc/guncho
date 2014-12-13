@@ -33,6 +33,7 @@ namespace Guncho.Connections
 
         public abstract Task WhenClosed();
 
+        [Obsolete]
         public abstract string ReadLine();
 
         public abstract Task<string> ReadLineAsync(CancellationToken cancellationToken);

@@ -37,10 +37,7 @@ module app {
         }
 
         public start() {
-            this.connection.start(
-                () => {
-                    this.proxy.invoke('createSession');
-                });
+            this.connection.start();
         }
 
         public stop() {

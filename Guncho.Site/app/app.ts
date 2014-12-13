@@ -63,6 +63,7 @@ module app {
         .config(configureRoutes)
         .config(configureAuthInterceptor)
         .value('hubConnection', $.hubConnection)
+        .value('signalR', $.signalR)
         .service('authService', AuthService)
         .service('authInterceptorService', AuthInterceptorService)
         .service('playService', PlayService)

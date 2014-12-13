@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNet.SignalR;
+﻿using Guncho.Connections;
+using Microsoft.AspNet.SignalR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,21 +15,29 @@ namespace Guncho.Api.Hubs
 
     public sealed class PlayHub : Hub<IClient>
     {
-        public void CreateSession()
+        private readonly ISignalRConnectionManager manager;
+
+        public PlayHub(ISignalRConnectionManager manager)
         {
-            Clients.Caller.WriteLine("Hello from Guncho via SignalR!");
+            this.manager = manager;
+        }
+
+        public override Task OnConnected()
+        {
+            manager.NotifyConnectionAccepted(Context.ConnectionId, Context.User.Identity.Name);
+            return base.OnConnected();
+        }
+
+        public override Task OnDisconnected(bool stopCalled)
+        {
+            manager.NotifyConnectionClosed(Context.ConnectionId);
+            return base.OnDisconnected(stopCalled);
         }
 
         public Task SendCommand(string command)
         {
-            if (string.IsNullOrWhiteSpace(command))
-            {
-                Clients.Caller.WriteLine("I beg your pardon?");
-            }
-            else
-            {
-                Clients.Caller.WriteLine("But why should I " + command.ToUpper() + "?");
-            }
+            var connection = manager.GetConnectionById(Context.ConnectionId);
+            connection.EnqueueCommand(command);
             return Task.FromResult(0);
         }
     }

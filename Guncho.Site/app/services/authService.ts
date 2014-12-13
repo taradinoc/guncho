@@ -32,8 +32,10 @@ module app {
     }
 
     export class AuthService implements IAuthService {
+        public static $inject = ['$http', '$q', 'localStorageService', 'serviceBase', 'signalR'];
         constructor(private $http: ng.IHttpService, private $q: ng.IQService,
-            private localStorageService: ng.localStorage.ILocalStorageService, private serviceBase: string) { }
+            private localStorageService: ng.localStorage.ILocalStorageService, private serviceBase: string,
+            private signalR: any) { }
 
         authentication = { isAuth: false, userName: "" };
 
@@ -59,6 +61,7 @@ module app {
                 .success(
                     (response: IAccessTokenResponse) => {
                         this.localStorageService.set('authorizationData', { token: response.access_token, userName: response.username });
+                        this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + response.access_token };
 
                         this.authentication.isAuth = true;
                         this.authentication.userName = response.username;
@@ -86,6 +89,7 @@ module app {
             if (authData) {
                 this.authentication.isAuth = true;
                 this.authentication.userName = authData.userName;
+                this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + authData.token };
             }
         }
     }
