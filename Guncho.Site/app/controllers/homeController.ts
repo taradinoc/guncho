@@ -1,6 +1,6 @@
-﻿module app {
-    'use strict';
-    export class HomeController {
-        // constructor($scope: ng.IScope) { }
-    }
+﻿/// <reference path="../app.ts" />
+'use strict';
+class HomeController {
 }
+
+app.controller('homeController', HomeController);

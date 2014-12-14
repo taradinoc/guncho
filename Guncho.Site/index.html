@@ -7,6 +7,11 @@
     <link href="content/css/site.css" rel="stylesheet" />
     <link href="content/css/loading-bar.css" rel="stylesheet" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <style type="text/css">
+        [ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
     <div class="navbar navbar-inverse navbar-fixed-top" role="navigation" data-ng-controller="indexController">
@@ -18,7 +23,7 @@
                 <a class="navbar-brand" href="#/">Guncho</a>
             </div>
             <div class="collapse navbar-collapse" data-collapse="!navbarExpanded">
-                <ul class="nav navbar-nav navbar-right">
+                <ul class="nav navbar-nav navbar-right" ng-cloak>
                     <li data-ng-hide="!authentication.isAuth"><a href="#/play">Play Now</a></li>
                     <li data-ng-hide="!authentication.isAuth"><a href="#/realms/my">My Realms</a></li>
                     <li data-ng-hide="!authentication.isAuth"><a href="" data-ng-click="logOut()">Logout {{ authentication.userName }}</a></li>
@@ -38,7 +43,7 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <p class="text-muted">
+                    <p class="text-muted" ng-cloak>
                         Guncho web client version {{ gunchoClientVersion }}.<br />
                         Powered by <a href="#/credits">vaporware</a>.
                     </p>
@@ -56,19 +61,10 @@
     <script src="scripts/loading-bar.min.js"></script>
     <script src="scripts/ui-utils.min.js"></script>
     <script src="scripts/ui-bootstrap-tpls-0.12.0.min.js"></script>
-    <!-- Load services -->
-    <script src="app/services/authInterceptorService.js"></script>
-    <script src="app/services/authService.js"></script>
-    <script src="app/services/playService.js"></script>
-    <script src="app/services/resources.js"></script>
-    <!-- Load controllers -->
-    <script src="app/controllers/indexController.js"></script>
-    <script src="app/controllers/homeController.js"></script>
-    <script src="app/controllers/loginController.js"></script>
-    <script src="app/controllers/listRealmsController.js"></script>
-    <script src="app/controllers/editRealmController.js"></script>
-    <script src="app/controllers/playController.js"></script>
     <!-- Load app main script -->
     <script src="app/app.js"></script>
+    <script type="text/javascript">
+        appMain();
+    </script>
 </body>
 </html>

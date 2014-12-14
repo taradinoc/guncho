@@ -1,96 +1,97 @@
-﻿module app {
-    'use strict';
-    export interface ILoginData {
-        userName: string;
-        password: string;
+﻿/// <reference path="../app.ts" />
+'use strict';
+interface ILoginData {
+    userName: string;
+    password: string;
+}
+
+interface IAuthentication {
+    isAuth: boolean;
+    userName: string;
+}
+
+interface IAuthorizationData {
+    token: string;
+    userName: string;
+}
+
+interface IAuthService {
+    authentication: IAuthentication;
+    saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}>;
+    login(loginData: ILoginData): ng.IPromise<{}>;
+    logout(): void;
+    fillAuthData(): void;
+}
+
+interface IAccessTokenResponse {
+    access_token: string;
+    expires_in: number;
+    token_type: string;
+    username: string;
+}
+
+class AuthService implements IAuthService {
+    public static $inject = ['$http', '$q', 'localStorageService', 'serviceBase', 'signalR'];
+    constructor(private $http: ng.IHttpService, private $q: ng.IQService,
+        private localStorageService: ng.localStorage.ILocalStorageService, private serviceBase: string,
+        private signalR: any) { }
+
+    authentication = { isAuth: false, userName: "" };
+
+    saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}> {
+        return this.$http.post(this.serviceBase + 'account/register', registration)
+            .then(response => {
+                return response;
+            });
     }
 
-    export interface IAuthentication {
-        isAuth: boolean;
-        userName: string;
-    }
+    login(loginData: ILoginData): ng.IPromise<{}> {
+        var data = "grant_type=password&username=" + encodeURIComponent(loginData.userName) +
+            "&password=" + encodeURIComponent(loginData.password);
 
-    export interface IAuthorizationData {
-        token: string;
-        userName: string;
-    }
+        var deferred = this.$q.defer();
 
-    export interface IAuthService {
-        authentication: IAuthentication;
-        saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}>;
-        login(loginData: ILoginData): ng.IPromise<{}>;
-        logout(): void;
-        fillAuthData(): void;
-    }
+        this.$http.post(
+            this.serviceBase + '/token',
+            data,
+            {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+            .success(
+                (response: IAccessTokenResponse) => {
+                    this.localStorageService.set('authorizationData', { token: response.access_token, userName: response.username });
+                    this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + response.access_token };
 
-    interface IAccessTokenResponse {
-        access_token: string;
-        expires_in: number;
-        token_type: string;
-        username: string;
-    }
+                    this.authentication.isAuth = true;
+                    this.authentication.userName = response.username;
 
-    export class AuthService implements IAuthService {
-        public static $inject = ['$http', '$q', 'localStorageService', 'serviceBase', 'signalR'];
-        constructor(private $http: ng.IHttpService, private $q: ng.IQService,
-            private localStorageService: ng.localStorage.ILocalStorageService, private serviceBase: string,
-            private signalR: any) { }
-
-        authentication = { isAuth: false, userName: "" };
-
-        saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}> {
-            return this.$http.post(this.serviceBase + 'account/register', registration)
-                .then(response => {
-                    return response;
-                });
-        }
-
-        login(loginData: ILoginData): ng.IPromise<{}> {
-            var data = "grant_type=password&username=" + encodeURIComponent(loginData.userName) +
-                "&password=" + encodeURIComponent(loginData.password);
-
-            var deferred = this.$q.defer();
-
-            this.$http.post(
-                this.serviceBase + '/token',
-                data,
-                {
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                    deferred.resolve(response);
                 })
-                .success(
-                    (response: IAccessTokenResponse) => {
-                        this.localStorageService.set('authorizationData', { token: response.access_token, userName: response.username });
-                        this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + response.access_token };
+            .error(
+                (err, status) => {
+                    this.logout();
+                    deferred.reject(err);
+                });
 
-                        this.authentication.isAuth = true;
-                        this.authentication.userName = response.username;
+        return deferred.promise;
+    }
 
-                        deferred.resolve(response);
-                    })
-                .error(
-                    (err, status) => {
-                        this.logout();
-                        deferred.reject(err);
-                    });
+    logout(): void {
+        this.localStorageService.remove('authorizationData');
+        delete this.signalR.ajaxDefaults.headers.Authorization;
 
-            return deferred.promise;
-        }
+        this.authentication.isAuth = false;
+        this.authentication.userName = "";
+    }
 
-        logout(): void {
-            this.localStorageService.remove('authorizationData');
-            delete this.signalR.ajaxDefaults.headers.Authorization;
-
-            this.authentication.isAuth = false;
-            this.authentication.userName = "";
-        }
-
-        fillAuthData(): void {
-            var authData : IAuthorizationData = this.localStorageService.get('authorizationData');
-            if (authData) {
-                this.authentication.isAuth = true;
-                this.authentication.userName = authData.userName;
-                this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + authData.token };
-            }
+    fillAuthData(): void {
+        var authData : IAuthorizationData = this.localStorageService.get('authorizationData');
+        if (authData) {
+            this.authentication.isAuth = true;
+            this.authentication.userName = authData.userName;
+            this.signalR.ajaxDefaults.headers = { Authorization: 'Bearer ' + authData.token };
         }
     }
 }
+
+app.service('authService', AuthService);
