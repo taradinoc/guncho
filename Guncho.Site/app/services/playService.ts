@@ -1,6 +1,6 @@
 ﻿/// <reference path="../../scripts/typings/signalr/signalr.d.ts" />
-'use strict';
 module app {
+    'use strict';
     export interface IPlayService {
         start(): void;
         stop(): void;
@@ -19,20 +19,51 @@ module app {
         private proxy: HubProxy;
         public events: ng.IScope;
 
-        public static $inject = ['$rootScope', '$log', 'hubConnection', 'signalrBase'];
-        constructor($rootScope: ng.IRootScopeService, $log: ng.ILogService, hubConnection: IHubConnectionFunc, signalrBase: string) {
-            var connection = hubConnection(signalrBase);
+        public static $inject = [
+            '$rootScope', '$timeout', '$log',
+            'hubConnection', 'signalrBase', 'signalR'];
+        constructor($rootScope: ng.IRootScopeService, $timeout: ng.ITimeoutService, $log: ng.ILogService,
+            hubConnection: IHubConnectionFunc, signalrBase: string, signalR: SignalR) {
+
+            var connection = hubConnection(signalrBase, null, true);
             this.connection = connection;
             this.proxy = connection.createHubProxy('PlayHub');
 
             var events = $rootScope.$new();
             this.events = events;
 
+            var connectionStateMap: { [n: number]: string } = {};
+            connectionStateMap[signalR.connectionState.connecting] = 'connecting';
+            connectionStateMap[signalR.connectionState.connected] = 'connected';
+            connectionStateMap[signalR.connectionState.reconnecting] = 'reconnecting';
+            connectionStateMap[signalR.connectionState.disconnected] = 'disconnected';
+
+            // hook connection lifecycle events
+            this.connection.connectionSlow(
+                () => {
+                    events.$emit('connectionSlow');
+                    $rootScope.$apply();
+                });
+
+            this.connection.stateChanged(
+                change => {
+                    $timeout(() => {
+                        events.$emit('connectionStateChanged',
+                            connectionStateMap[change.oldState],
+                            connectionStateMap[change.newState]);
+                    }, 0);
+                });
+
+            // hook client methods
             this.proxy.on('writeLine',
                 line => {
-                    $log.log('writeLine(' + line + ')');
                     events.$emit('writeLine', line);
                     $rootScope.$apply();
+                });
+
+            this.proxy.on('goodbye',
+                () => {
+                    this.stop();
                 });
         }
 
@@ -41,7 +72,7 @@ module app {
         }
 
         public stop() {
-            this.connection.stop();
+            this.connection.stop(true, true);
         }
 
         public sendCommand(command: string) {

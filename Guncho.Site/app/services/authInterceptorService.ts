@@ -1,5 +1,5 @@
-﻿'use strict';
-module app {
+﻿module app {
+    'use strict';
     export interface IAuthInterceptorService {
         request(config: ng.IRequestConfig): ng.IRequestConfig;
         responseError(rejection: any): void;

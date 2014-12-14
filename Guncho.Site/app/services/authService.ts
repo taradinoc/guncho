@@ -1,6 +1,5 @@
-﻿'use strict';
-
-module app {
+﻿module app {
+    'use strict';
     export interface ILoginData {
         userName: string;
         password: string;

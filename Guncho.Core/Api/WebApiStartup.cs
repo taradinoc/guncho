@@ -37,16 +37,20 @@ namespace Guncho.Api
 
         public void Configuration(IAppBuilder appBuilder)
         {
+            // Configure authorization.
+            appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
+            ConfigureOAuth(appBuilder);
+            appBuilder.UseResourceAuthorization(resourceAuth);
+
+            // Map SignalR.
+            GlobalHost.DependencyResolver.Register(typeof(Guncho.Api.Hubs.PlayHub), () => sigrResolver.GetService(typeof(Guncho.Api.Hubs.PlayHub)));
+            appBuilder.MapSignalR();
+
             // Configure Web API for self-host. 
             HttpConfiguration config = new HttpConfiguration();
             config.DependencyResolver = webResolver;
             config.Filters.Add(new System.Web.Http.AuthorizeAttribute());
             config.MessageHandlers.Add(new HeadHandler());
-
-            // Configure authorization.
-            appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
-            ConfigureOAuth(appBuilder);
-            appBuilder.UseResourceAuthorization(resourceAuth);
 
             // Configure JSON formatting.
             ConfigureJson(config);
@@ -55,15 +59,11 @@ namespace Guncho.Api
             config.MapHttpAttributeRoutes();
 
             // Configure tracing.
-            config.EnableSystemDiagnosticsTracing();
+            //config.EnableSystemDiagnosticsTracing();
 
             // Map Web API.
             config.EnsureInitialized();
             appBuilder.UseWebApi(config);
-
-            // Map SignalR.
-            GlobalHost.DependencyResolver = sigrResolver;
-            appBuilder.MapSignalR();
         }
 
         private void ConfigureOAuth(IAppBuilder app)

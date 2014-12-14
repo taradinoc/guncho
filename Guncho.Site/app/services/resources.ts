@@ -1,5 +1,5 @@
-﻿'use strict';
-module app {
+﻿module app {
+    'use strict';
     export interface IRealm {
         name: string;
         owner: string;
@@ -46,7 +46,7 @@ module app {
                 update: { method: 'PUT' },
                 queryMy: {
                     method: 'GET', params: { name: 'my' }, isArray: true
-                },
+                }
             });
     }
 
@@ -83,7 +83,7 @@ module app {
             {
                 update: {
                     method: 'PUT', url: '@uri'
-                },
+                }
             });
     }
 

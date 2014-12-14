@@ -1,5 +1,5 @@
-﻿'use strict';
-module app {
+﻿module app {
+    'use strict';
     export interface IListRealmsControllerScope {
         heading: string;
         realms: IRealmResource[];
@@ -8,7 +8,7 @@ module app {
     export interface IListRealmsFilter {
         ownedByActor?: boolean;
     }
-    
+
     export class ListRealmsController {
         constructor($scope: IListRealmsControllerScope, Realm: IRealmResourceClass,
             filter: IListRealmsFilter) {

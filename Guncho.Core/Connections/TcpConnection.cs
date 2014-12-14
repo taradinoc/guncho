@@ -17,7 +17,6 @@ namespace Guncho.Connections
         private readonly StreamReader rdr;
         private readonly StreamWriter wtr;
         private readonly StringBuilder outputBuffer = new StringBuilder();
-        private readonly Thread clientThread;
         private readonly TaskCompletionSource<bool> whenClosed = new TaskCompletionSource<bool>();
 
         public TcpConnection(TcpClient client)
@@ -30,8 +29,6 @@ namespace Guncho.Connections
             NetworkStream stream = client.GetStream();
             this.rdr = new StreamReader(stream);
             this.wtr = new StreamWriter(stream);
-
-            this.clientThread = Thread.CurrentThread;
         }
 
         public EndPoint OtherSide { get; private set; }
@@ -47,23 +44,6 @@ namespace Guncho.Connections
         /// </summary>
         /// <returns>The line of input, or <b>null</b> if the connection was
         /// closed.</returns>
-        public override string ReadLine()
-        {
-            try
-            {
-                FlushOutput();
-
-                string str = rdr.ReadLine();
-                LastActivity = DateTime.Now;
-                return str;
-            }
-            catch (IOException)
-            {
-                whenClosed.TrySetResult(true);
-                return null;
-            }
-        }
-
         public async override Task<string> ReadLineAsync(CancellationToken cancellationToken)
         {
             try

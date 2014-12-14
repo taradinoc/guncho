@@ -80,5 +80,3 @@ module app {
             authService.fillAuthData();
         }]);
 }
-
-(() => { })();

@@ -57,29 +57,7 @@ namespace Guncho
                         }
                         else if (name.ToLower() == "guest")
                         {
-                            Player guest;
-
-                            lock (players)
-                            {
-                                int guestNum = 0;
-                                string guestName, key;
-                                do
-                                {
-                                    guestNum++;
-                                    guestName = "Guest" + guestNum.ToString();
-                                    key = guestName.ToLower();
-                                } while (players.ContainsKey(key));
-
-                                guest = new Player(-guestNum, guestName, false, true);
-                                guest.Connection = conn;
-                                players.Add(key, guest);
-                            }
-
-                            lock (conn)
-                                conn.Player = guest;
-
-                            SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
-                            EnterInstance(guest, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+                            LogInAsGuest(conn);
                         }
                         else
                         {
@@ -92,24 +70,7 @@ namespace Guncho
                             }
                             else
                             {
-                                lock (conn)
-                                    conn.Player = player;
-
-                                Connection oldConn;
-                                lock (player)
-                                    oldConn = player.Connection;
-
-                                if (oldConn != null)
-                                {
-                                    oldConn.WriteLine("*** Connection superseded ***");
-                                    oldConn.Terminate(wait: true);
-                                }
-
-                                lock (player)
-                                    player.Connection = conn;
-
-                                SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
-                                EnterInstance(player, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+                                LogInAsPlayer(conn, player);
                             }
                         }
                         return true;
@@ -165,6 +126,56 @@ namespace Guncho
             return false;
         }
 
+        private void LogInAsPlayer(Connection conn, Player player)
+        {
+            lock (conn)
+                conn.Player = player;
+
+            Connection oldConn;
+            lock (player)
+                oldConn = player.Connection;
+
+            if (oldConn != null)
+            {
+                oldConn.WriteLine("*** Connection superseded ***");
+                conn.WriteLine("*** Connection resumed ***");
+                oldConn.Terminate(wait: true);
+            }
+
+            lock (player)
+                player.Connection = conn;
+
+            SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
+            EnterInstance(player, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+        }
+
+        private void LogInAsGuest(Connection conn)
+        {
+            Player guest;
+
+            lock (players)
+            {
+                int guestNum = 0;
+                string guestName, key;
+                do
+                {
+                    guestNum++;
+                    guestName = "Guest" + guestNum.ToString();
+                    key = guestName.ToLower();
+                } while (players.ContainsKey(key));
+
+                guest = new Player(-guestNum, guestName, false, true);
+                guest.Connection = conn;
+                players.Add(key, guest);
+            }
+
+            lock (conn)
+                conn.Player = guest;
+
+            SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
+            EnterInstance(guest, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+        }
+
         private void CmdShutdown(Connection conn, Player player, string args)
         {
             if (player.IsAdmin)
@@ -193,12 +204,11 @@ namespace Guncho
                 else
                 {
                     msg = "*** " + player.Name + " announces, \"" + msg + "\" ***";
-                    lock (connections)
-                        foreach (Connection c in connections)
-                        {
-                            c.WriteLine(msg);
-                            c.FlushOutput();
-                        }
+                    foreach (Connection c in openConnections.Keys)
+                    {
+                        c.WriteLine(msg);
+                        c.FlushOutput();
+                    }
                 }
             }
             else

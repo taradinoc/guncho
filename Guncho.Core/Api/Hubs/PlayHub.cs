@@ -10,7 +10,9 @@ namespace Guncho.Api.Hubs
 {
     public interface IClient
     {
-        void WriteLine(string line);
+        Task WriteLine(string line);
+
+        Task Goodbye();
     }
 
     public sealed class PlayHub : Hub<IClient>
@@ -24,18 +26,21 @@ namespace Guncho.Api.Hubs
 
         public override Task OnConnected()
         {
+            System.Diagnostics.Debug.WriteLine("OnConnected: id = {0}", new string[] { Context.ConnectionId });
             manager.NotifyConnectionAccepted(Context.ConnectionId, Context.User.Identity.Name);
             return base.OnConnected();
         }
 
         public override Task OnDisconnected(bool stopCalled)
         {
+            System.Diagnostics.Debug.WriteLine("OnDisconnected: id = {0}, stopCalled = {1}", new object[] { Context.ConnectionId, stopCalled });
             manager.NotifyConnectionClosed(Context.ConnectionId);
             return base.OnDisconnected(stopCalled);
         }
 
         public Task SendCommand(string command)
         {
+            System.Diagnostics.Debug.WriteLine("SendCommand: id = {0}", new string[] { Context.ConnectionId });
             var connection = manager.GetConnectionById(Context.ConnectionId);
             connection.EnqueueCommand(command);
             return Task.FromResult(0);

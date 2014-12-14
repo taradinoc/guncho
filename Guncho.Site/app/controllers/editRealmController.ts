@@ -1,5 +1,6 @@
-﻿'use strict';
+﻿/* tslint:disable:no-string-literal */
 module app {
+    'use strict';
     export interface IEditRealmControllerScope extends ng.IScope {
         settingsForm: {
             realmName: string;
@@ -60,10 +61,10 @@ module app {
                 realmName: '',
                 compiler: { language: '', version: '' },
                 privacy: '',
-                acl: [],
+                acl: []
             };
             $scope.assetsForm = {
-                selectedAsset: null,
+                selectedAsset: null
             };
 
             $scope.privacyLevels = [
@@ -116,7 +117,7 @@ module app {
             $scope.addAclEntry = () => {
                 $scope.settingsForm.acl.push({
                     user: $scope.settingsForm.newAclEntryUser,
-                    access: $scope.settingsForm.newAclEntryAccess,
+                    access: $scope.settingsForm.newAclEntryAccess
                 });
                 $scope.settingsForm.newAclEntryUser = null;
                 $scope.settingsForm.newAclEntryAccess = null;
@@ -124,9 +125,9 @@ module app {
 
             $scope.isSettingsFormDirty = () => {
                 var form = $scope.settingsForm;
-                return (form.realmName != $scope.realm.name ||
-                    form.compiler.language != $scope.realm.compiler.language ||
-                    form.compiler.version != $scope.realm.compiler.version);
+                return (form.realmName !== $scope.realm.name ||
+                    form.compiler.language !== $scope.realm.compiler.language ||
+                    form.compiler.version !== $scope.realm.compiler.version);
             };
 
             $scope.isAssetsFormDirty = () => {

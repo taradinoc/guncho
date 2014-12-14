@@ -1,5 +1,5 @@
-﻿'use strict';
-module app {
+﻿module app {
+    'use strict';
     export interface IIndexControllerScope extends ng.IScope {
         authentication: IAuthentication;
         gunchoClientVersion: string;

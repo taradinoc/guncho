@@ -87,7 +87,7 @@ namespace Guncho
         private volatile bool running;
         private TaskCompletionSource<bool> whenShutDown;
 
-        private readonly List<Connection> connections = new List<Connection>();
+        private readonly ConcurrentDictionary<Connection, Task> openConnections = new ConcurrentDictionary<Connection, Task>();
         private readonly Dictionary<string, Player> players = new Dictionary<string, Player>();
         private readonly Dictionary<string, Realm> realms = new Dictionary<string, Realm>();
         private readonly Dictionary<string, Instance> instances = new Dictionary<string, Instance>();
@@ -1324,20 +1324,18 @@ namespace Guncho
                 whenShutDown = new TaskCompletionSource<bool>();
                 eventThread.Start();
 
-                var openConnections = new ConcurrentDictionary<Connection, Task>();
-
                 // TCP connections
                 //XXX break dependency
                 var tcpManager = new TcpConnectionManager(System.Net.IPAddress.Any, config.Port);
                 tcpManager.ConnectionAccepted += (sender, e) =>
                 {
-                    logger.LogMessage(LogLevel.Verbose, "Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
+                    logger.LogMessage(LogLevel.Verbose, "TCP: Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
                     var connTask = HandleConnection(e.Connection, cancellation.Token);
                     openConnections.TryAdd(e.Connection, connTask);
                 };
                 tcpManager.ConnectionClosed += (sender, e) =>
                 {
-                    logger.LogMessage(LogLevel.Verbose, "Lost connection to {0}.", FormatEndPoint(e.Connection.OtherSide));
+                    logger.LogMessage(LogLevel.Verbose, "TCP: Lost connection to {0}.", FormatEndPoint(e.Connection.OtherSide));
                     Task dummy;
                     openConnections.TryRemove(e.Connection, out dummy);
                 };
@@ -1346,14 +1344,42 @@ namespace Guncho
                 var tcpListenTask = tcpManager.Run(cancellation.Token);
 
                 // SignalR connections
-                using (StartWebApi())
-                {
-                    Task.WaitAny(tcpListenTask, whenShutDown.Task);
-
-                    foreach (var connection in openConnections.Keys)
+                EventHandler<ConnectionAcceptedEventArgs<SignalRConnection>> sigrAcceptedHandler =
+                    (sender, e) =>
                     {
-                        connection.Terminate(wait: false);
+                        logger.LogMessage(LogLevel.Verbose, "SignalR: Accepting connection with ID {0}.", e.Connection.ConnectionId);
+                        var connTask = HandleConnection(e.Connection, cancellation.Token, e.AuthenticatedUserName);
+                        openConnections.TryAdd(e.Connection, connTask);
+                    };
+                EventHandler<ConnectionEventArgs<SignalRConnection>> sigrClosedHandler =
+                    (sender, e) =>
+                    {
+                        logger.LogMessage(LogLevel.Verbose, "SignalR: Lost connection with ID {0}.", e.Connection.ConnectionId);
+                        Task dummy;
+                        openConnections.TryRemove(e.Connection, out dummy);
+                    };
+                sigrManager.ConnectionAccepted += sigrAcceptedHandler;
+                sigrManager.ConnectionClosed += sigrClosedHandler;
+
+                logger.LogMessage(LogLevel.Notice, "SignalR: Listening.");  //XXX where?
+                var sigrListenTask = sigrManager.Run(cancellation.Token);
+
+                try
+                {
+                    using (StartWebApi())
+                    {
+                        Task.WaitAny(tcpListenTask, sigrListenTask, whenShutDown.Task);
+
+                        foreach (var connection in openConnections.Keys)
+                        {
+                            connection.Terminate(wait: false);
+                        }
                     }
+                }
+                finally
+                {
+                    sigrManager.ConnectionAccepted -= sigrAcceptedHandler;
+                    sigrManager.ConnectionClosed -= sigrClosedHandler;
                 }
 
                 eventThread.Join();
@@ -1375,12 +1401,11 @@ namespace Guncho
 
             string msg = "*** The server is shutting down immediately (" + reason + ") ***";
 
-            lock (connections)
-                foreach (Connection c in connections)
-                {
-                    c.WriteLine(msg);
-                    c.FlushOutput();
-                }
+            foreach (Connection c in openConnections.Keys)
+            {
+                c.WriteLine(msg);
+                c.FlushOutput();
+            }
 
             running = false;
             whenShutDown.TrySetResult(true);
@@ -1491,9 +1516,35 @@ namespace Guncho
             return sb.ToString();
         }
 
-        private async Task HandleConnection(Connection conn, CancellationToken cancellationToken)
+        private async Task HandleConnection(Connection conn, CancellationToken cancellationToken, string authenticatedUser = null)
         {
-            GreetClient(conn);
+            if (authenticatedUser != null)
+            {
+                // log them in immediately
+                if (authenticatedUser.ToLower() == "guest")
+                {
+                    LogInAsGuest(conn);
+                }
+                else
+                {
+                    var player = GetPlayerByName(authenticatedUser);
+                    if (player != null)
+                    {
+                        LogInAsPlayer(conn, player);
+                    }
+                    else
+                    {
+                        // no player by that name? weird
+                        logger.LogMessage(LogLevel.Error, "Can't auto-login authenticatedUser because they don't exist: {0}", authenticatedUser);
+                        await GreetClientAsync(conn);
+                    }
+                }
+            }
+            else
+            {
+                // send the normal greeting
+                await GreetClientAsync(conn);
+            }
 
             string line;
             while ((line = await conn.ReadLineAsync(cancellationToken)) != null)
@@ -1810,43 +1861,38 @@ namespace Guncho
             conn.WriteLine("{0,-25} {1,-6} {2,-6} {3}", "Player", "Conn", "Idle", "Realm");
 
             int count = 0;
-            lock (connections)
+            foreach (var c in openConnections.Keys.OrderByDescending(c => c.ConnectedTime))
             {
-                for (int i = connections.Count - 1; i >= 0; i--)
+                Player p;
+                TimeSpan connectedTime, idleTime;
+                lock (c)
                 {
-                    Connection c = connections[i];
+                    p = c.Player;
+                    connectedTime = c.ConnectedTime;
+                    idleTime = c.IdleTime;
+                }
 
-                    Player p;
-                    TimeSpan connectedTime, idleTime;
-                    lock (c)
-                    {
-                        p = c.Player;
-                        connectedTime = c.ConnectedTime;
-                        idleTime = c.IdleTime;
-                    }
+                if (p != null)
+                {
+                    count++;
 
-                    if (p != null)
-                    {
-                        count++;
+                    Realm r;
+                    lock (p)
+                        r = p.Realm;
 
-                        Realm r;
-                        lock (p)
-                            r = p.Realm;
+                    string realmName;
+                    if (r == null)
+                        realmName = "<none>";
+                    else if (r.GetAccessLevel(player) < RealmAccessLevel.Visible)
+                        realmName = "<private>";
+                    else
+                        realmName = r.Name;
 
-                        string realmName;
-                        if (r == null)
-                            realmName = "<none>";
-                        else if (r.GetAccessLevel(player) < RealmAccessLevel.Visible)
-                            realmName = "<private>";
-                        else
-                            realmName = r.Name;
-
-                        conn.WriteLine("{0,-25} {1,-6} {2,-6} {3}",
-                            p.Name,
-                            FormatTimeSpan(connectedTime),
-                            FormatTimeSpan(idleTime),
-                            realmName);
-                    }
+                    conn.WriteLine("{0,-25} {1,-6} {2,-6} {3}",
+                        p.Name,
+                        FormatTimeSpan(connectedTime),
+                        FormatTimeSpan(idleTime),
+                        realmName);
                 }
             }
 
@@ -1855,25 +1901,14 @@ namespace Guncho
 
         public string[][] GetWhoList()
         {
-            lock (connections)
-            {
-                List<string[]> result = new List<string[]>(connections.Count);
+            var query = from c in openConnections.Keys
+                        let player = c.Player
+                        where player != null
+                        let connTime = c.ConnectedTime
+                        orderby connTime descending
+                        select new string[] { player.Name, FormatTimeSpan(connTime), FormatTimeSpan(c.IdleTime) };
 
-                foreach (Connection c in connections)
-                {
-                    if (c.Player != null)
-                    {
-                        result.Add(new string[]{
-                            c.Player.Name,
-                            FormatTimeSpan(c.ConnectedTime),
-                            FormatTimeSpan(c.IdleTime)
-                        });
-                    }
-                }
-
-                result.Reverse();
-                return result.ToArray();
-            }
+            return query.ToArray();
         }
 
         public static string FormatTimeSpan(TimeSpan timeSpan)

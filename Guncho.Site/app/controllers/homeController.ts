@@ -1,6 +1,6 @@
-﻿'use strict';
-module app {
+﻿module app {
+    'use strict';
     export class HomeController {
-        constructor($scope: ng.IScope) { }
+        // constructor($scope: ng.IScope) { }
     }
 }
