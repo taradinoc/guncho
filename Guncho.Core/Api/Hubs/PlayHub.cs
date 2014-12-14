@@ -27,7 +27,14 @@ namespace Guncho.Api.Hubs
         public override Task OnConnected()
         {
             System.Diagnostics.Debug.WriteLine("OnConnected: id = {0}", new string[] { Context.ConnectionId });
-            manager.NotifyConnectionAccepted(Context.ConnectionId, Context.User.Identity.Name);
+
+            string userName = null;
+            if (Context.User != null && Context.User.Identity != null)
+            {
+                userName = Context.User.Identity.Name;
+            }
+
+            manager.NotifyConnectionAccepted(Context.ConnectionId, userName);
             return base.OnConnected();
         }
 

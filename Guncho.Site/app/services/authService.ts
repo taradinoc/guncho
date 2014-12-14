@@ -78,6 +78,7 @@
 
         logout(): void {
             this.localStorageService.remove('authorizationData');
+            delete this.signalR.ajaxDefaults.headers.Authorization;
 
             this.authentication.isAuth = false;
             this.authentication.userName = "";

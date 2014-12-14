@@ -63,7 +63,9 @@ module app {
 
             this.proxy.on('goodbye',
                 () => {
-                    this.stop();
+                    // if we close too soon after receiving the goodbye message, the connection will time out
+                    // instead of closing immediately. 50ms seems to be enough.
+                    $timeout(() => { connection.stop(); }, 50);
                 });
         }
 

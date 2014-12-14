@@ -139,6 +139,7 @@ namespace Guncho
             {
                 oldConn.WriteLine("*** Connection superseded ***");
                 conn.WriteLine("*** Connection resumed ***");
+                conn.FlushOutput();
                 oldConn.Terminate(wait: true);
             }
 
