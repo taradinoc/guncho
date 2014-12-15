@@ -18,6 +18,7 @@
     <IISExpressUseClassicPipelineMode />
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="app\directives\glkGameport.html" />
     <Content Include="app\views\editRealm.html" />
     <Content Include="app\views\home.html" />
     <Content Include="app\views\listRealms.html" />
@@ -25,16 +26,19 @@
     <Content Include="app\views\play.html" />
     <Content Include="content\css\bootstrap.css" />
     <Content Include="content\css\bootstrap.min.css" />
+    <Content Include="content\css\glkote.css" />
     <Content Include="content\css\loading-bar.css" />
     <Content Include="content\css\site.css" />
     <Content Include="content\css\loading-bar.min.css" />
     <Content Include="content\fonts\glyphicons-halflings-regular.svg" />
+    <Content Include="content\images\waiting.gif" />
     <Content Include="index.html" />
     <Content Include="scripts\angular-local-storage.min.js" />
     <Content Include="content\fonts\glyphicons-halflings-regular.eot" />
     <Content Include="content\fonts\glyphicons-halflings-regular.ttf" />
     <Content Include="scripts\angular-resource.min.js" />
     <None Include="scripts\jquery-2.1.1.intellisense.js" />
+    <Content Include="scripts\glkote.js" />
     <Content Include="scripts\jquery-2.1.1.js" />
     <Content Include="scripts\jquery-2.1.1.min.js" />
     <Content Include="scripts\jquery.signalR-2.1.2.js" />
@@ -53,8 +57,10 @@
     <TypeScriptCompile Include="app\controllers\loginController.ts" />
     <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
     <TypeScriptCompile Include="app\controllers\playController.ts" />
+    <TypeScriptCompile Include="app\directives\glkGameport.ts" />
     <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
     <TypeScriptCompile Include="app\services\authService.ts" />
+    <TypeScriptCompile Include="app\services\glkService.ts" />
     <TypeScriptCompile Include="app\services\playService.ts" />
     <TypeScriptCompile Include="app\services\resources.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
@@ -66,6 +72,7 @@
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-scenario.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularLocalStorage\angularLocalStorage.d.ts" />
+    <TypeScriptCompile Include="scripts\typings\glkote\glkote.d.ts" />
     <TypeScriptCompile Include="scripts\typings\jquery\jquery.d.ts" />
     <TypeScriptCompile Include="scripts\typings\signalr\signalr.d.ts" />
   </ItemGroup>

@@ -1,40 +1,47 @@
 ﻿/// <reference path="../app.ts" />
 'use strict';
 interface IPlayControllerScope extends ng.IScope {
-    lines: string[];
-    command: string;
+    connectionState: string;
+    connectionSlow: number;
 
-    keyPress(event: KeyboardEvent): void;
+    sendCommand(command: string): void;
 }
 
 class PlayController {
-    public static $inject = ['$scope', 'playService'];
-    constructor(private $scope: IPlayControllerScope, private playService: IPlayService) {
-        $scope.keyPress = event => {
-            if (event.keyCode === 13) {
-                playService.sendCommand($scope.command);
-                $scope.command = null;
-            }
-        };
+    public static $inject = ['$scope', '$timeout',
+        'playService', 'glkService'];
+    constructor(private $scope: IPlayControllerScope, $timeout: ng.ITimeoutService,
+        playService: IPlayService, glkService: IGlkService) {
 
         $scope.$on('$viewContentLoaded',
             () => { playService.start(); });
 
+        function say(text: string) {
+            glkService.updateText([
+                {
+                    content: [{ style: 'normal', text: text }]
+                }
+            ]);
+        }
+
         var unsubscribe : Function[] = [];
         unsubscribe.push(playService.events.$on(
             'writeLine',
-            (event, line) => {
-                $scope.lines.push(line);
-            }));
+            (event, line) => { say(line); }));
         unsubscribe.push(playService.events.$on(
             'connectionStateChanged',
             (event, oldState, newState) => {
-                $scope.lines.push('[Connection state: ' + oldState + ' -> ' + newState + ']');
+                $scope.connectionState = newState;
             }));
         unsubscribe.push(playService.events.$on(
             'connectionSlow',
             event => {
-                $scope.lines.push('[Wait for it...]');
+                $scope.connectionSlow++;
+                $timeout(() => {
+                    if ($scope.connectionSlow > 0) {
+                        $scope.connectionSlow--;
+                    }
+                }, 17000);
             }));
 
         $scope.$on('$destroy',
@@ -45,7 +52,9 @@ class PlayController {
                 });
             });
 
-        $scope.lines = [];
+        $scope.sendCommand = command => {
+            playService.sendCommand(command);
+        };
     }
 }
 

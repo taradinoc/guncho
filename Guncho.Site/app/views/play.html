@@ -4,14 +4,30 @@
     </div>
 </div>
 <div class="row">
-    <div class="col-md-10 col-md-offset-1">
-        <ul ng-repeat="line in lines track by $index">
-            <li>{{ line }}</li>
-        </ul>
+    <div ng-switch="connectionState" class="col-md-10 col-md-offset-1">
+        <div ng-switch-when="connecting" class="alert alert-info" role="alert">
+            Connecting...
+        </div>
+        <div ng-switch-when="connected" class="alert alert-success" role="alert">
+            Connected.
+        </div>
+        <div ng-switch-when="reconnecting" class="alert alert-warning" role="alert">
+            Reconnecting...
+        </div>
+        <div ng-switch-when="disconnected" class="alert alert-danger" role="alert">
+            Not connected.
+        </div>
     </div>
 </div>
-<form class="row">
+<div class="row">
     <div class="col-md-10 col-md-offset-1">
-        <input type="text" class="form-control" placeholder="Enter command" ng-model="command" ng-keypress="keyPress($event)" />
+        <div ng-show="connectionSlow" class="alert alert-warning">
+            Wait for it...
+        </div>
     </div>
-</form>
+</div>
+<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <glk-gameport line-entered="sendCommand($line)"></glk-gameport>
+    </div>
+</div>
