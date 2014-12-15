@@ -1,8 +1,11 @@
 ﻿'use strict';
 function configureRoutes($routeProvider: ng.route.IRouteProvider) {
     $routeProvider.when("/home", {
-        controller: "homeController",
         templateUrl: "/app/views/home.html"
+    });
+
+    $routeProvider.when("/credits", {
+        templateUrl: "/app/views/credits.html"
     });
 
     $routeProvider.when("/login", {

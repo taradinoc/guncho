@@ -19,6 +19,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="app\directives\glkGameport.html" />
+    <Content Include="app\views\credits.html" />
     <Content Include="app\views\editRealm.html" />
     <Content Include="app\views\home.html" />
     <Content Include="app\views\listRealms.html" />
@@ -52,7 +53,6 @@
   <ItemGroup>
     <TypeScriptCompile Include="app\app.ts" />
     <TypeScriptCompile Include="app\controllers\editRealmController.ts" />
-    <TypeScriptCompile Include="app\controllers\homeController.ts" />
     <TypeScriptCompile Include="app\controllers\indexController.ts" />
     <TypeScriptCompile Include="app\controllers\loginController.ts" />
     <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
