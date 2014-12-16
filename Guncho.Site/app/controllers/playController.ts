@@ -13,21 +13,34 @@ class PlayController {
     constructor(private $scope: IPlayControllerScope, $timeout: ng.ITimeoutService,
         playService: IPlayService, glkService: IGlkService) {
 
+        // reset count in case messages were received while we were away
+        playService.messageCount.reset();
+
+        // set up scope
+        $scope.connectionSlow = 0;
+        $scope.sendCommand = command => {
+            playService.sendCommand(command);
+        };
+
         $scope.$on('$viewContentLoaded',
             () => { playService.start(); });
 
-        function say(text: string) {
-            glkService.updateText([
-                {
-                    content: [{ style: 'normal', text: text }]
-                }
-            ]);
-        }
+        var unsubscribe: Function[] = [];
+        $scope.$on('$destroy',
+            () => {
+                angular.forEach(unsubscribe, (value, key) => {
+                    value();
+                });
+            });
 
-        var unsubscribe : Function[] = [];
+        // hook playService events
+
+        // writeLine is handled by indexController to send the line to Glk, but we
+        // also handle it here to keep the message count from increasing while output is visible.
         unsubscribe.push(playService.events.$on(
             'writeLine',
-            (event, line) => { say(line); }));
+            (event, line) => { playService.messageCount.reset(); }));
+       
         unsubscribe.push(playService.events.$on(
             'connectionStateChanged',
             (event, oldState, newState) => {
@@ -41,20 +54,8 @@ class PlayController {
                     if ($scope.connectionSlow > 0) {
                         $scope.connectionSlow--;
                     }
-                }, 17000);
+                }, 5000);
             }));
-
-        $scope.$on('$destroy',
-            () => {
-                playService.stop();
-                angular.forEach(unsubscribe, (value, key) => {
-                    value();
-                });
-            });
-
-        $scope.sendCommand = command => {
-            playService.sendCommand(command);
-        };
     }
 }
 

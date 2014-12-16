@@ -1,22 +1,28 @@
 ﻿/// <reference path="../app.ts" />
 'use strict';
 interface IGlkService {
-    registerGameport(gameport: IGlkGameportController): void;
     /**
      * Gets the previously saved gameport element, or null if none has been saved.
-     * The saved gameport element is removed after this function returns it.
+     * Prompts are removed first, and the saved gameport element is cleared upon return.
      */
     restoreDom(): JQuery;
     /**
      * Performs one-time GlkOte initialization. This must be called by the glkGameport
      * directive when restoreDom() has returned null and a new element has been created
      * from the template.
+     * 
+     * @param removePrompts A function that removes all past lines that were printed with the 'prompt' style.
      */
-    initialSetup(): void;
+    initialSetup(removePrompts: () => void): void;
     /**
      * Saves the gameport element to be restored later. It must have already been detached.
      */
     saveDom(gameportDom: JQuery): void;
+    /**
+     * Sends an input event, printing any pending output and recreating the input line.
+     * This must be called after reattaching the gameport element.
+     */
+    interrupt(): void;
 
     updateText(update: GlkContentTextUpdate[]): void;
 
@@ -26,31 +32,32 @@ interface IGlkService {
 }
 
 class GlkService implements IGlkService {
-    private gameport: IGlkGameportController;
     private savedDom: JQuery = null;
+    private removePrompts: () => void = null;
 
     private metrics: GlkMetrics = null;
     private initialSetupDone = false;
     private windowsCreated = false;
+    private lastOutputWasPrompt = false;
     private generation = 0;
     private pendingUpdate: GlkUpdate = null;
     private bufferWindowId = 1;
 
+    private $log: ng.ILogService;
+
     public events: ng.IScope;
 
-    public static $inject: string[] = ['$rootScope'];
-    constructor($rootScope: ng.IRootScopeService) {
+    public static $inject: string[] = ['$rootScope', '$log'];
+    constructor($rootScope: ng.IRootScopeService, $log: ng.ILogService) {
         this.events = $rootScope.$new();
+        this.$log = $log;
     }
 
     //#region Public Methods
-    public registerGameport(gameport: IGlkGameportController) {
-        this.gameport = gameport;
-    }
-
-    public initialSetup() {
+    public initialSetup(removePrompts: () => void) {
         if (!this.initialSetupDone) {
             this.initialSetupDone = true;
+            this.removePrompts = removePrompts;
             GlkOte.init({
                 accept: event => {
                     this.accept(event);
@@ -75,13 +82,18 @@ class GlkService implements IGlkService {
                 type: 'update',
                 content: [{ id: this.bufferWindowId, text: update }]
             });
-        if (this.windowsCreated) {
-            GlkOte.extevent(null);
-        }
+        this.lastOutputWasPrompt = false;
+        this.interrupt();
     }
 
     public filterInputForDisplay(input: string) {
         return input;
+    }
+
+    public interrupt() {
+        if (this.windowsCreated) {
+            GlkOte.extevent(null);
+        }
     }
     //#endregion
 
@@ -121,7 +133,6 @@ class GlkService implements IGlkService {
     }
 
     private showPrompt() {
-        this.gameport.removePrompts();
         this.appendUpdate(
             {
                 type: 'update',
@@ -129,6 +140,7 @@ class GlkService implements IGlkService {
                     { id: this.bufferWindowId, text: [{ content: [{ style: 'prompt', text: '> ' }] }] }
                 ]
             });
+        this.lastOutputWasPrompt = true;
     }
 
     private accept(event: GlkEvent) {
@@ -138,6 +150,7 @@ class GlkService implements IGlkService {
         if (angular.isDefined(event.metrics)) {
             this.metrics = event.metrics;
         }
+        var forceInput = false;
         switch (event.type) {
             case 'init':
                 this.appendUpdate({
@@ -150,51 +163,33 @@ class GlkService implements IGlkService {
                         top: 1,
                         width: 500,
                         height: 500
-                    }],
-                    input: [{
-                        id: this.bufferWindowId,
-                        type: 'line',
-                        gen: this.generation,
-                        maxlen: 256
-                    }],
+                    }]
                 });
-                this.showPrompt();
+                this.windowsCreated = true;
+                forceInput = true;
                 break;
 
             case 'line':
                 var input: string = event.value;
                 var displayInput = this.filterInputForDisplay(input);
-                this.updateText([
+                this.appendUpdate(
                     {
-                        append: true,
-                        content: [{ style: 'normal', text: '> ' }, { style: 'input', text: displayInput }]
-                    }
-                ]);
-                this.showPrompt();
-                this.appendUpdate({
-                    type: 'update',
-                    input: [{
-                        id: this.bufferWindowId,
-                        type: 'line',
-                        gen: this.generation,
-                        maxlen: 256
-                    }]
-                });
+                        type: 'update',
+                        content: [{
+                            id: this.bufferWindowId,
+                            text: [
+                            {
+                                append: true,
+                                content: [{ style: 'normal', text: '> ' }, { style: 'input', text: displayInput }]
+                            }
+                        ] }]
+                    });
+                this.lastOutputWasPrompt = false;
                 this.events.$emit('lineEntered', input);
                 break;
 
             case 'external':
-                this.appendUpdate({
-                    type: 'update',
-                    input: [{
-                        id: this.bufferWindowId,
-                        type: 'line',
-                        gen: this.generation,
-                        maxlen: 256,
-                        initial: event.partial ? event.partial[this.bufferWindowId] : null
-                    }]
-                });
-                this.showPrompt();
+                // nada
                 break;
 
             default:
@@ -202,15 +197,39 @@ class GlkService implements IGlkService {
                 break;
         }
 
+        // refresh prompt
+        if (!this.lastOutputWasPrompt) {
+            this.removePrompts();
+            this.showPrompt();
+        }
+
+        // refresh input line
+        // TODO: this will move the cursor to the end of the input line every time an event happens :(
+        this.appendUpdate({
+            type: 'update',
+            input: [{
+                id: this.bufferWindowId,
+                type: 'line',
+                gen: this.generation,
+                maxlen: 256,
+                initial: event.partial ? event.partial[this.bufferWindowId] : null
+            }]
+        });
+
         this.select();
-        this.windowsCreated = true;
+    }
+
+    private flushUpdate() {
+        if (this.pendingUpdate) {
+            GlkOte.update(this.pendingUpdate);
+            this.pendingUpdate = null;
+        }
     }
 
     private select() {
         if (this.pendingUpdate) {
             this.pendingUpdate.gen = this.generation++;
-            GlkOte.update(this.pendingUpdate);
-            this.pendingUpdate = null;
+            this.flushUpdate();
         } else {
             GlkOte.update({ type: 'pass' });
         }

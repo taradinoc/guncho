@@ -1,14 +1,10 @@
 ﻿/// <reference path="../app.ts" />
 'use strict';
-interface IGlkGameportController {
-    removePrompts(): void;
-}
-
 interface IGlkGameportScope extends ng.IScope {
     lineEntered: Function;
 }
 
-function GlkGameportDirective($timeout: ng.ITimeoutService, glkService: IGlkService): ng.IDirective {
+function GlkGameportDirective($timeout: ng.ITimeoutService, $log: ng.ILogService, glkService: IGlkService): ng.IDirective {
     if (angular.isUndefined(GlkOte)) {
         throw new Error('GlkOte is required');
     }
@@ -17,14 +13,18 @@ function GlkGameportDirective($timeout: ng.ITimeoutService, glkService: IGlkServ
         ($scope: IGlkGameportScope, $element: ng.IAugmentedJQuery, $attrs: ng.IAttributes,
             $controller: any, $transclude: ng.ITranscludeFunction) => {
 
-            glkService.registerGameport($controller);
-
             var prevDom = glkService.restoreDom();
             if (prevDom) {
                 $element.empty();
                 $element.append(prevDom);
+                glkService.interrupt();
             } else {
-                glkService.initialSetup();
+                var children = $element.children();
+                var xxxcount = 1;
+                glkService.initialSetup(() => {
+                    children.find('.Style_prompt').remove();
+                    children.find('.BufferLine:empty').remove();
+                });
                 var windowFrame = $element.find('> :first-child > :first-child .WindowFrame');
                 var windowHeight = windowFrame.innerHeight();
                 windowFrame.css({ position: 'relative', height: windowHeight + 'px' });
@@ -37,26 +37,20 @@ function GlkGameportDirective($timeout: ng.ITimeoutService, glkService: IGlkServ
 
             $scope.$on('$destroy',
                 event => {
+                    unsubscribe();
                     glkService.saveDom($element.children().first().detach());
                 });
         };
-
-    var myController = function ($scope: ng.IScope, $element: ng.IAugmentedJQuery, $attrs: ng.IAttributes) {
-        this.removePrompts = () => {
-            $element.find('.Style_prompt').remove();
-        };
-    };
 
     return {
         restrict: 'E',
         scope: {
             lineEntered: '&'
         },
-        controller: myController,
         link: linkFn,
         templateUrl: '/app/directives/glkGameport.html'
     };
 }
-GlkGameportDirective.$inject = ['$timeout', 'glkService'];
+GlkGameportDirective.$inject = ['$timeout', '$log', 'glkService'];
 
 app.directive('glkGameport', GlkGameportDirective);

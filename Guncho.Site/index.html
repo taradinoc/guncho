@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html data-ng-app="GunchoApp">
+<html ng-app="GunchoApp">
 <head>
     <meta content="IE=edge, chrome=1" http-equiv="X-UA-Compatible" />
     <title>Guncho</title>
@@ -14,8 +14,8 @@
         }
     </style>
 </head>
-<body>
-    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation" data-ng-controller="indexController">
+<body ng-controller="indexController">
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
         <div class="container">
             <div class="navbar-header">
                 <button class="btn btn-success navbar-toggle" ng-init="navbarExpanded = false" ng-click="navbarExpanded = !navbarExpanded">
@@ -23,24 +23,30 @@
                 </button>
                 <a class="navbar-brand" href="#/">Guncho</a>
             </div>
-            <div class="collapse navbar-collapse" data-collapse="!navbarExpanded">
+            <div class="collapse navbar-collapse" collapse="!navbarExpanded">
                 <ul class="nav navbar-nav navbar-right" ng-cloak>
-                    <li data-ng-hide="!authentication.isAuth"><a href="#/play">Play Now</a></li>
-                    <li data-ng-hide="!authentication.isAuth"><a href="#/realms/my">My Realms</a></li>
-                    <li data-ng-hide="!authentication.isAuth"><a href="" data-ng-click="logOut()">Logout {{ authentication.userName }}</a></li>
-                    <li data-ng-hide="authentication.isAuth"><a href="#/play">Play As Guest</a></li>
-                    <li data-ng-hide="authentication.isAuth"><a href="#/login">Login</a></li>
-                    <li data-ng-hide="authentication.isAuth"><a href="#/signup">Sign Up</a></li>
+                    <li ng-hide="!authentication.isAuth">
+                        <a href="#/play">
+                            Play Now
+                            <span class="label label-info label-as-badge" ng-bind="pendingMsgCount.total" ng-show="pendingMsgCount.total"></span>
+                            <span class="label label-danger label-as-badge" ng-bind="pendingMsgCount.highPriority" ng-show="pendingMsgCount.highPriority"></span>
+                        </a>
+                    </li>
+                    <li ng-hide="!authentication.isAuth"><a href="#/realms/my">My Realms</a></li>
+                    <li ng-hide="!authentication.isAuth"><a href="" ng-click="logOut()">Logout {{ authentication.userName }}</a></li>
+                    <li ng-hide="authentication.isAuth"><a href="#/play">Play As Guest</a></li>
+                    <li ng-hide="authentication.isAuth"><a href="#/login">Login</a></li>
+                    <li ng-hide="authentication.isAuth"><a href="#/signup">Sign Up</a></li>
                 </ul>
             </div>
         </div>
     </div>
     <div class="container">
-        <div data-ng-view="">
+        <div ng-view="">
         </div>
     </div>
     <hr />
-    <div id="footer" data-ng-controller="indexController">
+    <div id="footer">
         <div class="container">
             <div class="row">
                 <div class="col-md-6">

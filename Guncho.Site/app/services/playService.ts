@@ -6,8 +6,16 @@ interface IPlayService {
     stop(): void;
 
     events: ng.IScope;
+    messageCount: IMessageCount;
 
     sendCommand(command: string): void;
+}
+
+interface IMessageCount {
+    highPriority: number;
+    total: number;
+
+    reset(): void;
 }
 
 interface IHubConnectionFunc {
@@ -17,7 +25,16 @@ interface IHubConnectionFunc {
 class PlayService implements IPlayService {
     private connection: HubConnection;
     private proxy: HubProxy;
+
     public events: ng.IScope;
+    public messageCount: IMessageCount = {
+        highPriority: 0,
+        total: 0,
+
+        reset: function () {
+            this.highPriority = this.total = 0;
+        }
+    }
 
     public static $inject = [
         '$rootScope', '$timeout', '$log',
@@ -57,6 +74,7 @@ class PlayService implements IPlayService {
         // hook client methods
         this.proxy.on('writeLine',
             line => {
+                this.messageCount.total++;
                 events.$emit('writeLine', line);
                 $rootScope.$apply();
             });
