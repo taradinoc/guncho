@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNet.Identity;
 using Microsoft.AspNet.SignalR;
 using Microsoft.Owin;
+using Microsoft.Owin.FileSystems;
 using Microsoft.Owin.Security.OAuth;
+using Microsoft.Owin.StaticFiles;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
@@ -37,6 +39,9 @@ namespace Guncho.Api
 
         public void Configuration(IAppBuilder appBuilder)
         {
+            // Map static web site, which doesn't need any authorization.
+            ConfigureStaticFiles(appBuilder);
+
             // Configure authorization.
             appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
             ConfigureOAuth(appBuilder);
@@ -64,6 +69,19 @@ namespace Guncho.Api
             // Map Web API.
             config.EnsureInitialized();
             appBuilder.UseWebApi(config);
+        }
+
+        private static void ConfigureStaticFiles(IAppBuilder appBuilder)
+        {
+            var staticFileSystem = new EmbeddedResourceFileSystem(typeof(Guncho.Site.Site).Assembly, typeof(Guncho.Site.Site).Namespace);
+            appBuilder.UseDefaultFiles(new DefaultFilesOptions
+            {
+                FileSystem = staticFileSystem
+            });
+            appBuilder.UseStaticFiles(new StaticFileOptions
+            {
+                FileSystem = staticFileSystem
+            });
         }
 
         private void ConfigureOAuth(IAppBuilder app)

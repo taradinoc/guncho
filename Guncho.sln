@@ -17,6 +17,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GunchoConsole", "GunchoConsole\GunchoConsole.csproj", "{C0730C2D-94C8-4A2B-B702-C69FC93FB97B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Core", "Guncho.Core\Guncho.Core.csproj", "{358595AD-6D80-4BC2-90DA-6390CAFBE0AA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{566757E1-9BE4-4086-9BE8-02C914E01062} = {566757E1-9BE4-4086-9BE8-02C914E01062}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Site", "Guncho.Site\Guncho.Site.csproj", "{566757E1-9BE4-4086-9BE8-02C914E01062}"
 EndProject

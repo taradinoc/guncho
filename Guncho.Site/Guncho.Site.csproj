@@ -18,51 +18,53 @@
     <IISExpressUseClassicPipelineMode />
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="app\directives\glkGameport.html" />
-    <Content Include="app\views\credits.html" />
-    <Content Include="app\views\editRealm.html" />
-    <Content Include="app\views\home.html" />
-    <Content Include="app\views\listRealms.html" />
-    <Content Include="app\views\login.html" />
-    <Content Include="app\views\play.html" />
-    <Content Include="content\css\bootstrap.css" />
-    <Content Include="content\css\bootstrap.min.css" />
-    <Content Include="content\css\glkote.css" />
-    <Content Include="content\css\loading-bar.css" />
-    <Content Include="content\css\site.css" />
-    <Content Include="content\css\loading-bar.min.css" />
-    <Content Include="content\fonts\glyphicons-halflings-regular.svg" />
-    <Content Include="content\images\waiting.gif" />
-    <Content Include="index.html" />
-    <Content Include="scripts\angular-local-storage.min.js" />
-    <Content Include="content\fonts\glyphicons-halflings-regular.eot" />
-    <Content Include="content\fonts\glyphicons-halflings-regular.ttf" />
-    <Content Include="scripts\angular-resource.min.js" />
-    <None Include="scripts\jquery-2.1.1.intellisense.js" />
-    <Content Include="scripts\glkote.js" />
-    <Content Include="scripts\jquery-2.1.1.js" />
-    <Content Include="scripts\jquery-2.1.1.min.js" />
-    <Content Include="scripts\jquery.signalR-2.1.2.js" />
-    <Content Include="scripts\jquery.signalR-2.1.2.min.js" />
-    <Content Include="scripts\loading-bar.js" />
-    <Content Include="scripts\loading-bar.min.js" />
-    <Content Include="scripts\ui-bootstrap-tpls-0.12.0.min.js" />
-    <Content Include="scripts\ui-utils.min.js" />
+    <EmbeddedResource Include="app\directives\glkGameport.html" />
+    <EmbeddedResource Include="app\views\credits.html" />
+    <EmbeddedResource Include="app\views\editRealm.html" />
+    <EmbeddedResource Include="app\views\home.html" />
+    <EmbeddedResource Include="app\views\listRealms.html" />
+    <EmbeddedResource Include="app\views\login.html" />
+    <EmbeddedResource Include="app\views\play.html" />
+    <EmbeddedResource Include="app\app.js" />
+    <EmbeddedResource Include="content\css\bootstrap.css" />
+    <EmbeddedResource Include="content\css\bootstrap.min.css" />
+    <EmbeddedResource Include="content\css\glkote.css" />
+    <EmbeddedResource Include="content\css\loading-bar.css" />
+    <EmbeddedResource Include="content\css\site.css" />
+    <EmbeddedResource Include="content\css\loading-bar.min.css" />
+    <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.svg" />
+    <EmbeddedResource Include="content\images\waiting.gif" />
+    <EmbeddedResource Include="index.html" />
+    <EmbeddedResource Include="scripts\angular-local-storage.min.js" />
+    <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.eot" />
+    <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.ttf" />
+    <EmbeddedResource Include="scripts\angular-resource.min.js" />
+    <EmbeddedResource Include="scripts\jquery-2.1.1.intellisense.js" />
+    <EmbeddedResource Include="scripts\glkote.js" />
+    <EmbeddedResource Include="scripts\jquery-2.1.1.js" />
+    <EmbeddedResource Include="scripts\jquery-2.1.1.min.js" />
+    <EmbeddedResource Include="scripts\jquery.signalR-2.1.2.js" />
+    <EmbeddedResource Include="scripts\jquery.signalR-2.1.2.min.js" />
+    <EmbeddedResource Include="scripts\loading-bar.js" />
+    <EmbeddedResource Include="scripts\loading-bar.min.js" />
+    <EmbeddedResource Include="scripts\ui-bootstrap-tpls-0.12.0.min.js" />
+    <EmbeddedResource Include="scripts\ui-utils.min.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="app\app.ts" />
-    <TypeScriptCompile Include="app\controllers\editRealmController.ts" />
-    <TypeScriptCompile Include="app\controllers\indexController.ts" />
-    <TypeScriptCompile Include="app\controllers\loginController.ts" />
-    <TypeScriptCompile Include="app\controllers\listRealmsController.ts" />
-    <TypeScriptCompile Include="app\controllers\playController.ts" />
-    <TypeScriptCompile Include="app\directives\glkGameport.ts" />
-    <TypeScriptCompile Include="app\services\authInterceptorService.ts" />
-    <TypeScriptCompile Include="app\services\authService.ts" />
-    <TypeScriptCompile Include="app\services\glkService.ts" />
-    <TypeScriptCompile Include="app\services\playService.ts" />
-    <TypeScriptCompile Include="app\services\resources.ts" />
+    <EmbeddedResource Include="app\app.ts" />
+    <EmbeddedResource Include="app\controllers\editRealmController.ts" />
+    <EmbeddedResource Include="app\controllers\indexController.ts" />
+    <EmbeddedResource Include="app\controllers\loginController.ts" />
+    <EmbeddedResource Include="app\controllers\listRealmsController.ts" />
+    <EmbeddedResource Include="app\controllers\playController.ts" />
+    <EmbeddedResource Include="app\directives\glkGameport.ts" />
+    <EmbeddedResource Include="app\services\authInterceptorService.ts" />
+    <EmbeddedResource Include="app\services\authService.ts" />
+    <EmbeddedResource Include="app\services\glkService.ts" />
+    <EmbeddedResource Include="app\services\playService.ts" />
+    <EmbeddedResource Include="app\services\resources.ts" />
+    <TypeScriptCompile Include="master.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-mocks.d.ts" />
@@ -78,11 +80,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />
-    <Content Include="scripts\loading-bar.min.js.map">
+    <EmbeddedResource Include="scripts\loading-bar.min.js.map">
       <DependentUpon>loading-bar.min.js</DependentUpon>
-    </Content>
-    <Content Include="content\fonts\glyphicons-halflings-regular.woff" />
-    <Content Include="scripts\jquery-2.1.1.min.map" />
+    </EmbeddedResource>
+    <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.woff" />
+    <EmbeddedResource Include="scripts\jquery-2.1.1.min.map" />
+    <EmbeddedResource Include="app\app.js.map" />
+    <EmbeddedResource Include="scripts\angular-resource.min.js.map" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -90,7 +94,9 @@
       <DependentUpon>web.config</DependentUpon>
     </None>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Compile Include="Site.cs" />
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>
