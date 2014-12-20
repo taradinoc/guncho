@@ -205,6 +205,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Api\Controllers\AccountController.cs" />
+    <Compile Include="Api\NoContentResult.cs" />
     <Compile Include="Api\Hubs\PlayHub.cs" />
     <Compile Include="Api\Security\ApiUser.cs" />
     <Compile Include="Api\Controllers\ArtifactsController.cs" />
@@ -225,7 +226,7 @@
     <Compile Include="Api\SimpleInjectorSignalRDependencyResolver.cs" />
     <Compile Include="Api\UnprocessableEntityResult.cs" />
     <Compile Include="Api\UnsupportedMediaTypeResult.cs" />
-    <Compile Include="Api\Controllers\UsersController.cs" />
+    <Compile Include="Api\Controllers\ProfilesController.cs" />
     <Compile Include="Commands.cs" />
     <Compile Include="Connections\Connection.cs" />
     <Compile Include="Connections\IConnectionManager.cs" />

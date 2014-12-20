@@ -40,7 +40,7 @@ class PlayController {
         unsubscribe.push(playService.events.$on(
             'writeLine',
             (event, line) => { playService.messageCount.reset(); }));
-       
+
         unsubscribe.push(playService.events.$on(
             'connectionStateChanged',
             (event, oldState, newState) => {

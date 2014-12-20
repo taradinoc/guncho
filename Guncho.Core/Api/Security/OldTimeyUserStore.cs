@@ -19,6 +19,11 @@ namespace Guncho.Api.Security
 
         private ApiUser ToApiUser(Player player)
         {
+            if (player == null)
+            {
+                return null;
+            }
+
             return new ApiUser(player.ID)
             {
                 UserName = player.Name,
@@ -29,7 +34,17 @@ namespace Guncho.Api.Security
 
         public Task CreateAsync(ApiUser user)
         {
-            var player = server.CreatePlayer(user.UserName, pwdSalt: "", pwdHash: "");
+            string pwdSalt = "", pwdHash = "";
+
+            if (user.PasswordHash != null)
+            {
+                // TODO: support new-timey hashes
+                var parts = user.PasswordHash.Split(new[] { ' ' }, 2);
+                pwdSalt = parts[0];
+                pwdHash = parts[1];
+            }
+
+            var player = server.CreatePlayer(user.UserName, pwdSalt, pwdHash);
             return Task.FromResult(player);
         }
 
@@ -80,13 +95,22 @@ namespace Guncho.Api.Security
 
         public Task SetPasswordHashAsync(ApiUser user, string passwordHash)
         {
+            user.PasswordHash = passwordHash;
+
             var parts = passwordHash.Split(new[] { ' ' }, 2);
 
             var player = server.GetPlayerByName(user.UserName);
-            player.PasswordSalt = parts[0];
-            player.PasswordHash = parts[1];
+            if (player != null)
+            {
+                player.PasswordSalt = parts[0];
+                player.PasswordHash = parts[1];
 
-            return Task.Run(() => server.SavePlayers());
+                return Task.Run(() => server.SavePlayers());
+            }
+            else
+            {
+                return Task.FromResult(0);
+            }
         }
 
         #endregion

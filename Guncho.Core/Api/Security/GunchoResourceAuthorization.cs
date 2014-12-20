@@ -71,9 +71,6 @@ namespace Guncho.Api.Security
                 case GunchoResources.RealmActions.Join:
                     return CheckRealmJoinAccessAsync(context, realm);
 
-                case GunchoResources.RealmActions.ListAssets:
-                    return CheckRealmViewAssetsAccessAsync(context, realm);
-
                 case GunchoResources.RealmActions.Teleport:
                     return CheckRealmTeleportAccessAsync(context, realm);
 
@@ -104,6 +101,7 @@ namespace Guncho.Api.Security
                 case GunchoResources.AssetActions.Share:
                     return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.EditAccess));
 
+                case GunchoResources.AssetActions.List:
                 case GunchoResources.AssetActions.View:
                 case GunchoResources.AssetActions.ViewHistory:
                     return Eval(HasRealmAccessLevel(context, realm, RealmAccessLevel.ViewSource));
@@ -176,22 +174,56 @@ namespace Guncho.Api.Security
                 return Nok();
             }
 
+            var nextResource = context.Resource.Skip(2).FirstOrDefault();
+            if (nextResource != null)
+            {
+                if (nextResource.Value == GunchoResources.Attribute)
+                {
+                    var attribute = context.Resource.Skip(3).First().Value;
+                    return CheckUserAttributeAccessAsync(context, victim, attribute);
+                }
+                else if (nextResource.Value == GunchoResources.Password)
+                {
+                    return CheckUserEditProfileAccessAsync(context, victim);
+                }
+                else if (nextResource.Value == GunchoResources.Name)
+                {
+                    return CheckUserEditInternalsAsync(context, victim);
+                }
+            }
+
             switch (action)
             {
-                case GunchoResources.UserActions.ChangePassword:
                 case GunchoResources.UserActions.Create:
-                case GunchoResources.UserActions.EditProfile:
+                case GunchoResources.UserActions.Edit:
                     return CheckUserEditProfileAccessAsync(context, victim);
 
-                case GunchoResources.UserActions.EditName:
                 case GunchoResources.UserActions.EnableDisable:
-                    return CheckUserEditInternals(context, victim);
+                    return CheckUserEditInternalsAsync(context, victim);
             }
 
             return Nok();
         }
 
-        private Task<bool> CheckUserEditInternals(ResourceAuthorizationContext context, Player victim)
+        private Task<bool> CheckUserAttributeAccessAsync(ResourceAuthorizationContext context, Player victim, string attribute)
+        {
+            var actor = GetActor(context);
+            var action = context.Action.First().Value;
+
+            switch (action)
+            {
+                case GunchoResources.AttributeActions.Delete:
+                case GunchoResources.AttributeActions.Edit:
+                    return Eval(actor == victim || actor.IsAdmin);
+
+                case GunchoResources.AttributeActions.View:
+                    return Ok();
+            }
+
+            return Nok();
+        }
+
+        private Task<bool> CheckUserEditInternalsAsync(ResourceAuthorizationContext context, Player victim)
         {
             var actor = GetActor(context);
             return Eval(actor != null && actor.IsAdmin);

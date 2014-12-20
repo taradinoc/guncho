@@ -5,6 +5,12 @@ interface ILoginData {
     password: string;
 }
 
+interface IRegistration {
+    userName: string;
+    password: string;
+    confirmPassword: string;
+}
+
 interface IAuthentication {
     isAuth: boolean;
     userName: string;
@@ -17,7 +23,7 @@ interface IAuthorizationData {
 
 interface IAuthService {
     authentication: IAuthentication;
-    saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}>;
+    saveRegistration(registration: {}): ng.IPromise<ng.IHttpPromiseCallbackArg<{}>>;
     login(loginData: ILoginData): ng.IPromise<{}>;
     logout(): void;
     fillAuthData(): void;
@@ -38,8 +44,10 @@ class AuthService implements IAuthService {
 
     authentication = { isAuth: false, userName: "" };
 
-    saveRegistration(registration: {}): ng.IHttpPromiseCallbackArg<{}> {
-        return this.$http.post(this.serviceBase + 'account/register', registration)
+    saveRegistration(registration: IRegistration): ng.IPromise<ng.IHttpPromiseCallbackArg<{}>> {
+        this.logout();
+
+        return this.$http.post(this.serviceBase + '/account', registration)
             .then(response => {
                 return response;
             });
@@ -78,10 +86,11 @@ class AuthService implements IAuthService {
 
     logout(): void {
         this.localStorageService.remove('authorizationData');
-        delete this.signalR.ajaxDefaults.headers.Authorization;
-
         this.authentication.isAuth = false;
         this.authentication.userName = "";
+        if (this.signalR.ajaxDefaults.headers) {
+            delete this.signalR.ajaxDefaults.headers.Authorization;
+        }
     }
 
     fillAuthData(): void {

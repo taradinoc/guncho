@@ -1217,6 +1217,33 @@ namespace Guncho
             }
         }
 
+        public bool IsValidNameChange(string oldName, string newName)
+        {
+            if (oldName.ToLower() == newName.ToLower())
+            {
+                return true;
+            }
+
+            return PlayersServiceConstants.UserNameRegex.IsMatch(newName) && GetPlayerByName(newName) == null;
+        }
+
+        public bool TransactionalUpdate(Player player, Func<Player, bool> transaction)
+        {
+            bool success;
+
+            lock (player)
+            {
+                success = transaction(player);
+            }
+
+            if (success)
+            {
+                SavePlayers();
+            }
+
+            return success;
+        }
+
         #endregion
 
         public string GetPasswordSalt(string name)

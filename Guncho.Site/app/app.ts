@@ -13,10 +13,10 @@ function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         templateUrl: "/app/views/login.html"
     });
 
-    /*$routeProvider.when("/signup", {
-        controller: "signupController",
-        templateUrl: "/app/views/signup.html"
-    });*/
+    $routeProvider.when("/signup", {
+        controller: "signUpController",
+        templateUrl: "/app/views/signUp.html"
+    });
 
     $routeProvider.when("/realms", {
         controller: "listRealmsController",

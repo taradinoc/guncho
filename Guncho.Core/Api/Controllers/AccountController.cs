@@ -7,20 +7,22 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.AspNet.Identity;
 using Guncho.Api.Security;
+using System.Text.RegularExpressions;
+using Guncho.Services;
 
 namespace Guncho.Api.Controllers
 {
     public class RegistrationDto
     {
-        [Required, MinLength(1), MaxLength(16)]
-        [RegularExpression(@"(?i)^(?!guest)[a-z][-a-z0-9_]*$")]
+        [Required, MinLength(3), MaxLength(16)]
+        [RegularExpression(PlayersServiceConstants.UserNameRegexPattern)]
         public string UserName;
         [Required, MinLength(8)]
         public string Password;
     }
 
     [RoutePrefix("api/account")]
-    class AccountController : GunchoApiController
+    public class AccountController : GunchoApiController
     {
         private readonly UserManager<ApiUser, int> userManager;
 

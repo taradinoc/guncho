@@ -25,5 +25,7 @@ namespace Guncho.Api.Security
         public string UserName { get; set; }
 
         #endregion
+
+        public string PasswordHash { get; set; }
     }
 }

@@ -20,6 +20,11 @@ namespace Guncho.Api.Controllers
             return new ForbiddenResult();
         }
 
+        protected IHttpActionResult NoContent()
+        {
+            return new NoContentResult();
+        }
+
         protected IHttpActionResult UnprocessableEntity()
         {
             return new UnprocessableEntityResult();
