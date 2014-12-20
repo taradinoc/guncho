@@ -55,7 +55,8 @@ namespace Guncho.Api.Security
 
         public Task<ApiUser> FindByIdAsync(int userId)
         {
-            throw new NotImplementedException();
+            var player = server.GetPlayerById(userId);
+            return Task.FromResult(ToApiUser(player));
         }
 
         public Task<ApiUser> FindByNameAsync(string userName)
@@ -66,7 +67,23 @@ namespace Guncho.Api.Security
 
         public Task UpdateAsync(ApiUser user)
         {
-            throw new NotImplementedException();
+            var player = server.GetPlayerById(user.Id);
+
+            if (player != null)
+            {
+                lock (player)
+                {
+                    player.Name = user.UserName;
+                    
+                    var parts = user.PasswordHash.Split(new[] { ' ' }, 2);
+                    player.PasswordSalt = parts[0];
+                    player.PasswordHash = parts[1];
+                }
+
+                server.SavePlayers();
+            }
+
+            return Task.FromResult(0);
         }
 
         #endregion

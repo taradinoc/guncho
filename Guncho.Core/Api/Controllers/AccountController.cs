@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
@@ -19,6 +20,18 @@ namespace Guncho.Api.Controllers
         public string UserName;
         [Required, MinLength(8)]
         public string Password;
+    }
+
+    public class PasswordChangeDto
+    {
+        public string OldPassword { get; set; }
+
+        [Required, MinLength(8)]
+        public string NewPassword { get; set; }
+
+        [Required, MinLength(8)]
+        [Compare("NewPassword", ErrorMessage = "New passwords must match")]
+        public string ConfirmNewPassword { get; set; }
     }
 
     [RoutePrefix("api/account")]
@@ -64,7 +77,38 @@ namespace Guncho.Api.Controllers
                 return errorResult;
             }
 
-            return Ok();
+            return CreatedAtRoute("GetProfileByName", new { name = user.UserName }, "");
+        }
+
+        [Route("password/{name}")]
+        public async Task<IHttpActionResult> PostPasswordByName(string name, PasswordChangeDto passwords)
+        {
+            if (!Request.CheckAccess(GunchoResources.UserActions.Edit, GunchoResources.User, name, GunchoResources.Password))
+            {
+                return Forbidden();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var user = userManager.FindByName(name);
+            var result = await userManager.ChangePasswordAsync(user.Id, passwords.OldPassword, passwords.NewPassword);
+            var errorResult = GetErrorResult(result);
+
+            if (errorResult != null)
+            {
+                return errorResult;
+            }
+
+            return NoContent();
+        }
+
+        [Route("password/my")]
+        public Task<IHttpActionResult> PostMyPassword(PasswordChangeDto passwords)
+        {
+            return PostPasswordByName(User.Identity.Name, passwords);
         }
 
         // http://bitoftech.net/2014/06/01/token-based-authentication-asp-net-web-api-2-owin-asp-net-identity/
