@@ -96,6 +96,7 @@ namespace Guncho.Api.Controllers
 
             var checks = new Queue<Func<Player, bool>>();
             var updates = new Queue<Action<Player>>();
+            // TODO: don't modify Player objects, do everything through service methods
 
             if (newProfile.Name != null && newProfile.Name != player.Name)
             {
@@ -117,7 +118,8 @@ namespace Guncho.Api.Controllers
 
                     if (!writableAttributes.Contains(key))
                     {
-                        return BadRequest();
+                        ModelState.AddModelError("Attributes", string.Format("Attribute {0} is not writable.", key));
+                        continue;
                     }
 
                     if (value == null || value.Length == 0)
@@ -139,6 +141,11 @@ namespace Guncho.Api.Controllers
 
                     updates.Enqueue(p => p.SetAttribute(key, value));
                 }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
             }
 
             var result = playersService.TransactionalUpdate(
@@ -163,7 +170,7 @@ namespace Guncho.Api.Controllers
 
             if (result == false)
             {
-                return BadRequest();
+                return BadRequest(ModelState);
             }
 
             return NoContent();

@@ -51,6 +51,7 @@
     <EmbeddedResource Include="scripts\ui-bootstrap-tpls-0.12.0.min.js" />
     <EmbeddedResource Include="scripts\ui-utils.min.js" />
     <EmbeddedResource Include="app\views\signUp.html" />
+    <Content Include="app\views\editProfile.html" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -67,6 +68,7 @@
     <EmbeddedResource Include="app\services\playService.ts" />
     <EmbeddedResource Include="app\services\resources.ts" />
     <EmbeddedResource Include="app\controllers\signUpController.ts" />
+    <TypeScriptCompile Include="app\controllers\editProfileController.ts" />
     <TypeScriptCompile Include="master.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />

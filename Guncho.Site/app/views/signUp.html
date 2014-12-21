@@ -1,9 +1,9 @@
-﻿<form class="form-login" role="form">
+﻿<form class="form-login" role="form" ng-submit="signUp()" novalidate>
     <h2 class="form-login-heading">Sign Up</h2>
-    <input type="text" class="form-control" placeholder="Username" ng-model="registration.userName" required autofocus />
+    <input type="text" class="form-control" placeholder="Username" ng-model="registration.userName" required ng-minlength="4" autofocus />
     <input type="password" class="form-control" placeholder="Password" ng-model="registration.password" required />
     <input type="password" class="form-control" placeholder="Confirm password" ng-model="registration.confirmPassword" required />
-    <button class="btn btn-lg btn-info btn-block" type="submit" ng-click="signUp()">Register</button>
+    <button class="btn btn-lg btn-info btn-block" type="submit">Register</button>
     <div data-ng-hide="message == ''" data-ng-class="(savedSuccessfully) ? 'alert alert-success' : 'alert alert-danger'">
         {{message}}
     </div>

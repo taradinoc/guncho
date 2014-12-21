@@ -23,7 +23,7 @@ class SignUpController {
             confirmPassword: ''
         };
 
-        var startTimer = function () {
+        var startTimer = () => {
             var timer = $timeout(
                 () => {
                     $timeout.cancel(timer);
@@ -31,8 +31,7 @@ class SignUpController {
                 }, 2000);
         };
 
-        $scope.signUp = function () {
-
+        $scope.signUp = () => {
             authService.saveRegistration($scope.registration).then(
                 response => {
                     $scope.savedSuccessfully = true;

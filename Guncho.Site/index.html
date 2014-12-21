@@ -33,7 +33,14 @@
                         </a>
                     </li>
                     <li ng-hide="!authentication.isAuth"><a href="#/realms/my">My Realms</a></li>
-                    <li ng-hide="!authentication.isAuth"><a href="" ng-click="logOut()">Logout {{ authentication.userName }}</a></li>
+                    <li ng-hide="!authentication.isAuth" class="dropdown" dropdown>
+                        <a href="" class="dropdown-toggle" dropdown-toggle>{{ authentication.userName }} <span class="caret"></span></a>
+                        <ul class="dropdown-menu" role="menu">
+                            <li><a href="#/profile/my/edit">Edit Profile</a></li>
+                            <li class="divider"></li>
+                            <li><a href="" ng-click="logOut()">Log Out</a></li>
+                        </ul>
+                    </li>
                     <li ng-hide="authentication.isAuth"><a href="#/play">Play As Guest</a></li>
                     <li ng-hide="authentication.isAuth"><a href="#/login">Login</a></li>
                     <li ng-hide="authentication.isAuth"><a href="#/signup">Sign Up</a></li>

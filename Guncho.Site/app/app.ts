@@ -1,11 +1,12 @@
 ﻿'use strict';
 function configureRoutes($routeProvider: ng.route.IRouteProvider) {
-    $routeProvider.when("/home", {
-        templateUrl: "/app/views/home.html"
-    });
-
+    'use strict';
     $routeProvider.when("/credits", {
         templateUrl: "/app/views/credits.html"
+    });
+
+    $routeProvider.when("/home", {
+        templateUrl: "/app/views/home.html"
     });
 
     $routeProvider.when("/login", {
@@ -13,9 +14,14 @@ function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         templateUrl: "/app/views/login.html"
     });
 
-    $routeProvider.when("/signup", {
-        controller: "signUpController",
-        templateUrl: "/app/views/signUp.html"
+    $routeProvider.when("/play", {
+        controller: "playController",
+        templateUrl: "/app/views/play.html"
+    });
+
+    $routeProvider.when("/profile/my/edit", {
+        controller: "editProfileController",
+        templateUrl: "/app/views/editProfile.html"
     });
 
     $routeProvider.when("/realms", {
@@ -39,21 +45,22 @@ function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         templateUrl: "/app/views/editRealm.html"
     });
 
-    $routeProvider.when("/play", {
-        controller: "playController",
-        templateUrl: "/app/views/play.html"
+    $routeProvider.when("/signup", {
+        controller: "signUpController",
+        templateUrl: "/app/views/signUp.html"
     });
 
     $routeProvider.otherwise({ redirectTo: "/home" });
 }
 
 function configureAuthInterceptor($httpProvider: ng.IHttpProvider) {
+    'use strict';
     $httpProvider.interceptors.push('authInterceptorService');
 }
 
 var app = angular
     .module('GunchoApp',
-    ['ngRoute', 'ngResource', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap'])
+    ['ngRoute', 'ngResource', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap', 'ui.validate'])
     .constant('gunchoClientVersion', '1.1')
     .constant('serviceBase', 'http://localhost:4109/api')
     .constant('signalrBase', 'http://localhost:4109/signalr')
@@ -63,6 +70,7 @@ var app = angular
     .value('signalR', $.signalR);
 
 function appMain() {
+    'use strict';
     app.run(['authService', function (authService: IAuthService) {
         authService.fillAuthData();
     }]);

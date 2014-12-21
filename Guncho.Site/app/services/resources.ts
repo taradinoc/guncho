@@ -39,6 +39,7 @@ interface IRealmResourceClass extends ng.resource.IResourceClass<IRealmResource>
 }
 
 function RealmResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
+    'use strict';
     return <IRealmResourceClass>$resource(
         serviceBase + '/realms/:name',
         { name: '@name' },
@@ -79,13 +80,12 @@ interface IRealmAssetResourceClass extends ng.resource.IResourceClass<IRealmAsse
 }
 
 function RealmAssetResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
+    'use strict';
     return <IRealmAssetResourceClass>$resource(
         serviceBase + '/realms/:realmName/asset/:path',
         { path: '@path' },
         {
-            update: {
-                method: 'PUT', url: '@uri'
-            }
+            update: { method: 'PUT' }
         });
 }
 RealmAssetResourceFactory.$inject = ['$resource', 'serviceBase'];
@@ -101,8 +101,46 @@ interface IRealmAssetManifestResourceClass extends ng.resource.IResourceClass<IR
 }
 
 function RealmAssetManifestResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
+    'use strict';
     return <IRealmAssetManifestResourceClass>$resource(
         serviceBase + '/realms/:realmName/manifest');
 }
 RealmAssetManifestResourceFactory.$inject = ['$resource', 'serviceBase'];
 app.factory('RealmAssetManifest', RealmAssetManifestResourceFactory);
+
+interface IProfile {
+    name: string;
+    uri: string;
+    attributes?: {
+        [key: string]: string;
+    };
+}
+
+interface IProfileResource extends IProfile, ng.resource.IResource<IProfile> {
+    $update(): ng.IPromise<IProfile>;
+    $update(params?: Object, success?: Function, error?: Function): ng.IPromise<IProfile>;
+    $update(success: Function, error?: Function): ng.IPromise<IProfile>;
+}
+
+interface IProfileResourceClass extends ng.resource.IResourceClass<IProfileResource> {
+    update(data: IProfile): IProfileResource;
+    update(data: IProfile, params?: Object, success?: Function, error?: Function): IProfileResource;
+    update(data: IProfile, success: Function, error?: Function): IProfileResource;
+
+    getMy(): IProfileResource;
+    getMy(params: Object, success?: Function, error?: Function): IProfileResource;
+    getMy(success: Function, error?: Function): IProfileResource;
+}
+
+function ProfileResourceFactory($resource: ng.resource.IResourceService, serviceBase: string) {
+    'use strict';
+    return <IProfileResourceClass>$resource(
+        serviceBase + '/profiles/:name',
+        { name: '@name' },
+        {
+            update: { method: 'PUT' },
+            getMy: { method: 'GET', params: { name: 'my' } }
+        });
+}
+ProfileResourceFactory.$inject = ['$resource', 'serviceBase'];
+app.factory('Profile', ProfileResourceFactory);
