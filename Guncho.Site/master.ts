@@ -1,4 +1,18 @@
 ﻿// This references all other TypeScript code in the project to ensure it gets compiled.
+
+/// <reference path="scripts/typings/angularLocalStorage/angularLocalStorage.d.ts" />
+/// <reference path="scripts/typings/jquery/jquery.d.ts" />
+/// <reference path="scripts/typings/signalr/signalr.d.ts" />
+/// <reference path="scripts/typings/glkote/glkote.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-route.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-resource.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-mocks.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-scenario.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-cookies.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-animate.d.ts" />
+/// <reference path="scripts/typings/angularjs/angular-sanitize.d.ts" />
+
 /// <reference path="app/app.ts" />
 /// <reference path="app/controllers/editRealmController.ts" />
 /// <reference path="app/controllers/indexController.ts" />

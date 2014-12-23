@@ -103,7 +103,7 @@
     "LintResultLocation": "Message",
     "MakeMinified": true,
     "OutputDirectory": null,
-    "RootDirectory": "/Scripts/",
+    "RootDirectory": "/scripts/",
     "RunOnBuild": false,
     "TermSemicolons": true
   },
