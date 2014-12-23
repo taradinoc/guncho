@@ -213,6 +213,7 @@
     <Compile Include="Api\FileResult.cs" />
     <Compile Include="Api\ForbiddenResult.cs" />
     <Compile Include="Api\Controllers\GunchoApiController.cs" />
+    <Compile Include="Api\Security\GunchoDataProtectionProvider.cs" />
     <Compile Include="Api\Security\GunchoOAuthServerProvider.cs" />
     <Compile Include="Api\Security\GunchoResourceAuthorization.cs" />
     <Compile Include="Api\HeadHandler.cs" />

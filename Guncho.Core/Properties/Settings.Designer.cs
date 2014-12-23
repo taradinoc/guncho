@@ -205,19 +205,22 @@ namespace Guncho.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("8014")]
-        public int ControllerPort {
-            get {
-                return ((int)(this["ControllerPort"]));
-            }
-        }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("4109")]
         public int WebServerPort {
             get {
                 return ((int)(this["WebServerPort"]));
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string WebAuthSecret {
+            get {
+                return ((string)(this["WebAuthSecret"]));
+            }
+            set {
+                this["WebAuthSecret"] = value;
             }
         }
     }
