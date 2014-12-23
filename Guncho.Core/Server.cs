@@ -127,8 +127,6 @@ namespace Guncho
                     throw new InvalidOperationException(
                         string.Format("Couldn't load initial realm '{0}'",
                                         Properties.Settings.Default.StartRealmName));
-
-                ControllerFactory.Register(this, config, logger);
             }
             catch (Exception ex)
             {
@@ -1278,7 +1276,7 @@ namespace Guncho
         public Player ValidateLogIn(string name, string password)
         {
             string salt = GetPasswordSalt(name);
-            string hash = Controller.HashPassword(salt, password);
+            string hash = OldTimeyPasswordHasher.HashPassword(salt, password);
             return ValidateLogIn(name, salt, hash);
         }
 

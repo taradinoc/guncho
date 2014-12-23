@@ -7,6 +7,7 @@ using System.Text;
 using System.Windows.Forms;
 using Guncho;
 using System.Web;
+using Guncho.Api.Security;
 
 namespace PassGen
 {
@@ -25,8 +26,8 @@ namespace PassGen
             }
             else
             {
-                string salt = Controller.GenerateSalt();
-                string hash = Controller.HashPassword(salt, textBox1.Text);
+                string salt = OldTimeyPasswordHasher.GenerateSalt();
+                string hash = OldTimeyPasswordHasher.HashPassword(salt, textBox1.Text);
                 textBox2.Text = string.Format("pwdSalt=\"{0}\" pwdHash=\"{1}\"",
                     HttpUtility.HtmlAttributeEncode(salt),
                     HttpUtility.HtmlAttributeEncode(hash));
