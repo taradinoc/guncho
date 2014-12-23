@@ -62,8 +62,8 @@ var app = angular
     .module('GunchoApp',
     ['ngRoute', 'ngResource', 'LocalStorageModule', 'angular-loading-bar', 'ui.unique', 'ui.bootstrap', 'ui.validate'])
     .constant('gunchoClientVersion', '1.1')
-    .constant('serviceBase', 'http://localhost:4109/api')
-    .constant('signalrBase', 'http://localhost:4109/signalr')
+    .constant('serviceBase', '/api')
+    .constant('signalrBase', '/signalr')
     .config(configureRoutes)
     .config(configureAuthInterceptor)
     .value('hubConnection', $.hubConnection)

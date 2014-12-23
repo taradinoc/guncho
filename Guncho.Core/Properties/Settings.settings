@@ -65,5 +65,8 @@
     <Setting Name="ControllerPort" Type="System.Int32" Scope="Application">
       <Value Profile="(Default)">8014</Value>
     </Setting>
+    <Setting Name="WebServerPort" Type="System.Int32" Scope="Application">
+      <Value Profile="(Default)">4109</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

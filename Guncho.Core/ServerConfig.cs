@@ -8,7 +8,8 @@ namespace Guncho
 {
     public class ServerConfig
     {
-        public int Port { get; set; }
+        public int GamePort { get; set; }
+        public int WebPort { get; set; }
         public string CachePath { get; set; }
         public string IndexPath { get; set; }
     }

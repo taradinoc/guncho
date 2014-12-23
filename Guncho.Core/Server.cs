@@ -1284,8 +1284,6 @@ namespace Guncho
 
         private IDisposable StartWebApi()
         {
-            var url = "http://localhost:4109";  // TODO: make web api url configurable!
-
             var services = (ServiceProvider)ServicesFactory.Create();
             services.AddInstance<IWebDependencyResolver>(apiDependencyResolver);
             services.AddInstance<ISignalRDependencyResolver>(sigrDependencyResolver);
@@ -1301,45 +1299,13 @@ namespace Guncho
                         PasswordHasher = new OldTimeyPasswordHasher(),
                     }));
 
-            var options = new StartOptions(url);
+            var options = new StartOptions() { Port = config.WebPort };
             options.AppStartup = typeof(WebApiStartup).AssemblyQualifiedName;
+
+            logger.LogMessage(LogLevel.Notice, "Web: Listening on port {0}.", config.WebPort);
 
             return services.GetService<IHostingStarter>().Start(options);
         }
-
-        /*public void Run()
-        {
-            try
-            {
-                TcpListener listener = new TcpListener(System.Net.IPAddress.Any, config.Port);
-
-                logger.LogMessage(LogLevel.Notice, "Listening on port {0}.", config.Port);
-                listener.Start();
-
-                running = true;
-                eventThread.Start();
-
-                using (StartWebApi())
-                {
-                    while (running)
-                    {
-                        listener.BeginAcceptTcpClient(AcceptClientProc, listener);
-                        mainLoopEvent.WaitOne();
-                    }
-                }
-
-                eventThread.Join();
-
-                lock (realms)
-                    foreach (Instance r in instances.Values)
-                        r.PolitelyDispose();
-            }
-            catch (Exception ex)
-            {
-                logger.LogException(ex);
-                throw;
-            }
-        }*/
 
         public void Run()
         {
@@ -1353,7 +1319,7 @@ namespace Guncho
 
                 // TCP connections
                 //XXX break dependency
-                var tcpManager = new TcpConnectionManager(System.Net.IPAddress.Any, config.Port);
+                var tcpManager = new TcpConnectionManager(System.Net.IPAddress.Any, config.GamePort);
                 tcpManager.ConnectionAccepted += (sender, e) =>
                 {
                     logger.LogMessage(LogLevel.Verbose, "TCP: Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
@@ -1367,7 +1333,7 @@ namespace Guncho
                     openConnections.TryRemove(e.Connection, out dummy);
                 };
 
-                logger.LogMessage(LogLevel.Notice, "TCP: Listening on port {0}.", config.Port);
+                logger.LogMessage(LogLevel.Notice, "TCP: Listening on port {0}.", config.GamePort);
                 var tcpListenTask = tcpManager.Run(cancellation.Token);
 
                 // SignalR connections

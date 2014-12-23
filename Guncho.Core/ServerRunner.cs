@@ -24,6 +24,7 @@ namespace Guncho
     {
         private string homeDir = Properties.Settings.Default.CachePath;
         private int port = Properties.Settings.Default.GameServerPort;
+        private int webPort = Properties.Settings.Default.WebServerPort;
         private ILogger logger;
         private Server svr;
 
@@ -43,6 +44,12 @@ namespace Guncho
         {
             get { return port; }
             set { port = value; }
+        }
+
+        public int WebPort
+        {
+            get { return webPort; }
+            set { webPort = value; }
         }
 
         internal Server Server
@@ -72,7 +79,8 @@ namespace Guncho
 
             var serverConfig = new ServerConfig
             {
-                Port = port,
+                GamePort = port,
+                WebPort = webPort,
                 CachePath = Properties.Settings.Default.CachePath,
                 IndexPath = Path.Combine(Properties.Settings.Default.CachePath, "Index"),
             };
