@@ -2,6 +2,7 @@
 using Microsoft.AspNet.SignalR;
 using Microsoft.Owin;
 using Microsoft.Owin.FileSystems;
+using Microsoft.Owin.Security.DataProtection;
 using Microsoft.Owin.Security.OAuth;
 using Microsoft.Owin.StaticFiles;
 using Newtonsoft.Json;
@@ -24,17 +25,20 @@ namespace Guncho.Api
         private readonly ISignalRDependencyResolver sigrResolver;
         private readonly IResourceAuthorizationManager resourceAuth;
         private readonly IOAuthAuthorizationServerProvider oauthServerProvider;
+        private readonly IDataProtectionProvider dataProtectionProvider;
 
         public WebApiStartup(
             IWebDependencyResolver webResolver,
             ISignalRDependencyResolver sigrResolver,
             IResourceAuthorizationManager resourceAuth,
-            IOAuthAuthorizationServerProvider oauthServerProvider)
+            IOAuthAuthorizationServerProvider oauthServerProvider,
+            IDataProtectionProvider dataProtectionProvider)
         {
             this.webResolver = webResolver;
             this.sigrResolver = sigrResolver;
             this.resourceAuth = resourceAuth;
             this.oauthServerProvider = oauthServerProvider;
+            this.dataProtectionProvider = dataProtectionProvider;
         }
 
         public void Configuration(IAppBuilder appBuilder)
@@ -43,6 +47,7 @@ namespace Guncho.Api
             ConfigureStaticFiles(appBuilder);
 
             // Configure authorization.
+            appBuilder.SetDataProtectionProvider(dataProtectionProvider);
             appBuilder.UseCors(Microsoft.Owin.Cors.CorsOptions.AllowAll);
             ConfigureOAuth(appBuilder);
             appBuilder.UseResourceAuthorization(resourceAuth);

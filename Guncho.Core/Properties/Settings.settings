@@ -62,11 +62,11 @@
     <Setting Name="NiInstallationsPath" Type="System.String" Scope="Application">
       <Value Profile="(Default)">C:\Guncho\HackedI7</Value>
     </Setting>
-    <Setting Name="ControllerPort" Type="System.Int32" Scope="Application">
-      <Value Profile="(Default)">8014</Value>
-    </Setting>
     <Setting Name="WebServerPort" Type="System.Int32" Scope="Application">
       <Value Profile="(Default)">4109</Value>
+    </Setting>
+    <Setting Name="WebAuthSecret" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
   </Settings>
 </SettingsFile>

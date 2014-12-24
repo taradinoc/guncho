@@ -35,6 +35,7 @@ using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 
 using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
 using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
+using Microsoft.Owin.Security.DataProtection;
 
 namespace Guncho
 {
@@ -83,6 +84,7 @@ namespace Guncho
         private readonly IWebDependencyResolver apiDependencyResolver;
         private readonly ISignalRDependencyResolver sigrDependencyResolver;
         private readonly ISignalRConnectionManager sigrManager;
+        private readonly IDataProtectionProvider dataProtectionProvider;
 
         private volatile bool running;
         private TaskCompletionSource<bool> whenShutDown;
@@ -104,7 +106,8 @@ namespace Guncho
             IWebDependencyResolver apiDependencyResolver,
             ISignalRDependencyResolver sigrDependencyResolver,
             ISignalRConnectionManager sigrManager,
-            IEnumerable<RealmFactory> allRealmFactories)
+            IEnumerable<RealmFactory> allRealmFactories,
+            IDataProtectionProvider dataProtectionProvider)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
@@ -114,6 +117,7 @@ namespace Guncho
             this.apiDependencyResolver = apiDependencyResolver;
             this.sigrDependencyResolver = sigrDependencyResolver;
             this.sigrManager = sigrManager;
+            this.dataProtectionProvider = dataProtectionProvider;
 
             try
             {
@@ -1287,6 +1291,7 @@ namespace Guncho
             services.AddInstance<ISignalRDependencyResolver>(sigrDependencyResolver);
             services.AddInstance<IResourceAuthorizationManager>(ResourceAuthorizationManager);
             services.AddInstance<ISignalRConnectionManager>(sigrManager);
+            services.AddInstance<IDataProtectionProvider>(dataProtectionProvider);
 
             //XXX
             // TODO: break this ugly dependency

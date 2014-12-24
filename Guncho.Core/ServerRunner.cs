@@ -17,6 +17,8 @@ using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
 using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
 using Guncho.Api.Hubs;
 using Guncho.Connections;
+using Microsoft.Owin.Security.DataProtection;
+using System.Security.Cryptography;
 
 namespace Guncho
 {
@@ -95,6 +97,24 @@ namespace Guncho
                     um.PasswordHasher = container.GetInstance<IPasswordHasher>();
                 });
             container.RegisterSingle<IResourceAuthorizationManager, GunchoResourceAuthorization>();
+
+            var savedSecret = Properties.Settings.Default.WebAuthSecret;
+            byte[] secretBytes;
+            if (string.IsNullOrEmpty(savedSecret))
+            {
+                using (var rng = new RNGCryptoServiceProvider())
+                {
+                    secretBytes = new byte[32];
+                    rng.GetBytes(secretBytes);
+                    Properties.Settings.Default.WebAuthSecret = Convert.ToBase64String(secretBytes);
+                    Properties.Settings.Default.Save();
+                }
+            }
+            else
+            {
+                secretBytes = Convert.FromBase64String(Properties.Settings.Default.WebAuthSecret);
+            }
+            container.RegisterSingle<IDataProtectionProvider>(new GunchoDataProtectionProvider(secretBytes));
 
             // register server classes
             var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
