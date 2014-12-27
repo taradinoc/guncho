@@ -19,6 +19,7 @@ using Guncho.Api.Hubs;
 using Guncho.Connections;
 using Microsoft.Owin.Security.DataProtection;
 using System.Security.Cryptography;
+using Microsoft.Owin.Security;
 
 namespace Guncho
 {
@@ -115,6 +116,7 @@ namespace Guncho
                 secretBytes = Convert.FromBase64String(Properties.Settings.Default.WebAuthSecret);
             }
             container.RegisterSingle<IDataProtectionProvider>(new GunchoDataProtectionProvider(secretBytes));
+            container.RegisterSingle<ISecureDataFormat<AuthenticationTicket>>(new GunchoTicketFormat(secretBytes));
 
             // register server classes
             var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);

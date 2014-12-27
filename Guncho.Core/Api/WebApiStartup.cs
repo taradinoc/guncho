@@ -2,6 +2,8 @@
 using Microsoft.AspNet.SignalR;
 using Microsoft.Owin;
 using Microsoft.Owin.FileSystems;
+using Microsoft.Owin.Logging;
+using Microsoft.Owin.Security;
 using Microsoft.Owin.Security.DataProtection;
 using Microsoft.Owin.Security.OAuth;
 using Microsoft.Owin.StaticFiles;
@@ -26,19 +28,22 @@ namespace Guncho.Api
         private readonly IResourceAuthorizationManager resourceAuth;
         private readonly IOAuthAuthorizationServerProvider oauthServerProvider;
         private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly ISecureDataFormat<AuthenticationTicket> oauthTokenFormat;
 
         public WebApiStartup(
             IWebDependencyResolver webResolver,
             ISignalRDependencyResolver sigrResolver,
             IResourceAuthorizationManager resourceAuth,
             IOAuthAuthorizationServerProvider oauthServerProvider,
-            IDataProtectionProvider dataProtectionProvider)
+            IDataProtectionProvider dataProtectionProvider,
+            ISecureDataFormat<AuthenticationTicket> oauthTokenFormat)
         {
             this.webResolver = webResolver;
             this.sigrResolver = sigrResolver;
             this.resourceAuth = resourceAuth;
             this.oauthServerProvider = oauthServerProvider;
             this.dataProtectionProvider = dataProtectionProvider;
+            this.oauthTokenFormat = oauthTokenFormat;
         }
 
         public void Configuration(IAppBuilder appBuilder)
@@ -70,6 +75,7 @@ namespace Guncho.Api
 
             // Configure tracing.
             //config.EnableSystemDiagnosticsTracing();
+            //appBuilder.SetLoggerFactory(new DiagnosticsLoggerFactory());
 
             // Map Web API.
             config.EnsureInitialized();
@@ -97,6 +103,9 @@ namespace Guncho.Api
                 TokenEndpointPath = new PathString("/api/token"),
                 AccessTokenExpireTimeSpan = TimeSpan.FromDays(1),
                 Provider = oauthServerProvider,
+                AccessTokenFormat = oauthTokenFormat,
+                RefreshTokenFormat = oauthTokenFormat,
+                AuthorizationCodeFormat = oauthTokenFormat,
             };
 
             app.UseOAuthAuthorizationServer(OAuthServerOptions);

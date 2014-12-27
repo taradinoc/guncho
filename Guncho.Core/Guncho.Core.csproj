@@ -219,6 +219,7 @@
     <Compile Include="Api\HeadHandler.cs" />
     <Compile Include="Api\Controllers\InstancesController.cs" />
     <Compile Include="Api\Security\GunchoRoles.cs" />
+    <Compile Include="Api\Security\GunchoTicketFormat.cs" />
     <Compile Include="Api\Security\OldTimeyPasswordHasher.cs" />
     <Compile Include="Api\Security\OldTimeyUserStore.cs" />
     <Compile Include="Api\Security\GunchoResources.cs" />

@@ -36,6 +36,7 @@ using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
 using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
 using Microsoft.Owin.Security.DataProtection;
+using Microsoft.Owin.Security;
 
 namespace Guncho
 {
@@ -85,6 +86,7 @@ namespace Guncho
         private readonly ISignalRDependencyResolver sigrDependencyResolver;
         private readonly ISignalRConnectionManager sigrManager;
         private readonly IDataProtectionProvider dataProtectionProvider;
+        private readonly ISecureDataFormat<AuthenticationTicket> oauthTicketFormat;
 
         private volatile bool running;
         private TaskCompletionSource<bool> whenShutDown;
@@ -107,7 +109,8 @@ namespace Guncho
             ISignalRDependencyResolver sigrDependencyResolver,
             ISignalRConnectionManager sigrManager,
             IEnumerable<RealmFactory> allRealmFactories,
-            IDataProtectionProvider dataProtectionProvider)
+            IDataProtectionProvider dataProtectionProvider,
+            ISecureDataFormat<AuthenticationTicket> oauthTicketFormat)
         {
             if (logger == null)
                 throw new ArgumentNullException("logger");
@@ -118,6 +121,7 @@ namespace Guncho
             this.sigrDependencyResolver = sigrDependencyResolver;
             this.sigrManager = sigrManager;
             this.dataProtectionProvider = dataProtectionProvider;
+            this.oauthTicketFormat = oauthTicketFormat;
 
             try
             {
@@ -1292,6 +1296,7 @@ namespace Guncho
             services.AddInstance<IResourceAuthorizationManager>(ResourceAuthorizationManager);
             services.AddInstance<ISignalRConnectionManager>(sigrManager);
             services.AddInstance<IDataProtectionProvider>(dataProtectionProvider);
+            services.AddInstance<ISecureDataFormat<AuthenticationTicket>>(oauthTicketFormat);
 
             //XXX
             // TODO: break this ugly dependency
