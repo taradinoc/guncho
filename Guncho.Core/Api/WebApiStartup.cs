@@ -109,7 +109,13 @@ namespace Guncho.Api
             };
 
             app.UseOAuthAuthorizationServer(OAuthServerOptions);
-            app.UseOAuthBearerAuthentication(new OAuthBearerAuthenticationOptions());
+
+            OAuthBearerAuthenticationOptions OAuthBearerOptions = new OAuthBearerAuthenticationOptions()
+            {
+                AccessTokenFormat = oauthTokenFormat,
+            };
+
+            app.UseOAuthBearerAuthentication(OAuthBearerOptions);
         }
 
         private static void ConfigureJson(HttpConfiguration config)
