@@ -12,15 +12,18 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Owin;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Dependencies;
 using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
 
-using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
-using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
-
 namespace Guncho.Api
 {
+    using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
+    using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
+
     public sealed class WebApiStartup
     {
         private readonly IWebDependencyResolver webResolver;
@@ -48,6 +51,9 @@ namespace Guncho.Api
 
         public void Configuration(IAppBuilder appBuilder)
         {
+            // Handle X-Forwarded-* headers.
+            appBuilder.Use(typeof(ApplyProxyHeadersMiddleware));
+
             // Map static web site, which doesn't need any authorization.
             ConfigureStaticFiles(appBuilder);
 

@@ -203,6 +203,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Api\ApplyProxyHeadersMiddleware.cs" />
     <Compile Include="Api\Controllers\AccountController.cs" />
     <Compile Include="Api\NoContentResult.cs" />
     <Compile Include="Api\Hubs\PlayHub.cs" />
