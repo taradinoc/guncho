@@ -754,6 +754,23 @@ namespace Guncho
             }
         }
 
+        public bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        {
+            bool success;
+
+            lock (realm)
+            {
+                success = transaction(realm);
+            }
+
+            if (success)
+            {
+                SaveRealms();
+            }
+
+            return success;
+        }
+
         #endregion
 
         /// <summary>
@@ -1223,7 +1240,7 @@ namespace Guncho
             }
         }
 
-        public bool IsValidNameChange(string oldName, string newName)
+        bool IPlayersService.IsValidNameChange(string oldName, string newName)
         {
             if (oldName.ToLower() == newName.ToLower())
             {
@@ -1233,6 +1250,16 @@ namespace Guncho
             return PlayersServiceConstants.UserNameRegex.IsMatch(newName) && GetPlayerByName(newName) == null;
         }
 
+        bool IRealmsService.IsValidNameChange(string oldName, string newName)
+        {
+            if (oldName.ToLower() == newName.ToLower())
+            {
+                return true;
+            }
+
+            return newName.Trim() == newName && GetRealmByName(newName) == null;
+        }
+        
         public bool TransactionalUpdate(Player player, Func<Player, bool> transaction)
         {
             bool success;

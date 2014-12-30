@@ -182,13 +182,10 @@ namespace Guncho.Api.Security
                     var attribute = context.Resource.Skip(3).First().Value;
                     return CheckUserAttributeAccessAsync(context, victim, attribute);
                 }
-                else if (nextResource.Value == GunchoResources.Password)
+                else if (nextResource.Value == GunchoResources.Field)
                 {
-                    return CheckUserEditProfileAccessAsync(context, victim);
-                }
-                else if (nextResource.Value == GunchoResources.Name)
-                {
-                    return CheckUserEditInternalsAsync(context, victim);
+                    var field = context.Resource.Skip(3).First().Value;
+                    return CheckUserFieldAccessAsync(context, victim, field);
                 }
             }
 
@@ -218,6 +215,20 @@ namespace Guncho.Api.Security
 
                 case GunchoResources.AttributeActions.View:
                     return Ok();
+            }
+
+            return Nok();
+        }
+
+        private Task<bool> CheckUserFieldAccessAsync(ResourceAuthorizationContext context, Player victim, string field)
+        {
+            switch (field)
+            {
+                case GunchoResources.UserFields.Password:
+                    return CheckUserEditProfileAccessAsync(context, victim);
+
+                case GunchoResources.UserFields.Name:
+                    return CheckUserEditInternalsAsync(context, victim);
             }
 
             return Nok();

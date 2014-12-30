@@ -39,8 +39,19 @@ namespace Guncho.Api.Security
             public const string View = "View";
         }
 
-        public const string Name = "Name";
-        public const string Password = "Password";
+        public const string Field = "Field";
+        public static class UserFields
+        {
+            public const string Name = "Name";
+            public const string Password = "Password";
+        }
+        public static class RealmFields
+        {
+            public const string Name = "Name";
+            public const string Owner = "Owner";
+            public const string Acl = "Acl";
+            public const string Privacy = "Privacy";
+        }
 
         public const string Asset = "Asset";
         public static class AssetActions

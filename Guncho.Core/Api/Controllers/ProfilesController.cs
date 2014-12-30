@@ -105,7 +105,7 @@ namespace Guncho.Api.Controllers
                     Request.CheckAccess(
                         GunchoResources.UserActions.Edit,
                         GunchoResources.User, p.Name,
-                        GunchoResources.Name));
+                        GunchoResources.Field, GunchoResources.UserFields.Name));
                 updates.Enqueue(p => p.Name = newProfile.Name);
             }
 
@@ -173,7 +173,7 @@ namespace Guncho.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            return NoContent();
+            return GetProfileByName(name);
         }
 
         [Route("my")]

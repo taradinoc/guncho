@@ -16,6 +16,9 @@ interface IEditRealmControllerScope extends ng.IScope {
         loaded?: boolean;
         realmLoaded?: boolean;
         compilersLoaded?: boolean;
+
+        savedSuccessfully?: boolean;
+        message: string;
     };
 
     assetsForm: {
@@ -61,7 +64,8 @@ class EditRealmController {
             realmName: '',
             compiler: { language: '', version: '' },
             privacy: '',
-            acl: []
+            acl: [],
+            message: ''
         };
         $scope.assetsForm = {
             selectedAsset: null
@@ -105,9 +109,31 @@ class EditRealmController {
                 });
         };
 
+        var copyFormToRealm = () => {
+            $scope.realm.name = $scope.settingsForm.realmName;
+            $scope.realm.compiler = angular.copy($scope.settingsForm.compiler);
+            $scope.realm.privacy = $scope.settingsForm.privacy;
+            $scope.realm.acl = angular.copy($scope.settingsForm.acl);
+        };
+
         $scope.saveSettings = () => {
-            // TODO: implement saveSettings
-            alert('FIXME');
+            if ($scope.settingsForm.newAclEntryUser || $scope.settingsForm.newAclEntryAccess) {
+                $scope.addAclEntry();
+            }
+            copyFormToRealm();
+            $scope.realm.$update(
+                (response: IRealm) => {
+                    // success
+                    $scope.settingsForm.savedSuccessfully = true;
+                    $scope.settingsForm.message = 'Settings saved successfully.';
+
+                    $scope.realm = new Realm(response);
+                },
+                () => {
+                    // failure
+                    $scope.settingsForm.savedSuccessfully = false;
+                    $scope.settingsForm.message = 'Failed to save settings.';
+                });
         };
 
         $scope.deleteAclEntry = index => {
@@ -146,12 +172,16 @@ class EditRealmController {
             f.loaded = f.realmLoaded && f.compilersLoaded;
         };
 
+        var copyRealmToForm = () => {
+            $scope.settingsForm.realmName = $scope.realm.name;
+            $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
+            $scope.settingsForm.privacy = $scope.realm.privacy;
+            $scope.settingsForm.acl = angular.copy($scope.realm.acl);
+        };
+
         $scope.realm = Realm.get({ name: realmName },
             () => {
-                $scope.settingsForm.realmName = $scope.realm.name;
-                $scope.settingsForm.compiler = angular.copy($scope.realm.compiler);
-                $scope.settingsForm.privacy = $scope.realm.privacy;
-                $scope.settingsForm.acl = angular.copy($scope.realm.acl);
+                copyRealmToForm();
                 $scope.settingsForm.realmLoaded = true;
                 updateLoaded();
             });

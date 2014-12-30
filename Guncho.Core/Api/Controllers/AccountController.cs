@@ -83,7 +83,10 @@ namespace Guncho.Api.Controllers
         [Route("password/{name}")]
         public async Task<IHttpActionResult> PostPasswordByName(string name, PasswordChangeDto passwords)
         {
-            if (!Request.CheckAccess(GunchoResources.UserActions.Edit, GunchoResources.User, name, GunchoResources.Password))
+            if (!Request.CheckAccess(
+                GunchoResources.UserActions.Edit,
+                GunchoResources.User, name,
+                GunchoResources.Field, GunchoResources.UserFields.Password))
             {
                 return Forbidden();
             }

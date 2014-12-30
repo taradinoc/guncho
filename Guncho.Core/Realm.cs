@@ -10,6 +10,7 @@ using System.Threading;
 using System.Xml.Serialization;
 using Textfyre.VM;
 using System.ComponentModel;
+using System.Diagnostics.Contracts;
 
 namespace Guncho
 {
@@ -109,9 +110,7 @@ namespace Guncho
     public class Realm
     {
         private readonly Server server;
-        private readonly RealmFactory factory;
-        private readonly string name, sourceFile, storyFile;
-        private readonly Player owner;
+        private readonly string sourceFile, storyFile;
         private RealmAccessListEntry[] accessList;
 
         private RealmPrivacyLevel privacy = RealmPrivacyLevel.Public;
@@ -123,40 +122,38 @@ namespace Guncho
         public Realm(Server server, RealmFactory factory, string name, string sourceFile,
             string storyFile, Player owner)
         {
+            Contract.Requires(server != null);
+            Contract.Requires(factory != null);
+            Contract.Requires(name != null);
+            Contract.Requires(sourceFile != null);
+            Contract.Requires(storyFile != null);
+            Contract.Requires(owner != null);
+
             this.server = server;
-            this.factory = factory;
-            this.name = name;
+            this.Factory = factory;
+            this.Name = name;
             this.sourceFile = sourceFile;
             this.storyFile = storyFile;
-            this.owner = owner;
+            this.Owner = owner;
             this.accessList = new RealmAccessListEntry[0];
 
             LoadStorage();
         }
 
         public Realm(Realm other, string newName)
-            : this(other.server, other.factory, newName, other.sourceFile, other.storyFile, other.owner)
+            : this(other.server, other.Factory, newName, other.sourceFile, other.storyFile, other.Owner)
         {
+            Contract.Requires(other != null);
+            Contract.Requires(newName != null);
+
             CopySettingsFrom(other);
         }
 
-        public RealmFactory Factory
-        {
-            get { return factory; }
-        }
+        public RealmFactory Factory { get; set; }
 
+        public string Name { get; set; }
 
-
-        public string Name
-        {
-            get { return name; }
-        }
-
-        public RealmPrivacyLevel PrivacyLevel
-        {
-            get { return privacy; }
-            set { privacy = value; }
-        }
+        public RealmPrivacyLevel PrivacyLevel { get; set; }
 
         public RealmAccessListEntry[] AccessList
         {
@@ -164,10 +161,7 @@ namespace Guncho
             set { accessList = (RealmAccessListEntry[])value.Clone(); }
         }
 
-        public Player Owner
-        {
-            get { return owner; }
-        }
+        public Player Owner { get; set; }
 
         public string SourceFile
         {
@@ -258,7 +252,7 @@ namespace Guncho
         {
             string filename = Path.Combine(
                 Properties.Settings.Default.RealmDataPath,
-                this.name + ".storage.xml");
+                this.Name + ".storage.xml");
 
             localStorage.Clear();
 
@@ -274,7 +268,7 @@ namespace Guncho
 
                 if (root != null)
                 {
-                    if (root.realm.ToLower() != this.name.ToLower())
+                    if (root.realm.ToLower() != this.Name.ToLower())
                         throw new Exception("Storage file doesn't match this realm");
 
                     if (root.item != null)
@@ -327,7 +321,7 @@ namespace Guncho
                 }
             }
 
-            root.realm = this.name;
+            root.realm = this.Name;
             root.item = items.ToArray();
 
             List<XML.realmStoragePlayer> players = new List<XML.realmStoragePlayer>();
@@ -343,7 +337,7 @@ namespace Guncho
 
             string filename = Path.Combine(
                 Properties.Settings.Default.RealmDataPath,
-                this.name + ".storage.xml");
+                this.Name + ".storage.xml");
 
             XmlSerializer ser = new XmlSerializer(typeof(XML.realmStorage));
             using (FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write))

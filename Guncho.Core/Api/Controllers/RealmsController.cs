@@ -44,10 +44,12 @@ namespace Guncho.Api.Controllers
     public sealed class RealmsController : GunchoApiController
     {
         private readonly IRealmsService realmsService;
+        private readonly IPlayersService playersService;
 
-        public RealmsController(IRealmsService realmsService)
+        public RealmsController(IRealmsService realmsService, IPlayersService playersService)
         {
             this.realmsService = realmsService;
+            this.playersService = playersService;
         }
 
         private RealmDto MakeDto(Realm r, bool details = false)
@@ -111,7 +113,6 @@ namespace Guncho.Api.Controllers
             if (realm == null)
             {
                 return NotFound();
-                throw new HttpResponseException(System.Net.HttpStatusCode.NotFound);
             }
 
             if (!Request.CheckAccess(GunchoResources.RealmActions.View, GunchoResources.Realm, realmName))
@@ -120,6 +121,205 @@ namespace Guncho.Api.Controllers
             }
 
             return Ok(MakeDto(realm, details: true));
+        }
+
+        private class Check<T>
+        {
+            public Check(Func<T, bool> checkFunc, string modelKey, string errorMsg)
+            {
+                this.CheckFunc = checkFunc;
+                this.ModelKey = modelKey;
+                this.ErrorMsg = errorMsg;
+            }
+
+            public Func<T, bool> CheckFunc { get; private set; }
+            public string ModelKey { get; private set; }
+            public string ErrorMsg { get; private set; }
+        }
+
+        [Route("{realmName}", Name = "PutRealmByName")]
+        public IHttpActionResult PutRealmByName(string realmName, RealmDto newSettings)
+        {
+            // TODO: use ETags for concurrency control
+
+            var realm = realmsService.GetRealmByName(realmName);
+
+            if (realm == null)
+            {
+                return NotFound();
+            }
+
+            if (!Request.CheckAccess(GunchoResources.RealmActions.Edit, GunchoResources.Realm, realmName))
+            {
+                return Forbidden();
+            }
+
+            var checks = new Queue<Check<Realm>>();
+            var updates = new Queue<Action<Realm>>();
+            // TODO: don't modify Realm objects, do everything through service methods (see ProfilesController)
+
+            if (newSettings.Name != null && newSettings.Name != realm.Name)
+            {
+                checks.Enqueue(new Check<Realm>(
+                    r => realmsService.IsValidNameChange(r.Name, newSettings.Name),
+                    "Name", "Invalid realm name."));
+                checks.Enqueue(new Check<Realm>(
+                    r => Request.CheckAccess(
+                        GunchoResources.RealmActions.Edit,
+                        GunchoResources.Realm, r.Name,
+                        GunchoResources.Field, GunchoResources.RealmFields.Name),
+                    "Name", "Permission denied."));
+                updates.Enqueue(r => r.Name = newSettings.Name);
+            }
+
+            if (newSettings.Owner != realm.Owner.Name)
+            {
+                checks.Enqueue(new Check<Realm>(
+                    r => Request.CheckAccess(
+                        GunchoResources.RealmActions.Edit,
+                        GunchoResources.Realm, r.Name,
+                        GunchoResources.Field, GunchoResources.RealmFields.Owner),
+                    "Owner", "Permission denied."));
+                checks.Enqueue(new Check<Realm>(
+                    r => playersService.GetPlayerByName(newSettings.Owner) != null,
+                    "Owner", "No such player."));
+                updates.Enqueue(r => r.Owner = playersService.GetPlayerByName(newSettings.Owner) ?? r.Owner);
+            }
+
+            // acl
+            if (newSettings.Acl != null && !AclEqualsDto(realm.AccessList, newSettings.Acl))
+            {
+                checks.Enqueue(new Check<Realm>(
+                    r => Request.CheckAccess(
+                        GunchoResources.RealmActions.Edit,
+                        GunchoResources.Realm, r.Name,
+                        GunchoResources.Field, GunchoResources.RealmFields.Acl),
+                    "Acl", "Permission denied."));
+                checks.Enqueue(new Check<Realm>(
+                    r => newSettings.Acl.All(e => playersService.GetPlayerByName(e.User) != null),
+                    "Acl", "No such player(s)."));
+                updates.Enqueue(r =>
+                {
+                    try
+                    {
+                        r.AccessList = DtoToAcl(newSettings.Acl);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // don't change ACL if some player names are invalid
+                    }
+                });
+            }
+
+            // privacy
+            if (newSettings.Privacy != realm.PrivacyLevel)
+            {
+                checks.Enqueue(new Check<Realm>(
+                    r => Request.CheckAccess(
+                        GunchoResources.RealmActions.Edit,
+                        GunchoResources.Realm, r.Name,
+                        GunchoResources.Field, GunchoResources.RealmFields.Privacy),
+                    "Privacy", "Permission denied."));
+                updates.Enqueue(r => r.PrivacyLevel = newSettings.Privacy);
+            }
+
+            // compiler
+            if (!CompilerEqualsFactory(newSettings.Compiler, realm.Factory))
+            {
+                checks.Enqueue(new Check<Realm>(
+                    r => realmsService.GetRealmFactories().Count(f => CompilerEqualsFactory(newSettings.Compiler, f)) == 1,
+                    "Compiler", "Invalid compiler settings."));
+                updates.Enqueue(r =>
+                    r.Factory = realmsService.GetRealmFactories().Single(f => CompilerEqualsFactory(newSettings.Compiler, f)));
+
+                // TODO: recompile realm if compiler setting is changed
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var result = realmsService.TransactionalUpdate(
+                realm,
+                r =>
+                {
+                    bool ok = true;
+
+                    foreach (var check in checks)
+                    {
+                        if (!check.CheckFunc(r))
+                        {
+                            ok = false;
+                            ModelState.AddModelError(check.ModelKey, check.ErrorMsg);
+                        }
+                    }
+
+                    if (!ok)
+                    {
+                        return false;
+                    }
+
+                    foreach (var update in updates)
+                    {
+                        update(r);
+                    }
+
+                    return true;
+                });
+
+            if (result == false)
+            {
+                return BadRequest(ModelState);
+            }
+
+            return GetRealmByName(realmName);
+        }
+
+        private RealmAccessListEntry[] DtoToAcl(IEnumerable<RealmAclEntryDto> dtos)
+        {
+            var result = new List<RealmAccessListEntry>();
+            
+            foreach (var dto in dtos)
+            {
+                var player = playersService.GetPlayerByName(dto.User);
+                if (player == null)
+                {
+                    throw new InvalidOperationException("No such player: " + dto.User);
+                }
+                result.Add(new RealmAccessListEntry(player, dto.Access));
+            }
+
+            return result.ToArray();
+        }
+
+        private bool AclEqualsDto(RealmAccessListEntry[] acl, IEnumerable<RealmAclEntryDto> dto)
+        {
+            var dtoByName = dto.ToDictionary(e => e.User);
+
+            return acl.Length == dtoByName.Count && acl.All(entry =>
+            {
+                RealmAclEntryDto matchingDto;
+                return dtoByName.TryGetValue(entry.Player.Name, out matchingDto) && matchingDto.Access == entry.Level;
+            });
+        }
+
+        private bool CompilerEqualsFactory(CompilerOptionsDto dto, RealmFactory factory)
+        {
+            // TODO: support factory languages other than Inform 7
+            return dto.Language == "Inform 7" && factory.Name == dto.Version;
+        }
+
+        [Route("", Name = "PostNewRealm")]
+        public IHttpActionResult PostNewRealm(RealmDto newRealm)
+        {
+            if (!Request.CheckAccess(GunchoResources.RealmActions.Create, GunchoResources.Realm, newRealm.Name))
+            {
+                return Forbidden();
+            }
+
+            //XXX
+            throw new NotImplementedException();
         }
 
         [Route("compilers")]

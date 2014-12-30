@@ -17,6 +17,10 @@ namespace Guncho.Services
         Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream);
 
         IEnumerable<RealmFactory> GetRealmFactories();
+
+        bool IsValidNameChange(string oldName, string newName);
+
+        bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction);
     }
 
     [ContractClassFor(typeof(IRealmsService))]
@@ -46,6 +50,20 @@ namespace Guncho.Services
             Contract.Requires(bodyStream != null);
             Contract.Ensures(Contract.Result<Task<RealmEditingOutcome>>() != null);
             return default(Task<RealmEditingOutcome>);
+        }
+
+        public bool IsValidNameChange(string oldName, string newName)
+        {
+            Contract.Requires(oldName != null);
+            Contract.Requires(newName != null);
+            return default(bool);
+        }
+
+        public bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        {
+            Contract.Requires(realm != null);
+            Contract.Requires(transaction != null);
+            return default(bool);
         }
     }
 }

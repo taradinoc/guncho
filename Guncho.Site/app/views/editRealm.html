@@ -78,7 +78,14 @@
                             </tfoot>
                         </table>
                     </fieldset>
-                    <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!settingsForm.loaded">Save settings</button>
+                    <div class="form-group">
+                        <div class="col-sm-12">
+                            <button class="btn btn-primary" ng-click="saveSettings()" ng-disabled="!settingsForm.loaded">Save settings</button>
+                        </div>
+                    </div>
+                    <div ng-hide="!settingsForm.message" ng-class="(settingsForm.savedSuccessfully) ? 'alert alert-success' : 'alert alert-danger'">
+                        {{settingsForm.message}}
+                    </div>
                 </form>
 
             </tab>

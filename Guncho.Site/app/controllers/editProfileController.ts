@@ -334,7 +334,7 @@ class EditProfileController {
             $scope.character.profile.attributes['pronouns_1p'] = packPronouns($scope.character.pronouns_1p);
             $scope.character.profile.attributes['pronouns_2p'] = packPronouns($scope.character.pronouns_2p);
             $scope.character.profile.attributes['pronouns_3p'] = packPronouns($scope.character.pronouns_3p);
-            $scope.character.profile.$update().then(
+            $scope.character.profile.$update(
                 () => {
                     // success
                     $scope.character.savedSuccessfully = true;
