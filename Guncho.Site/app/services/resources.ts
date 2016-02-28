@@ -22,12 +22,20 @@ interface IRuntimeOptions {
 }
 
 interface IRealmResource extends IRealm, ng.resource.IResource<IRealm> {
+    $create(): ng.IPromise<IRealm>;
+    $create(params?: Object, success?: Function, error?: Function): ng.IPromise<IRealm>;
+    $create(success: Function, error?: Function): ng.IPromise<IRealm>;
+
     $update(): ng.IPromise<IRealm>;
     $update(params?: Object, success?: Function, error?: Function): ng.IPromise<IRealm>;
     $update(success: Function, error?: Function): ng.IPromise<IRealm>;
 }
 
 interface IRealmResourceClass extends ng.resource.IResourceClass<IRealmResource> {
+    create(data: IRealm): IRealmResource;
+    create(data: IRealm, params?: Object, success?: Function, error?: Function): IRealmResource;
+    create(data: IRealm, success: Function, error?: Function): IRealmResource;
+
     update(data: IRealm): IRealmResource;
     update(data: IRealm, params?: Object, success?: Function, error?: Function): IRealmResource;
     update(data: IRealm, success: Function, error?: Function): IRealmResource;
@@ -44,6 +52,7 @@ function RealmResourceFactory($resource: ng.resource.IResourceService, serviceBa
         serviceBase + '/realms/:name',
         { name: '@name' },
         {
+            create: { method: 'POST', url: serviceBase + '/realms' },
             update: { method: 'PUT' },
             queryMy: {
                 method: 'GET', params: { name: 'my' }, isArray: true

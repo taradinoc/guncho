@@ -10,7 +10,7 @@
     <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
-    <TypeScriptToolsVersion>1.0</TypeScriptToolsVersion>
+    <TypeScriptToolsVersion>1.7</TypeScriptToolsVersion>
     <UseIISExpress>true</UseIISExpress>
     <IISExpressSSLPort />
     <IISExpressAnonymousAuthentication />
@@ -19,6 +19,7 @@
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <RestorePackages>true</RestorePackages>
+    <UseGlobalApplicationHostFile />
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="app\directives\glkGameport.html" />
@@ -54,6 +55,7 @@
     <EmbeddedResource Include="scripts\ui-utils.min.js" />
     <EmbeddedResource Include="app\views\signUp.html" />
     <EmbeddedResource Include="app\views\editProfile.html" />
+    <EmbeddedResource Include="app\views\newRealm.html" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -70,7 +72,8 @@
     <EmbeddedResource Include="app\services\playService.ts" />
     <EmbeddedResource Include="app\services\resources.ts" />
     <EmbeddedResource Include="app\controllers\signUpController.ts" />
-    <TypeScriptCompile Include="app\controllers\editProfileController.ts" />
+    <EmbeddedResource Include="app\controllers\editProfileController.ts" />
+    <EmbeddedResource Include="app\controllers\newRealmController.ts" />
     <TypeScriptCompile Include="master.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />

@@ -5,6 +5,10 @@ function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         templateUrl: "/app/views/credits.html"
     });
 
+    //$routeProvider.when("/about", {
+    //    templateUrl: "/app/views/about.html"
+    //});
+
     $routeProvider.when("/home", {
         templateUrl: "/app/views/home.html"
     });
@@ -24,25 +28,19 @@ function configureRoutes($routeProvider: ng.route.IRouteProvider) {
         templateUrl: "/app/views/editProfile.html"
     });
 
-    $routeProvider.when("/realms", {
+    $routeProvider.when("/realms/list/:query", {
         controller: "listRealmsController",
         templateUrl: "/app/views/listRealms.html",
-        resolve: {
-            filter: (): IListRealmsFilter => ({})
-        }
     });
 
-    $routeProvider.when("/realms/my", {
-        controller: "listRealmsController",
-        templateUrl: "/app/views/listRealms.html",
-        resolve: {
-            filter: (): IListRealmsFilter => ({ ownedByActor: true })
-        }
-    });
-
-    $routeProvider.when("/realms/:realmName", {
+    $routeProvider.when("/realms/edit/:realmName", {
         controller: "editRealmController",
         templateUrl: "/app/views/editRealm.html"
+    });
+
+    $routeProvider.when("/realms/new", {
+        controller: "newRealmController",
+        templateUrl: "/app/views/newRealm.html"
     });
 
     $routeProvider.when("/signup", {

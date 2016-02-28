@@ -21,6 +21,7 @@
 /// <reference path="app/controllers/playController.ts" />
 /// <reference path="app/controllers/signUpController.ts" />
 /// <reference path="app/controllers/editProfileController.ts" />
+/// <reference path="app/controllers/newRealmController.ts" />
 /// <reference path="app/directives/glkGameport.ts" />
 /// <reference path="app/services/authInterceptorService.ts" />
 /// <reference path="app/services/authService.ts" />

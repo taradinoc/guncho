@@ -716,6 +716,50 @@ namespace Guncho
             return result;
         }
 
+        public Realm CreateRealm(Player newOwner, string newName, RealmFactory factory)
+        {
+#if COVERUP
+            // no realm creation in coverup mode
+            return null;
+#else
+            string key = newName.ToLower();
+
+            lock (realms)
+            {
+                if (!IsValidRealmName(newName))
+                    return null;
+
+                if (realms.ContainsKey(key))
+                    return null;
+
+                // enforce limit on number of realms per player
+                if (!newOwner.IsAdmin)
+                {
+                    int count = 0;
+                    foreach (Realm r in realms.Values)
+                        if (r.Owner == newOwner)
+                            count++;
+
+                    if (count >= Properties.Settings.Default.MaxRealmsPerPlayer)
+                        return null;
+                }
+
+                string source = NewSourceFileName(newOwner.Name, newName, factory.SourceFileExtension);
+                File.WriteAllText(source, factory.GetInitialSourceText(newOwner.Name, newName));
+                try
+                {
+                    LoadRealm(newName, source, factory.Name, newOwner);
+                }
+                catch
+                {
+                    return null;
+                }
+                SaveRealms();
+                return GetRealm(newName);
+            }
+#endif
+        }
+
         public async Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream newSource)
         {
             // TODO: enforce access controls (ownership, condemned realms)
@@ -987,54 +1031,6 @@ namespace Guncho
                 return false;
 
             return true;
-        }
-
-        public Realm CreateRealm(Player newOwner, string newName, string newFactoryName)
-        {
-#if COVERUP
-            // no realm creation in coverup mode
-            return null;
-#else
-            string key = newName.ToLower();
-
-            lock (realms)
-            {
-                if (!IsValidRealmName(newName))
-                    return null;
-
-                if (realms.ContainsKey(key))
-                    return null;
-
-                RealmFactory factory;
-                if (factories.TryGetValue(newFactoryName, out factory) == false)
-                    return null;
-
-                // enforce limit on number of realms per player
-                if (!newOwner.IsAdmin)
-                {
-                    int count = 0;
-                    foreach (Realm r in realms.Values)
-                        if (r.Owner == newOwner)
-                            count++;
-
-                    if (count >= Properties.Settings.Default.MaxRealmsPerPlayer)
-                        return null;
-                }
-
-                string source = NewSourceFileName(newOwner.Name, newName, factory.SourceFileExtension);
-                File.WriteAllText(source, factory.GetInitialSourceText(newOwner.Name, newName));
-                try
-                {
-                    LoadRealm(newName, source, newFactoryName, newOwner);
-                }
-                catch
-                {
-                    return null;
-                }
-                SaveRealms();
-                return GetRealm(newName);
-            }
-#endif
         }
 
         public bool DeleteRealm(Realm realm)

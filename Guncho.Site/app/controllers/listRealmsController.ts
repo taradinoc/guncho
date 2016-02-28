@@ -5,21 +5,25 @@ interface IListRealmsControllerScope {
     realms: IRealmResource[];
 }
 
-interface IListRealmsFilter {
-    ownedByActor?: boolean;
-}
-
 class ListRealmsController {
-    public static $inject = ['$scope', 'Realm', 'filter'];
-    constructor($scope: IListRealmsControllerScope, Realm: IRealmResourceClass,
-        filter: IListRealmsFilter) {
+    public static $inject = [
+        '$scope', '$routeParams',
+        'Realm'
+    ];
+    constructor($scope: IListRealmsControllerScope, $routeParams: ng.route.IRouteParamsService,
+        Realm: IRealmResourceClass) {
 
-        if (filter && filter.ownedByActor) {
-            $scope.heading = "My Realms";
-            $scope.realms = Realm.queryMy();
-        } else {
-            $scope.heading = "All Realms";
-            $scope.realms = Realm.query();
+        var query = 'query' in $routeParams ? $routeParams['query'] : '';
+        switch (query) {
+            case 'my':
+                $scope.heading = "My Realms";
+                $scope.realms = Realm.queryMy();
+                break;
+
+            default:
+                $scope.heading = "All Realms";
+                $scope.realms = Realm.query();
+                break;
         }
     }
 }

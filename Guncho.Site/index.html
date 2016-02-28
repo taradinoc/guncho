@@ -32,7 +32,7 @@
                             <span class="label label-danger label-as-badge" ng-bind="pendingMsgCount.highPriority" ng-show="pendingMsgCount.highPriority"></span>
                         </a>
                     </li>
-                    <li ng-hide="!authentication.isAuth"><a href="#/realms/my">My Realms</a></li>
+                    <li ng-hide="!authentication.isAuth"><a href="#/realms/list/my">My Realms</a></li>
                     <li ng-hide="!authentication.isAuth" class="dropdown" dropdown>
                         <a href="" class="dropdown-toggle" dropdown-toggle>{{ authentication.userName }} <span class="caret"></span></a>
                         <ul class="dropdown-menu" role="menu">

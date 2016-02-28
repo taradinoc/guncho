@@ -41,7 +41,14 @@ namespace Guncho.Api.Security
 
         private Task<bool> CheckRealmAccessAsync(ResourceAuthorizationContext context)
         {
+            var action = context.Action.First().Value;
             var realmName = context.Resource.Skip(1).Take(1).Single().Value;
+
+            if (action == GunchoResources.RealmActions.Create)
+            {
+                return CheckRealmCreateAccessAsync(context, realmName);
+            }
+
             var realm = realmsService.GetRealmByName(realmName);
             if (realm == null)
             {
@@ -55,13 +62,8 @@ namespace Guncho.Api.Security
                 return CheckRealmAssetAccessAsync(context, realm, asset);
             }
 
-            var action = context.Action.First().Value;
-
             switch (action)
             {
-                case GunchoResources.RealmActions.Create:
-                    return CheckRealmCreateAccessAsync(context, realm);
-
                 case GunchoResources.RealmActions.EnableDisable:
                     return CheckRealmEnableDisableAccessAsync(context, realm);
 
@@ -126,7 +128,7 @@ namespace Guncho.Api.Security
             return Eval(actor != null && (actor == realm.Owner || actor.IsAdmin));
         }
 
-        private Task<bool> CheckRealmCreateAccessAsync(ResourceAuthorizationContext context, Realm realm)
+        private Task<bool> CheckRealmCreateAccessAsync(ResourceAuthorizationContext context, string realmName)
         {
             var actor = GetActor(context);
             return Eval(actor != null && !actor.IsGuest);

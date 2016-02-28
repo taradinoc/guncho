@@ -12,5 +12,8 @@ namespace Guncho
         public int WebPort { get; set; }
         public string CachePath { get; set; }
         public string IndexPath { get; set; }
+
+        public string DefaultCompilerLanguage { get; set; }
+        public string DefaultCompilerVersion { get; set; }
     }
 }

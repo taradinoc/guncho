@@ -14,6 +14,7 @@ namespace Guncho.Services
     {
         IEnumerable<Realm> GetAllRealms();
         Realm GetRealmByName(string name);
+        Realm CreateRealm(Player owner, string name, RealmFactory factory);
         Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream);
 
         IEnumerable<RealmFactory> GetRealmFactories();
@@ -35,6 +36,17 @@ namespace Guncho.Services
         public Realm GetRealmByName(string name)
         {
             Contract.Requires(name != null);
+            return default(Realm);
+        }
+
+        public Realm CreateRealm(Player player, string name, RealmFactory factory)
+        {
+            Contract.Requires(player != null);
+            Contract.Requires(!string.IsNullOrWhiteSpace(name));
+            Contract.Requires(factory != null);
+            Contract.Ensures
+                (Contract.Result<Realm>() == null ||
+                (Contract.Result<Realm>().Factory == factory && Contract.Result<Realm>().Name == name));
             return default(Realm);
         }
 

@@ -20,7 +20,7 @@ class LoginController {
         $scope.login = () => {
             authService.login($scope.loginData).then(
                 response => {
-                    $location.path('/realms/my');
+                    $location.path('/realms/list/my');
                 },
                 err => {
                     $scope.message = err.error_description;

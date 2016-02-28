@@ -4,14 +4,17 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net.Http;
 using System.Web.Http;
+using System.Web.Http.Results;
 
 namespace Guncho.Api.Controllers
 {
     public sealed class RealmDto
     {
+        [Required]
         public string Name;
         public string Owner;
         public string Uri;
@@ -24,13 +27,17 @@ namespace Guncho.Api.Controllers
 
     public sealed class RealmAclEntryDto
     {
+        [Required]
         public string User;
+        [Required]
         public RealmAccessLevel Access;
     }
 
     public sealed class CompilerOptionsDto
     {
+        [Required]
         public string Language;
+        [Required]
         public string Version;
         public IEnumerable<RuntimeOptionsDto> SupportedRuntimes;
     }
@@ -45,11 +52,13 @@ namespace Guncho.Api.Controllers
     {
         private readonly IRealmsService realmsService;
         private readonly IPlayersService playersService;
+        private readonly ServerConfig config;
 
-        public RealmsController(IRealmsService realmsService, IPlayersService playersService)
+        public RealmsController(IRealmsService realmsService, IPlayersService playersService, ServerConfig config)
         {
             this.realmsService = realmsService;
             this.playersService = playersService;
+            this.config = config;
         }
 
         private RealmDto MakeDto(Realm r, bool details = false)
@@ -313,13 +322,69 @@ namespace Guncho.Api.Controllers
         [Route("", Name = "PostNewRealm")]
         public IHttpActionResult PostNewRealm(RealmDto newRealm)
         {
+            // verify permission
             if (!Request.CheckAccess(GunchoResources.RealmActions.Create, GunchoResources.Realm, newRealm.Name))
             {
                 return Forbidden();
             }
 
-            //XXX
-            throw new NotImplementedException();
+            // fill in defaults
+            if (newRealm.Compiler == null)
+            {
+                newRealm.Compiler = new CompilerOptionsDto()
+                {
+                    Language = config.DefaultCompilerLanguage,
+                    Version = config.DefaultCompilerVersion,
+                };
+            }
+
+            newRealm.Owner = User.Identity.Name;
+
+            // validate request
+            var factory = realmsService.GetRealmFactories().SingleOrDefault(f => CompilerEqualsFactory(newRealm.Compiler, f));
+
+            if (factory == null)
+            {
+                ModelState.AddModelError("Compiler", "Invalid compiler settings.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (realmsService.GetRealmByName(newRealm.Name) != null)
+            {
+                return Conflict();
+            }
+
+            // create the realm
+            var realm = realmsService.CreateRealm(playersService.GetPlayerByName(User.Identity.Name), newRealm.Name, factory);
+
+            if (realm == null)
+            {
+                // that's weird!
+                if (realmsService.GetRealmByName(newRealm.Name) != null)
+                {
+                    return Conflict();
+                }
+                else
+                {
+                    return BadRequest(ModelState);
+                }
+            }
+
+            // invoke the PUT handler to update any other settings
+            var innerResult = PutRealmByName(newRealm.Name, newRealm) as OkNegotiatedContentResult<RealmDto>;
+
+            if (innerResult != null)
+            {
+                // TODO: if PUT failed, delete the realm and return an error
+                return Created(Url.Link("GetRealmByName", new { realmName = newRealm.Name }), innerResult.Content);
+            }
+
+            innerResult = GetRealmByName(newRealm.Name) as OkNegotiatedContentResult<RealmDto>;
+            return Created(Url.Link("GetRealmByName", new { realmName = newRealm.Name }), GetRealmByName(newRealm.Name));
         }
 
         [Route("compilers")]

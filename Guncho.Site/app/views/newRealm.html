@@ -1,0 +1,28 @@
+﻿<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <h1>Create New Realm</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <p>To create a new realm, first give it a unique name. This name will be visible to everyone, and players may have to type it to enter the realm.</p>
+
+        <p>You'll be able to change other settings and edit the realm's code on the next screen.</p>
+
+        <form name="newRealmForm" class="form-horizontal" ng-submit="createRealm()" novalidate>
+            <div class="form-group">
+                <label for="realmName" class="col-sm-2 control-label">Name:</label>
+                <div class="col-sm-6">
+                    <input id="realmName" class="form-control" type="text" ng-model="newRealm.name" required />
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" ng-disabled="newRealmForm.submitting">
+                <span ng-hide="newRealmForm.submitting">Create</span>
+                <span ng-hide="!newRealmForm.submitting">Creating, please wait...</span>
+            </button>
+            <div ng-hide="!newRealmForm.message" class="alert alert-danger">
+                {{newRealmForm.message}}
+            </div>
+        </form>
+    </div>
+</div>

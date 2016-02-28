@@ -86,6 +86,8 @@ namespace Guncho
                 WebPort = webPort,
                 CachePath = Properties.Settings.Default.CachePath,
                 IndexPath = Path.Combine(Properties.Settings.Default.CachePath, "Index"),
+                DefaultCompilerLanguage = "Inform 7",
+                DefaultCompilerVersion = "5Z71",
             };
 
             // register auth classes
