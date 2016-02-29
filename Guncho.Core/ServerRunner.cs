@@ -91,15 +91,15 @@ namespace Guncho
             };
 
             // register auth classes
-            container.Register<IUserStore<ApiUser, int>, OldTimeyUserStore>();
-            container.RegisterSingle<IPasswordHasher, OldTimeyPasswordHasher>();
-            container.Register<UserManager<ApiUser, int>>();
+            container.RegisterSingleton<IUserStore<ApiUser, int>, OldTimeyUserStore>();
+            container.RegisterSingleton<IPasswordHasher, OldTimeyPasswordHasher>();
+            container.RegisterWebApiRequest<UserManager<ApiUser, int>>();
             container.RegisterInitializer<UserManager<ApiUser, int>>(
                 um =>
                 {
                     um.PasswordHasher = container.GetInstance<IPasswordHasher>();
                 });
-            container.RegisterSingle<IResourceAuthorizationManager, GunchoResourceAuthorization>();
+            container.RegisterSingleton<IResourceAuthorizationManager, GunchoResourceAuthorization>();
 
             var savedSecret = Properties.Settings.Default.WebAuthSecret;
             byte[] secretBytes;
@@ -117,8 +117,8 @@ namespace Guncho
             {
                 secretBytes = Convert.FromBase64String(Properties.Settings.Default.WebAuthSecret);
             }
-            container.RegisterSingle<IDataProtectionProvider>(new GunchoDataProtectionProvider(secretBytes));
-            container.RegisterSingle<ISecureDataFormat<AuthenticationTicket>>(new GunchoTicketFormat(secretBytes));
+            container.RegisterSingleton<IDataProtectionProvider>(new GunchoDataProtectionProvider(secretBytes));
+            container.RegisterSingleton<ISecureDataFormat<AuthenticationTicket>>(new GunchoTicketFormat(secretBytes));
 
             // register server classes
             var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
@@ -132,12 +132,13 @@ namespace Guncho
                     s.ResourceAuthorizationManager = new GunchoResourceAuthorization(s, s);
                 });
 
-            container.RegisterSingle<ServerConfig>(serverConfig);
-            container.RegisterSingle<ILogger>(logger);
-            container.RegisterSingle<IWebDependencyResolver, SimpleInjectorWebApiDependencyResolver>();
-            container.RegisterSingle<ISignalRDependencyResolver, SimpleInjectorSignalRDependencyResolver>();
+            container.RegisterSingleton<ServerConfig>(serverConfig);
+            container.RegisterSingleton<ILogger>(logger);
+            container.RegisterSingleton<IWebDependencyResolver>(new SimpleInjectorWebApiDependencyResolver(container));
+            container.RegisterSingleton<ISignalRDependencyResolver, SimpleInjectorSignalRDependencyResolver>();
 
             // register API controller classes
+            // TODO: use container.RegisterWebApiControllers()
             var webApiLifestyle = new WebApiRequestLifestyle();
             var controllerTypes = from t in typeof(ServerRunner).Assembly.GetTypes()
                                   where !t.IsAbstract && typeof(ApiController).IsAssignableFrom(t)
@@ -148,19 +149,19 @@ namespace Guncho
             }
 
             // register SignalR hub and utility classes
-            container.RegisterSingle<ISignalRConnectionManager, SignalRConnectionManager>();
-            container.Register<PlayHub>();
+            container.RegisterSingleton<ISignalRConnectionManager, SignalRConnectionManager>();
+            container.RegisterSingleton<PlayHub>();
 
             // register realm factory classes
             var informRealmFactories = InformRealmFactory.ConstructAll(
                 logger: logger,
                 installationsPath: Properties.Settings.Default.NiInstallationsPath,
                 indexOutputDir: serverConfig.IndexPath);
-            container.RegisterAll<InformRealmFactory>(informRealmFactories);
+            container.RegisterCollection<InformRealmFactory>(informRealmFactories);
 
             var allRealmFactories = new List<RealmFactory>();
             allRealmFactories.AddRange(informRealmFactories);
-            container.RegisterAll<RealmFactory>(allRealmFactories);
+            container.RegisterCollection<RealmFactory>(allRealmFactories);
 
             container.Verify();
 
