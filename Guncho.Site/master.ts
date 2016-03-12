@@ -4,6 +4,7 @@
 /// <reference path="scripts/typings/jquery/jquery.d.ts" />
 /// <reference path="scripts/typings/signalr/signalr.d.ts" />
 /// <reference path="scripts/typings/glkote/glkote.d.ts" />
+/// <reference path="scripts/typings/es6-promise/es6-promise.d.ts" />
 /// <reference path="scripts/typings/angularjs/angular-route.d.ts" />
 /// <reference path="scripts/typings/angularjs/angular-resource.d.ts" />
 /// <reference path="scripts/typings/angularjs/angular-mocks.d.ts" />

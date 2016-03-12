@@ -1,4 +1,3 @@
-/* tslint:disable */
 // Type definitions for SignalR 1.0
 // Project: http://www.asp.net/signalr
 // Definitions by: Boris Yankov <https://github.com/borisyankov/>, T. Michael Keesey <https://github.com/keesey/>
@@ -61,7 +60,7 @@ interface SignalR {
 
     starting(handler: () => void ): SignalR;
     received(handler: (data: any) => void ): SignalR;
-    error(handler: (error: string) => void ): SignalR;
+    error(handler: (error: Error) => void ): SignalR;
     stateChanged(handler: (change: SignalRStateChange) => void ): SignalR;
     disconnected(handler: () => void ): SignalR;
     connectionSlow(handler: () => void ): SignalR;
@@ -91,6 +90,7 @@ interface HubConnectionSettings {
 interface HubConnection extends SignalR {
     //(url?: string, queryString?: any, logging?: boolean): HubConnection;
     proxies: any;
+    transport: { name: string, supportsKeepAlive: () => boolean };
     received(callback: (data: { Id: any; Method: any; Hub: any; State: any; Args: any; }) => void ): HubConnection;
     createHubProxy(hubName: string): HubProxy;
 }
@@ -109,5 +109,5 @@ interface ConnectionSettings {
 interface JQueryStatic {
     signalR: SignalR;
     connection: SignalR;
-    hubConnection(url?: string, queryString?: any, logging?: boolean): HubConnection;
+    hubConnection(url?: string, options?: HubConnectionSettings): HubConnection;
 }

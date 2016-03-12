@@ -1,4 +1,3 @@
-/* tslint:disable */
 // Type definitions for AngularLocalStorage 0.1.7
 // Project: https://github.com/agrublev/angularLocalStorage
 // Definitions by: Horiuchi_H <https://github.com/horiuchi/>
@@ -6,7 +5,7 @@
 
 /// <reference path="../angularjs/angular.d.ts"/>
 
-declare module ng.localStorage {
+declare module angular.localStorage {
   interface ILocalStorageService {
     set(key: string, value: any): any;
     get(key: string): any;

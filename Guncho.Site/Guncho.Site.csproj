@@ -43,12 +43,8 @@
     <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.eot" />
     <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.ttf" />
     <EmbeddedResource Include="scripts\angular-resource.min.js" />
-    <EmbeddedResource Include="scripts\jquery-2.1.1.intellisense.js" />
     <EmbeddedResource Include="scripts\glkote.js" />
-    <EmbeddedResource Include="scripts\jquery-2.1.1.js" />
-    <EmbeddedResource Include="scripts\jquery-2.1.1.min.js" />
     <EmbeddedResource Include="scripts\jquery.signalR-2.1.2.js" />
-    <EmbeddedResource Include="scripts\jquery.signalR-2.1.2.min.js" />
     <EmbeddedResource Include="scripts\loading-bar.js" />
     <EmbeddedResource Include="scripts\loading-bar.min.js" />
     <EmbeddedResource Include="scripts\ui-bootstrap-tpls-0.12.0.min.js" />
@@ -56,6 +52,11 @@
     <EmbeddedResource Include="app\views\signUp.html" />
     <EmbeddedResource Include="app\views\editProfile.html" />
     <EmbeddedResource Include="app\views\newRealm.html" />
+    <Content Include="packages.config" />
+    <EmbeddedResource Include="scripts\jquery-2.2.1.js" />
+    <EmbeddedResource Include="scripts\jquery-2.2.1.min.js" />
+    <EmbeddedResource Include="scripts\jquery.signalR-2.2.0.js" />
+    <EmbeddedResource Include="scripts\jquery.signalR-2.2.0.min.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -76,6 +77,7 @@
     <EmbeddedResource Include="app\controllers\newRealmController.ts" />
     <TypeScriptCompile Include="master.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-animate.d.ts" />
+    <TypeScriptCompile Include="scripts\typings\angularjs\angular-component-router.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-cookies.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-mocks.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-resource.d.ts" />
@@ -84,19 +86,19 @@
     <TypeScriptCompile Include="scripts\typings\angularjs\angular-scenario.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularjs\angular.d.ts" />
     <TypeScriptCompile Include="scripts\typings\angularLocalStorage\angularLocalStorage.d.ts" />
+    <TypeScriptCompile Include="scripts\typings\es6-promise\es6-promise.d.ts" />
     <TypeScriptCompile Include="scripts\typings\glkote\glkote.d.ts" />
     <TypeScriptCompile Include="scripts\typings\jquery\jquery.d.ts" />
     <TypeScriptCompile Include="scripts\typings\signalr\signalr.d.ts" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="packages.config" />
     <EmbeddedResource Include="scripts\loading-bar.min.js.map">
       <DependentUpon>loading-bar.min.js</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="content\fonts\glyphicons-halflings-regular.woff" />
-    <EmbeddedResource Include="scripts\jquery-2.1.1.min.map" />
     <EmbeddedResource Include="app\app.js.map" />
     <EmbeddedResource Include="scripts\angular-resource.min.js.map" />
+    <EmbeddedResource Include="scripts\jquery-2.2.1.min.map" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

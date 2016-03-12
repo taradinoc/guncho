@@ -18,7 +18,7 @@ class AuthInterceptorService implements IAuthInterceptorService {
 
             var authData: IAuthorizationData = localStorageService.get('authorizationData');
             if (authData) {
-                config.headers.Authorization = 'Bearer ' + authData.token;
+                config.headers['Authorization'] = 'Bearer ' + authData.token;
             }
 
             return config;
