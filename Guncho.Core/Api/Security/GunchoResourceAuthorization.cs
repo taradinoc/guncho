@@ -213,7 +213,7 @@ namespace Guncho.Api.Security
             {
                 case GunchoResources.AttributeActions.Delete:
                 case GunchoResources.AttributeActions.Edit:
-                    return Eval(actor == victim || actor.IsAdmin);
+                    return Eval(actor != null && (actor == victim || actor.IsAdmin));
 
                 case GunchoResources.AttributeActions.View:
                     return Ok();

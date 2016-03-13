@@ -15,36 +15,36 @@ namespace Guncho.Api.Controllers
     public sealed class RealmDto
     {
         [Required]
-        public string Name;
-        public string Owner;
-        public string Uri;
-        public CompilerOptionsDto Compiler;
-        public RuntimeOptionsDto Runtime;
-        public string ManifestUri;
-        public RealmPrivacyLevel Privacy;
-        public IEnumerable<RealmAclEntryDto> Acl;
+        public string Name { get; set; }
+        public string Owner { get; set; }
+        public string Uri { get; set; }
+        public CompilerOptionsDto Compiler { get; set; }
+        public RuntimeOptionsDto Runtime { get; set; }
+        public string ManifestUri { get; set; }
+        public RealmPrivacyLevel Privacy { get; set; }
+        public IEnumerable<RealmAclEntryDto> Acl { get; set; }
     }
 
     public sealed class RealmAclEntryDto
     {
         [Required]
-        public string User;
+        public string User { get; set; }
         [Required]
-        public RealmAccessLevel Access;
+        public RealmAccessLevel Access { get; set; }
     }
 
     public sealed class CompilerOptionsDto
     {
         [Required]
-        public string Language;
+        public string Language { get; set; }
         [Required]
-        public string Version;
-        public IEnumerable<RuntimeOptionsDto> SupportedRuntimes;
+        public string Version { get; set; }
+        public IEnumerable<RuntimeOptionsDto> SupportedRuntimes { get; set; }
     }
 
     public sealed class RuntimeOptionsDto
     {
-        public string Platform;
+        public string Platform { get; set; }
     }
 
     [RoutePrefix("api/realms")]
@@ -288,7 +288,7 @@ namespace Guncho.Api.Controllers
         private RealmAccessListEntry[] DtoToAcl(IEnumerable<RealmAclEntryDto> dtos)
         {
             var result = new List<RealmAccessListEntry>();
-            
+
             foreach (var dto in dtos)
             {
                 var player = playersService.GetPlayerByName(dto.User);

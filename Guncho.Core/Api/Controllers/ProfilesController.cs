@@ -12,12 +12,13 @@ namespace Guncho.Api.Controllers
 {
     public class ProfileDto
     {
-        public string Name;
-        public string Uri;
-        public IDictionary<string, string> Attributes;
+        public string Name { get; set; }
+        public string Uri { get; set; }
+        public IDictionary<string, string> Attributes { get; set; }
     }
 
     [RoutePrefix("api/profiles")]
+    [Authorize]
     public sealed class ProfilesController : GunchoApiController
     {
         private static readonly string[] writableAttributes =
@@ -94,6 +95,13 @@ namespace Guncho.Api.Controllers
                 return NotFound();
             }
 
+            if (!Request.CheckAccess(
+                    GunchoResources.UserActions.Edit,
+                    GunchoResources.User, player.Name))
+            {
+                return Forbidden();
+            }
+
             var checks = new Queue<Func<Player, bool>>();
             var updates = new Queue<Action<Player>>();
             // TODO: don't modify Player objects, do everything through service methods
@@ -134,7 +142,7 @@ namespace Guncho.Api.Controllers
                     {
                         checks.Enqueue(p =>
                             Request.CheckAccess(
-                                GunchoResources.AttributeActions.Delete,
+                                GunchoResources.AttributeActions.Edit,
                                 GunchoResources.User, p.Name,
                                 GunchoResources.Attribute, key));
                     }

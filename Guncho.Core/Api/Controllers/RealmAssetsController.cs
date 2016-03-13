@@ -14,31 +14,31 @@ namespace Guncho.Api.Controllers
 {
     public class AssetManifestDto
     {
-        public int Version;
-        public string HistoryUri;
-        public IEnumerable<AssetRefDto> Assets;
+        public int Version { get; set; }
+        public string HistoryUri { get; set; }
+        public IEnumerable<AssetRefDto> Assets { get; set; }
     }
 
     public class AssetRefDto
     {
-        public string Path;
-        public int Version;
-        public string Uri;
-        public string ContentType;
-        public string HistoryUri;
+        public string Path { get; set; }
+        public int Version { get; set; }
+        public string Uri { get; set; }
+        public string ContentType { get; set; }
+        public string HistoryUri { get; set; }
     }
 
     public class HistoryDto
     {
-        public int LatestVersion;
-        public IDictionary<int, HistoryEntryDto> Versions;
+        public int LatestVersion { get; set; }
+        public IDictionary<int, HistoryEntryDto> Versions { get; set; }
     }
 
     public class HistoryEntryDto
     {
-        public string Uri;
-        public DateTime Created;
-        public string Creator;
+        public string Uri { get; set; }
+        public DateTime Created { get; set; }
+        public string Creator { get; set; }
     }
 
     [RoutePrefix("api/realms/{realmName}")]

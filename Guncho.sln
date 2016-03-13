@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "XML Index Files", "XML Index Files", "{A26671B1-FE12-4B02-A86C-B3879BD63905}"
 	ProjectSection(SolutionItems) = preProject
@@ -33,6 +33,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{386461
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Guncho.Api.Tests", "Guncho.Api.Tests\Guncho.Api.Tests.csproj", "{420029C3-557E-42DA-965B-4E4AD3D97E9C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,6 +61,10 @@ Global
 		{566757E1-9BE4-4086-9BE8-02C914E01062}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{566757E1-9BE4-4086-9BE8-02C914E01062}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{566757E1-9BE4-4086-9BE8-02C914E01062}.Release|Any CPU.Build.0 = Release|Any CPU
+		{420029C3-557E-42DA-965B-4E4AD3D97E9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{420029C3-557E-42DA-965B-4E4AD3D97E9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{420029C3-557E-42DA-965B-4E4AD3D97E9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{420029C3-557E-42DA-965B-4E4AD3D97E9C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

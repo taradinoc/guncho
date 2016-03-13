@@ -17,9 +17,9 @@ namespace Guncho.Api.Controllers
     {
         [Required, MinLength(3), MaxLength(16)]
         [RegularExpression(PlayersServiceConstants.UserNameRegexPattern)]
-        public string UserName;
+        public string UserName { get; set; }
         [Required, MinLength(8)]
-        public string Password;
+        public string Password { get; set; }
     }
 
     public class PasswordChangeDto
