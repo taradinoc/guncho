@@ -24,7 +24,7 @@ A PC has indexed text called the mud-name. Rule for printing the name of a PC (c
 The description of a PC is "[possibly customized description of the item described]".
 
 After examining a PC (this is the list PC possessions after examining rule):
-    if the noun is wearing something, say "[The noun] is wearing [a list of things worn by the noun.";
+    if the noun is wearing something, say "[The noun] is wearing [a list of things worn by the noun].";
     if the noun is carrying something, say "[The noun] is carrying [a list of things carried by the noun]."
 
 To say possibly customized description of (victim - PC):
