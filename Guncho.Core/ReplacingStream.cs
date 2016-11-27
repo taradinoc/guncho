@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Guncho
 {
@@ -77,6 +79,11 @@ namespace Guncho
             stream.Flush();
         }
 
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            return stream.FlushAsync(cancellationToken);
+        }
+
         public override long Length
         {
             get { return stream.Length; }
@@ -93,6 +100,21 @@ namespace Guncho
             return stream.Read(buffer, offset, count);
         }
 
+        public override IAsyncResult BeginRead(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        {
+            return stream.BeginRead(buffer, offset, count, callback, state);
+        }
+
+        public override int EndRead(IAsyncResult asyncResult)
+        {
+            return stream.EndRead(asyncResult);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            return stream.ReadAsync(buffer, offset, count, cancellationToken);
+        }
+
         public override long Seek(long offset, SeekOrigin origin)
         {
             return stream.Seek(offset, origin);
@@ -106,6 +128,21 @@ namespace Guncho
         public override void Write(byte[] buffer, int offset, int count)
         {
             stream.Write(buffer, offset, count);
+        }
+
+        public override IAsyncResult BeginWrite(byte[] buffer, int offset, int count, AsyncCallback callback, object state)
+        {
+            return stream.BeginWrite(buffer, offset, count, callback, state);
+        }
+
+        public override void EndWrite(IAsyncResult asyncResult)
+        {
+            stream.EndWrite(asyncResult);
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            return stream.WriteAsync(buffer, offset, count, cancellationToken);
         }
     }
 }

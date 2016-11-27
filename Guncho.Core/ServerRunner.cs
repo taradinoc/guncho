@@ -1,80 +1,52 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.IO;
-using SimpleInjector;
-using System.Web.Http.Dependencies;
-using SimpleInjector.Integration.WebApi;
-using System.Web.Http;
-using Guncho.Services;
-using Guncho.Api;
-using Microsoft.AspNet.Identity;
-using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
-using Guncho.Api.Security;
-
-using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
-using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
-using Guncho.Api.Hubs;
-using Guncho.Connections;
-using Microsoft.Owin.Security.DataProtection;
 using System.Security.Cryptography;
+using System.Web.Http;
+
+using Microsoft.AspNet.Identity;
 using Microsoft.Owin.Security;
+using Microsoft.Owin.Security.DataProtection;
+using SimpleInjector;
+using SimpleInjector.Integration.WebApi;
+using Thinktecture.IdentityModel.Owin.ResourceAuthorization;
+
+using Guncho.Api;
+using Guncho.Api.Hubs;
+using Guncho.Api.Security;
+using Guncho.Connections;
+using Guncho.Services;
+
+using ISignalRDependencyResolver = Microsoft.AspNet.SignalR.IDependencyResolver;
+using IWebDependencyResolver = System.Web.Http.Dependencies.IDependencyResolver;
 
 namespace Guncho
 {
     public class ServerRunner
     {
-        private string homeDir = Properties.Settings.Default.CachePath;
-        private int port = Properties.Settings.Default.GameServerPort;
-        private int webPort = Properties.Settings.Default.WebServerPort;
-        private ILogger logger;
-        private Server svr;
+        public string HomeDir { get; set; } = Properties.Settings.Default.CachePath;
+        public ILogger Logger { get; set; }
+        public int Port { get; set; } = Properties.Settings.Default.GameServerPort;
+        public int WebPort { get; set; } = Properties.Settings.Default.WebServerPort;
 
-        public string HomeDir
-        {
-            get { return homeDir; }
-            set { homeDir = value; }
-        }
-
-        public ILogger Logger
-        {
-            get { return logger; }
-            set { logger = value; }
-        }
-
-        public int Port
-        {
-            get { return port; }
-            set { port = value; }
-        }
-
-        public int WebPort
-        {
-            get { return webPort; }
-            set { webPort = value; }
-        }
-
-        internal Server Server
-        {
-            get { return svr; }
-        }
+        internal Server Server { get; private set; }
 
         public void Run()
         {
             var container = new Container();
 
             // set up server configuration
-            Environment.SetEnvironmentVariable("HOME", homeDir);
+            Environment.SetEnvironmentVariable("HOME", HomeDir);
 
-            string idir = Path.Combine(homeDir, "Inform");
+            string idir = Path.Combine(HomeDir, "Inform");
             Directory.CreateDirectory(Path.Combine(idir, "Documentation"));
             Directory.CreateDirectory(Path.Combine(idir, "Extensions"));
 
             bool ownLogger = false;
-            if (logger == null)
+            if (Logger == null)
             {
-                logger = new FileLogger(
+                Logger = new FileLogger(
                     Properties.Settings.Default.LogPath,
                     Properties.Settings.Default.LogSpam);
                 ownLogger = true;
@@ -82,15 +54,94 @@ namespace Guncho
 
             var serverConfig = new ServerConfig
             {
-                GamePort = port,
-                WebPort = webPort,
+                GamePort = Port,
+                WebPort = WebPort,
                 CachePath = Properties.Settings.Default.CachePath,
                 IndexPath = Path.Combine(Properties.Settings.Default.CachePath, "Index"),
                 DefaultCompilerLanguage = "Inform 7",
                 DefaultCompilerVersion = "5Z71",
             };
 
-            // register auth classes
+            // register all of our classes
+            RegisterAuthClasses(container);
+            RegisterServerClasses(container, serverConfig, Logger);
+            RegisterApiControllers(container);
+            RegisterSignalRClasses(container);
+            RegisterRealmFactories(container, serverConfig, Logger);
+
+            container.Verify();
+
+            // run server
+            try
+            {
+                Server = container.GetInstance<Server>();
+                Server.Run();
+                Logger.LogMessage(LogLevel.Notice, "Service terminating.");
+            }
+            finally
+            {
+                Server = null;
+                if (ownLogger)
+                {
+                    (Logger as IDisposable)?.Dispose();
+                    Logger = null;
+                }
+            }
+        }
+
+        private static void RegisterRealmFactories(Container container, ServerConfig serverConfig, ILogger logger)
+        {
+            var informRealmFactories = InformRealmFactory.ConstructAll(
+                            logger: logger,
+                            installationsPath: Properties.Settings.Default.NiInstallationsPath,
+                            indexOutputDir: serverConfig.IndexPath);
+            container.RegisterCollection<InformRealmFactory>(informRealmFactories);
+
+            var allRealmFactories = new List<RealmFactory>();
+            allRealmFactories.AddRange(informRealmFactories);
+            container.RegisterCollection<RealmFactory>(allRealmFactories);
+        }
+
+        private static void RegisterSignalRClasses(Container container)
+        {
+            container.RegisterSingleton<ISignalRConnectionManager, SignalRConnectionManager>();
+            container.RegisterSingleton<PlayHub>();
+        }
+
+        private static void RegisterApiControllers(Container container)
+        {
+            // TODO: use container.RegisterWebApiControllers()
+            var webApiLifestyle = new WebApiRequestLifestyle();
+            var controllerTypes = from t in typeof(ServerRunner).Assembly.GetTypes()
+                                  where !t.IsAbstract && typeof(ApiController).IsAssignableFrom(t)
+                                  select t;
+            foreach (var type in controllerTypes)
+            {
+                container.Register(type, type, webApiLifestyle);
+            }
+        }
+
+        private static void RegisterServerClasses(Container container, ServerConfig serverConfig, ILogger logger)
+        {
+            var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
+            container.AddRegistration(typeof(Server), serverReg);
+            container.AddRegistration(typeof(IRealmsService), serverReg);
+            container.AddRegistration(typeof(IPlayersService), serverReg);
+            container.RegisterInitializer<Server>(
+                s =>
+                {
+                    // ugly
+                    s.ResourceAuthorizationManager = new GunchoResourceAuthorization(s, s);
+                });
+
+            container.RegisterSingleton<ServerConfig>(serverConfig);
+            container.RegisterSingleton<ILogger>(logger);
+            container.RegisterSingleton<IWebDependencyResolver>(new SimpleInjectorWebApiDependencyResolver(container));
+            container.RegisterSingleton<ISignalRDependencyResolver, SimpleInjectorSignalRDependencyResolver>();
+        }
+
+        private static void RegisterAuthClasses(Container container)
+        {
             container.RegisterSingleton<IUserStore<ApiUser, int>, OldTimeyUserStore>();
             container.RegisterSingleton<IPasswordHasher, OldTimeyPasswordHasher>();
             container.RegisterWebApiRequest<UserManager<ApiUser, int>>();
@@ -119,75 +170,11 @@ namespace Guncho
             }
             container.RegisterSingleton<IDataProtectionProvider>(new GunchoDataProtectionProvider(secretBytes));
             container.RegisterSingleton<ISecureDataFormat<AuthenticationTicket>>(new GunchoTicketFormat(secretBytes));
-
-            // register server classes
-            var serverReg = Lifestyle.Singleton.CreateRegistration<Server>(container);
-            container.AddRegistration(typeof(Server), serverReg);
-            container.AddRegistration(typeof(IRealmsService), serverReg);
-            container.AddRegistration(typeof(IPlayersService), serverReg);
-            container.RegisterInitializer<Server>(
-                s =>
-                {
-                    // ugly
-                    s.ResourceAuthorizationManager = new GunchoResourceAuthorization(s, s);
-                });
-
-            container.RegisterSingleton<ServerConfig>(serverConfig);
-            container.RegisterSingleton<ILogger>(logger);
-            container.RegisterSingleton<IWebDependencyResolver>(new SimpleInjectorWebApiDependencyResolver(container));
-            container.RegisterSingleton<ISignalRDependencyResolver, SimpleInjectorSignalRDependencyResolver>();
-
-            // register API controller classes
-            // TODO: use container.RegisterWebApiControllers()
-            var webApiLifestyle = new WebApiRequestLifestyle();
-            var controllerTypes = from t in typeof(ServerRunner).Assembly.GetTypes()
-                                  where !t.IsAbstract && typeof(ApiController).IsAssignableFrom(t)
-                                  select t;
-            foreach (var type in controllerTypes)
-            {
-                container.Register(type, type, webApiLifestyle);
-            }
-
-            // register SignalR hub and utility classes
-            container.RegisterSingleton<ISignalRConnectionManager, SignalRConnectionManager>();
-            container.RegisterSingleton<PlayHub>();
-
-            // register realm factory classes
-            var informRealmFactories = InformRealmFactory.ConstructAll(
-                logger: logger,
-                installationsPath: Properties.Settings.Default.NiInstallationsPath,
-                indexOutputDir: serverConfig.IndexPath);
-            container.RegisterCollection<InformRealmFactory>(informRealmFactories);
-
-            var allRealmFactories = new List<RealmFactory>();
-            allRealmFactories.AddRange(informRealmFactories);
-            container.RegisterCollection<RealmFactory>(allRealmFactories);
-
-            container.Verify();
-
-            // run server
-            try
-            {
-                svr = container.GetInstance<Server>();
-                svr.Run();
-                logger.LogMessage(LogLevel.Notice, "Service terminating.");
-            }
-            finally
-            {
-                svr = null;
-                if (ownLogger)
-                {
-                    if (logger is IDisposable)
-                        ((IDisposable)logger).Dispose();
-                    logger = null;
-                }
-            }
         }
 
         public void Stop(string reason)
         {
-            if (svr != null)
-                svr.Shutdown(reason);
+            Server?.Shutdown(reason);
         }
     }
 }

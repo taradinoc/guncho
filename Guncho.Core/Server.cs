@@ -40,8 +40,6 @@ using Microsoft.Owin.Security;
 
 namespace Guncho
 {
-    delegate void VoidDelegate();
-
     public class RealmLoadingException : Exception
     {
         public RealmLoadingException(string realmName, Exception innerException)
@@ -96,7 +94,7 @@ namespace Guncho
         private readonly Dictionary<string, Realm> realms = new Dictionary<string, Realm>();
         private readonly Dictionary<string, Instance> instances = new Dictionary<string, Instance>();
         private readonly Dictionary<string, RealmFactory> factories = new Dictionary<string, RealmFactory>();
-        private readonly Queue<VoidDelegate> eventQueue = new Queue<VoidDelegate>();
+        private readonly Queue<Action> eventQueue = new Queue<Action>();
         private readonly Thread eventThread;
         private readonly PriorityQueue<TimedEvent> timedEvents = new PriorityQueue<TimedEvent>();
         private readonly Dictionary<Instance, TimedEvent> timedEventsByInstance = new Dictionary<Instance, TimedEvent>();
@@ -151,7 +149,7 @@ namespace Guncho
 
                 while (running)
                 {
-                    VoidDelegate eventToRun;
+                    Action eventToRun;
 
                     lock (eventQueue)
                     {
@@ -1648,7 +1646,7 @@ namespace Guncho
             }
         }
 
-        private void QueueEvent(VoidDelegate del)
+        private void QueueEvent(Action del)
         {
             lock (eventQueue)
             {
