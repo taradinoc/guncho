@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using Nito.AsyncEx;
 
 namespace Guncho.Api.Security
 {
@@ -21,7 +22,7 @@ namespace Guncho.Api.Security
         public override Task ValidateClientAuthentication(OAuthValidateClientAuthenticationContext context)
         {
             context.Validated();
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
 
         public override async Task GrantResourceOwnerCredentials(OAuthGrantResourceOwnerCredentialsContext context)
@@ -54,7 +55,7 @@ namespace Guncho.Api.Security
         public override Task TokenEndpoint(OAuthTokenEndpointContext context)
         {
             context.AdditionalResponseParameters.Add("username", context.Identity.Name);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
     }
 }

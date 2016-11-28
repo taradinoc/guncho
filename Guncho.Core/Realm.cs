@@ -11,6 +11,7 @@ using System.Xml.Serialization;
 using Textfyre.VM;
 using System.ComponentModel;
 using System.Diagnostics.Contracts;
+using Nito.AsyncEx;
 
 namespace Guncho
 {
@@ -148,6 +149,8 @@ namespace Guncho
 
             CopySettingsFrom(other);
         }
+
+        public AsyncReaderWriterLock Lock { get; } = new AsyncReaderWriterLock();
 
         public RealmFactory Factory { get; set; }
 

@@ -14,14 +14,14 @@ namespace Guncho.Services
     {
         IEnumerable<Realm> GetAllRealms();
         Realm GetRealmByName(string name);
-        Realm CreateRealm(Player owner, string name, RealmFactory factory);
+        Task<Realm> CreateRealm(Player owner, string name, RealmFactory factory);
         Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream);
 
         IEnumerable<RealmFactory> GetRealmFactories();
 
         bool IsValidNameChange(string oldName, string newName);
 
-        bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction);
+        Task<bool> TransactionalUpdate(Realm realm, Func<Realm, bool> transaction);
     }
 
     [ContractClassFor(typeof(IRealmsService))]
@@ -39,15 +39,15 @@ namespace Guncho.Services
             return default(Realm);
         }
 
-        public Realm CreateRealm(Player player, string name, RealmFactory factory)
+        public Task<Realm> CreateRealm(Player player, string name, RealmFactory factory)
         {
             Contract.Requires(player != null);
             Contract.Requires(!string.IsNullOrWhiteSpace(name));
             Contract.Requires(factory != null);
-            Contract.Ensures
+            /*Contract.Ensures
                 (Contract.Result<Realm>() == null ||
-                (Contract.Result<Realm>().Factory == factory && Contract.Result<Realm>().Name == name));
-            return default(Realm);
+                (Contract.Result<Realm>().Factory == factory && Contract.Result<Realm>().Name == name));*/
+            return default(Task<Realm>);
         }
 
         public IEnumerable<RealmFactory> GetRealmFactories()
@@ -71,11 +71,11 @@ namespace Guncho.Services
             return default(bool);
         }
 
-        public bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        public Task<bool> TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
         {
             Contract.Requires(realm != null);
             Contract.Requires(transaction != null);
-            return default(bool);
+            return default(Task<bool>);
         }
     }
 }

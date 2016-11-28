@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Nito.AsyncEx;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
@@ -60,76 +61,31 @@ namespace Guncho.Connections
             }
         }
 
-        public override void Write(string text)
-        {
-            outputBuffer.Append(text);
-        }
-
         public override Task WriteAsync(string text)
         {
             outputBuffer.Append(text);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
         
-        public override void Write(char c)
-        {
-            outputBuffer.Append(c);
-        }
-
         public override Task WriteAsync(char c)
         {
             outputBuffer.Append(c);
-            return Task.FromResult(0);
-        }
-
-        public override void WriteLine(string text)
-        {
-            outputBuffer.AppendLine(text);
+            return TaskConstants.Completed;
         }
 
         public override Task WriteLineAsync(string text)
         {
             outputBuffer.AppendLine(text);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
 
-        public override void WriteLine(string format, params object[] args)
+        public override async Task TerminateAsync()
         {
-            outputBuffer.AppendFormat(format, args);
-            outputBuffer.AppendLine();
-        }
-
-        public override void WriteLine()
-        {
-            outputBuffer.AppendLine();
-        }
-
-        public override void Terminate(bool wait)
-        {
-            FlushOutput();
+            await FlushOutputAsync();
             client.Client.Shutdown(SocketShutdown.Both);
             client.Client.Close();
 
-            if (wait)
-            {
-                whenClosed.Task.Wait();
-            }
-        }
-
-        public override void FlushOutput()
-        {
-            // trim leading and trailing newlines
-            string line = outputBuffer.ToString().Trim(new char[] { '\r', '\n' });
-            if (line.Length > 0)
-            {
-                string rawLine = Server.Desanitize(line);
-                if (rawLine.EndsWith("\n>"))
-                    wtr.Write(rawLine);
-                else
-                    wtr.WriteLine(rawLine);
-            }
-            outputBuffer.Length = 0;
-            wtr.Flush();
+            await whenClosed.Task;
         }
 
         public async override Task FlushOutputAsync()

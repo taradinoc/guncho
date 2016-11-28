@@ -22,5 +22,19 @@ namespace Guncho
             }
             return await task;
         }
+
+        // https://msdn.microsoft.com/en-us/library/hh873178(v=vs.110).aspx
+        public static Task WaitOneAsync(this WaitHandle waitHandle)
+        {
+            if (waitHandle == null)
+                throw new ArgumentNullException("waitHandle");
+
+            var tcs = new TaskCompletionSource<bool>();
+            var rwh = ThreadPool.RegisterWaitForSingleObject(waitHandle,
+                delegate { tcs.TrySetResult(true); }, null, -1, true);
+            var t = tcs.Task;
+            t.ContinueWith((antecedent) => rwh.Unregister(null));
+            return t;
+        }
     }
 }

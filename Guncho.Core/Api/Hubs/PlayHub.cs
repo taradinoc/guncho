@@ -1,5 +1,6 @@
 ﻿using Guncho.Connections;
 using Microsoft.AspNet.SignalR;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,7 +51,7 @@ namespace Guncho.Api.Hubs
             System.Diagnostics.Debug.WriteLine("SendCommand: id = {0}", new string[] { Context.ConnectionId });
             var connection = manager.GetConnectionById(Context.ConnectionId);
             connection.EnqueueCommand(command);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
     }
 }

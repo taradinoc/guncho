@@ -1,42 +1,56 @@
 using Guncho.Connections;
+using System;
+using System.Threading.Tasks;
 
 namespace Guncho
 {
     partial class Server
     {
+        private struct HandleSystemCommandResult
+        {
+            public bool Handled;
+            public string Line;
+        }
+
         /// <summary>
         /// Checks whether a command should be intercepted rather than passed into
         /// the realm, and handles the command if so.
         /// </summary>
         /// <param name="conn">The connection that issued the command.</param>
-        /// <param name="line">The command. This may be modified if HandleSystemCommand
-        /// returns <b>false</b>.</param>
-        /// <returns><b>true</b> if the command was intercepted, or <b>false</b> if it
-        /// should still be passed into the realm.</returns>
-        private bool HandleSystemCommand(Connection conn, ref string line)
+        /// <param name="line">The command.</param>
+        /// <returns>A <see cref="HandleSystemCommandResult"/> whose <see cref="HandleSystemCommandResult.Handled"/>
+        /// is <b>true</b> if the command was intercepted, or <b>false</b> if it should still be passed into the
+        /// realm, and whose <see cref="HandleSystemCommandResult.Line"/> is the modified line.</returns>
+        private async Task<HandleSystemCommandResult> HandleSystemCommand(Connection conn, string line)
         {
             string trimmed = line.Trim();
             string command = GetToken(ref trimmed, ' ').ToLower();
 
+            var result = new HandleSystemCommandResult
+            {
+                Handled = true,
+                Line = line,
+            };
+
             // ignore blank lines
             if (command.Length == 0)
-                return true;
+                return result;
 
             Player player;
-            lock (conn)
+            using (await conn.Lock.ReaderLockAsync())
                 player = conn.Player;
 
             // check commands that can be used any time
             switch (command)
             {
                 case "who":
-                    ShowWhoList(conn, player);
-                    return true;
+                    await ShowWhoList(conn, player);
+                    return result;
 
                 case "quit":
-                    conn.WriteLine("Goodbye.");
-                    conn.Terminate(wait: false);
-                    return true;
+                    await conn.WriteLineAsync("Goodbye.");
+                    await conn.TerminateAsync();
+                    return result;
             }
 
             if (player == null || player.Realm == null)
@@ -53,11 +67,11 @@ namespace Guncho
                         string name = GetToken(ref trimmed, ' ');
                         if (name.Length == 0)
                         {
-                            conn.WriteLine("Usage: connect <name> <password>");
+                            await conn.WriteLineAsync("Usage: connect <name> <password>");
                         }
                         else if (name.ToLower() == "guest")
                         {
-                            LogInAsGuest(conn);
+                            await LogInAsGuest(conn);
                         }
                         else
                         {
@@ -66,14 +80,14 @@ namespace Guncho
 
                             if (player == null || player.IsGuest)
                             {
-                                conn.WriteLine("Incorrect login.");
+                                await conn.WriteLineAsync("Incorrect login.");
                             }
                             else
                             {
-                                LogInAsPlayer(conn, player);
+                                await LogInAsPlayer(conn, player);
                             }
                         }
-                        return true;
+                        return result;
                 }
             }
             else
@@ -82,102 +96,109 @@ namespace Guncho
                 switch (command)
                 {
                     case "@shutdown":
-                        CmdShutdown(conn, player, trimmed);
-                        return true;
+                        await CmdShutdown(conn, player, trimmed);
+                        return result;
 
                     case "@wall":
-                        CmdWall(conn, player, trimmed);
-                        return true;
+                        await CmdWall(conn, player, trimmed);
+                        return result;
 
                     case "@teleport":
                     case "@tel":
-                        CmdTeleport(conn, player, trimmed);
-                        return true;
+                        await CmdTeleport(conn, player, trimmed);
+                        return result;
 
                     case "@invite":
-                        CmdInvite(conn, player, trimmed);
-                        return true;
+                        await CmdInvite(conn, player, trimmed);
+                        return result;
 
                     case "page":
                     case "p":
-                        CmdPage(conn, player, trimmed);
-                        return true;
+                        await CmdPage(conn, player, trimmed);
+                        return result;
 
                     case "again":
                     case "g":
-                        lock (player)
+                        using (await player.Lock.ReaderLockAsync())
                         {
                             if (player.LastCommand == null)
                             {
-                                conn.WriteLine("No previous command to repeat.");
-                                return true;
+                                await conn.WriteLineAsync("No previous command to repeat.");
+                                return result;
                             }
 
-                            line = player.LastCommand;
-                            return false;
+                            result.Handled = false;
+                            result.Line = player.LastCommand;
+                            return result;
                         }
                 }
 
                 // save command for 'again'
-                lock (player)
+                using (await player.Lock.WriterLockAsync())
                     player.LastCommand = line;
             }
 
-            return false;
+            result.Handled = false;
+            return result;
         }
 
-        private void LogInAsPlayer(Connection conn, Player player)
+        private async Task LogInAsPlayer(Connection conn, Player player)
         {
-            lock (conn)
+            using (await conn.Lock.WriterLockAsync())
                 conn.Player = player;
 
             Connection oldConn;
-            lock (player)
+            using (await player.Lock.ReaderLockAsync())
                 oldConn = player.Connection;
 
             if (oldConn != null)
             {
-                oldConn.WriteLine("*** Connection superseded ***");
-                conn.WriteLine("*** Connection resumed ***");
-                conn.FlushOutput();
-                oldConn.Terminate(wait: true);
+                Func<Task> notifyOldConn = async () =>
+                {
+                    await oldConn.WriteLineAsync("*** Connection superseded ***");
+                    await oldConn.TerminateAsync();
+                };
+                Func<Task> notifyNewConn = async () =>
+                {
+                    await conn.WriteLineAsync("*** Connection resumed ***");
+                    await conn.FlushOutputAsync();
+                };
+                await Task.WhenAll(notifyOldConn(), notifyNewConn());
             }
 
-            lock (player)
+            using (await player.Lock.WriterLockAsync())
                 player.Connection = conn;
 
-            SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
-            EnterInstance(player, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+            await SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
+            await EnterInstance(player, await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
         }
 
-        private void LogInAsGuest(Connection conn)
+        private async Task LogInAsGuest(Connection conn)
         {
             Player guest;
 
-            lock (players)
+            int guestNum = 0;
+            string guestName, key;
+            do
             {
-                int guestNum = 0;
-                string guestName, key;
-                do
-                {
-                    guestNum++;
-                    guestName = "Guest" + guestNum.ToString();
-                    key = guestName.ToLower();
-                } while (players.ContainsKey(key));
+                guestNum++;
+                guestName = "Guest" + guestNum.ToString();
+                key = guestName.ToLower();
+            } while (!players.TryAdd(key, null));
 
-                guest = new Player(-guestNum, guestName, false, true);
-                guest.Connection = conn;
-                players.Add(key, guest);
-            }
+            guest = new Player(-guestNum, guestName, false, true);
+            guest.Connection = conn;
+            players[key] = guest;
+            playersById[-guestNum] = guest;
 
-            lock (conn)
+            using (await conn.Lock.WriterLockAsync())
                 conn.Player = guest;
 
-            SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
-            EnterInstance(guest, GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+            await SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
+            await EnterInstance(guest, await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
         }
 
-        private void CmdShutdown(Connection conn, Player player, string args)
+        private async Task CmdShutdown(Connection conn, Player player, string args)
         {
             if (player.IsAdmin)
             {
@@ -185,144 +206,146 @@ namespace Guncho
                 if (msg.Length == 0)
                     msg = "no reason specified";
 
-                Shutdown(msg);
+                await ShutdownAsync(msg);
             }
             else
             {
-                conn.WriteLine("Permission denied.");
+                await conn.WriteLineAsync("Permission denied.");
             }
         }
 
-        private void CmdWall(Connection conn, Player player, string args)
+        private async Task CmdWall(Connection conn, Player player, string args)
         {
             if (player.IsAdmin)
             {
                 string msg = args.Trim();
                 if (msg.Length == 0)
                 {
-                    conn.WriteLine("No message.");
+                    await conn.WriteLineAsync("No message.");
                 }
                 else
                 {
                     msg = "*** " + player.Name + " announces, \"" + msg + "\" ***";
                     foreach (Connection c in openConnections.Keys)
                     {
-                        c.WriteLine(msg);
-                        c.FlushOutput();
+                        await c.WriteLineAsync(msg);
+                        await c.FlushOutputAsync();
                     }
                 }
             }
             else
             {
-                conn.WriteLine("Permission denied.");
+                await conn.WriteLineAsync("Permission denied.");
             }
         }
 
-        private void CmdTeleport(Connection conn, Player player, string args)
+        private async Task CmdTeleport(Connection conn, Player player, string args)
         {
             Realm dest = GetRealm(args);
 
             if (dest == null)
             {
-                conn.WriteLine("No such realm.");
+                await conn.WriteLineAsync("No such realm.");
                 return;
             }
 
-            lock (player)
+            using (await player.Lock.ReaderLockAsync())
+            {
                 if (player.Realm == dest)
                 {
-                    conn.WriteLine("You're already in that realm.");
+                    await conn.WriteLineAsync("You're already in that realm.");
                     return;
                 }
+            }
 
             if (dest.GetAccessLevel(player) < RealmAccessLevel.Invited &&
                 args.ToLower() != Properties.Settings.Default.StartRealmName.ToLower())
             {
-                conn.WriteLine("Permission denied.");
+                await conn.WriteLineAsync("Permission denied.");
                 return;
             }
 
             if (dest.IsCondemned)
             {
-                conn.WriteLine("That realm has been condemned.");
+                await conn.WriteLineAsync("That realm has been condemned.");
                 return;
             }
 
-            Instance inst = GetDefaultInstance(dest);
+            Instance inst = await GetDefaultInstance(dest);
             inst.Activate();
 
             string check = inst.SendAndGet("$knock default");
             switch (check)
             {
                 case "ok":
-                    EnterInstance(player, inst);
+                    await EnterInstance(player, inst);
                     break;
 
                 case "full":
-                    conn.WriteLine("That realm is full.");
+                    await conn.WriteLineAsync("That realm is full.");
                     break;
 
                 default:
-                    conn.WriteLine("Teleporting failed mysteriously.");
+                    await conn.WriteLineAsync("Teleporting failed mysteriously.");
                     break;
             }
         }
 
-        private void CmdInvite(Connection conn, Player player, string args)
+        private async Task CmdInvite(Connection conn, Player player, string args)
         {
             //XXX @invite
-            conn.WriteLine("Not implemented.");
+            await conn.WriteLineAsync("Not implemented.");
         }
 
-        private void CmdPage(Connection conn, Player player, string args)
+        private async Task CmdPage(Connection conn, Player player, string args)
         {
             string target = GetToken(ref args, '=').Trim();
             string msg = args.Trim();
 
             if (target.Length == 0 || msg.Length == 0)
             {
-                conn.WriteLine("Usage: page <player>=<message>");
+                await conn.WriteLineAsync("Usage: page <player>=<message>");
                 return;
             }
 
             Player targetPlayer = GetPlayerByName(target);
             if (targetPlayer == null)
             {
-                conn.WriteLine("No such player.");
+                await conn.WriteLineAsync("No such player.");
                 return;
             }
 
             if (msg.StartsWith(":"))
             {
                 msg = msg.Substring(1);
-                lock (targetPlayer)
+                using (await targetPlayer.Lock.ReaderLockAsync())
                 {
                     if (targetPlayer.Connection != null)
                     {
-                        targetPlayer.Connection.WriteLine(player.Name + " (paging you) " + msg);
-                        targetPlayer.Connection.FlushOutput();
-                        conn.WriteLine("You page-posed " + targetPlayer.Name + ": " +
+                        await targetPlayer.Connection.WriteLineAsync(player.Name + " (paging you) " + msg);
+                        await targetPlayer.Connection.FlushOutputAsync();
+                        await conn.WriteLineAsync("You page-posed " + targetPlayer.Name + ": " +
                                        player.Name + " " + msg);
                     }
                     else
                     {
-                        conn.WriteLine("That player is not connected.");
+                        await conn.WriteLineAsync("That player is not connected.");
                     }
                 }
             }
             else
             {
-                lock (targetPlayer)
+                using (await targetPlayer.Lock.ReaderLockAsync())
                 {
                     if (targetPlayer.Connection != null)
                     {
-                        targetPlayer.Connection.WriteLine(player.Name + " pages: " + msg);
-                        targetPlayer.Connection.FlushOutput();
-                        conn.WriteLine("You paged " + targetPlayer.Name + ": " + msg);
+                        await targetPlayer.Connection.WriteLineAsync(player.Name + " pages: " + msg);
+                        await targetPlayer.Connection.FlushOutputAsync();
+                        await conn.WriteLineAsync("You paged " + targetPlayer.Name + ": " + msg);
                     }
                     else
                     {
-                        conn.WriteLine("That player is not connected.");
+                        await conn.WriteLineAsync("That player is not connected.");
                     }
                 }
             }

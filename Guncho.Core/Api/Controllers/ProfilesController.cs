@@ -86,7 +86,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("{name}", Name = "PutProfileByName")]
-        public IHttpActionResult PutProfileByName(string name, [FromBody] ProfileDto newProfile)
+        public async Task<IHttpActionResult> PutProfileByName(string name, [FromBody] ProfileDto newProfile)
         {
             var player = playersService.GetPlayerByName(name);
 
@@ -156,7 +156,7 @@ namespace Guncho.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = playersService.TransactionalUpdate(
+            var result = await playersService.TransactionalUpdate(
                 player,
                 p =>
                 {
@@ -191,7 +191,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("my")]
-        public IHttpActionResult PutMy(ProfileDto newProfile)
+        public Task<IHttpActionResult> PutMy(ProfileDto newProfile)
         {
             return PutProfileByName(User.Identity.Name, newProfile);
         }

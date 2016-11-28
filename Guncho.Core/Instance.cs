@@ -6,6 +6,8 @@ using System.IO;
 using Textfyre.VM;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Nito.AsyncEx;
 
 namespace Guncho
 {
@@ -29,7 +31,8 @@ namespace Guncho
         private Thread terpThread;
         private object terpThreadLock = new object();
 
-        private Dictionary<int, Player> players = new Dictionary<int, Player>();
+        private readonly Dictionary<int, Player> players = new Dictionary<int, Player>();
+        private readonly AsyncReaderWriterLock playersLock = new AsyncReaderWriterLock();
 
         private int tagstate = 0;
         private Player curPlayer = null;
@@ -214,7 +217,7 @@ namespace Guncho
                     }
 
                     Player[] abandoned;
-                    lock (players)
+                    using (playersLock.WriterLock())
                     {
                         abandoned = new Player[players.Count];
                         players.Values.CopyTo(abandoned, 0);
@@ -222,9 +225,9 @@ namespace Guncho
                     }
 
                     foreach (Player p in abandoned)
-                        lock (p)
+                        using (p.Lock.ReaderLock())
                             if (p.Connection != null)
-                                p.Connection.FlushOutput();
+                                p.Connection.FlushOutputAsync().Wait();
 
                     server.InstanceFinished(this, abandoned, wasTerminated);
                 }
@@ -297,8 +300,10 @@ namespace Guncho
         /// <b>null</b>.</param>
         public void AddPlayer(Player player, string position)
         {
-            lock (players)
+            using (playersLock.WriterLock())
+            {
                 players.Add(player.ID, player);
+            }
 
             if (!rawMode)
                 QueueInput(string.Format("$join {0}={1}{2}",
@@ -311,16 +316,16 @@ namespace Guncho
         /// Removes a player from the instance.
         /// </summary>
         /// <param name="player">The player who is leaving.</param>
-        public void RemovePlayer(Player player)
+        public async Task RemovePlayer(Player player)
         {
             if (!rawMode)
             {
                 string result = SendAndGet(string.Format("$part {0}", player.ID));
-                HandleOutput(result);
-                FlushAll();
+                await HandleOutput(result);
+                await FlushAll();
             }
 
-            lock (players)
+            using (await playersLock.WriterLockAsync())
                 players.Remove(player.ID);
         }
 
@@ -331,7 +336,7 @@ namespace Guncho
         public Player[] ListPlayers()
         {
             Player[] result;
-            lock (players)
+            using (playersLock.ReaderLock())
             {
                 result = new Player[players.Count];
                 players.Values.CopyTo(result, 0);
@@ -348,7 +353,7 @@ namespace Guncho
         /// <remarks>If an exception occurs while retrieving any player's
         /// location string, that player will be added to the dictionary
         /// with a <b>null</b> value.</remarks>
-        public int ExportPlayerPositions(IDictionary<Player, string> results)
+        public async Task<int> ExportPlayerPositions(IDictionary<Player, string> results)
         {
             if (results == null)
                 throw new ArgumentNullException("results");
@@ -356,7 +361,7 @@ namespace Guncho
                 throw new ArgumentException("Dictionary is read only", "results");
 
             Player[] temp;
-            lock (players)
+            using (await playersLock.WriterLockAsync())
             {
                 temp = new Player[players.Count];
                 players.Values.CopyTo(temp, 0);
@@ -365,7 +370,7 @@ namespace Guncho
 
             foreach (Player p in temp)
             {
-                lock (p)
+                using (await p.Lock.WriterLockAsync())
                     p.Instance = null;
 
                 string locationStr;
@@ -385,26 +390,32 @@ namespace Guncho
             return temp.Length;
         }
 
-        private void FlushAll()
+        private async Task FlushAll()
         {
-            lock (players)
+            using (await playersLock.ReaderLockAsync())
+            {
                 foreach (Player p in players.Values)
-                    lock (p)
+                {
+                    using (await p.Lock.ReaderLockAsync())
+                    {
                         if (p.Connection != null)
-                            p.Connection.FlushOutput();
+                            await p.Connection.FlushOutputAsync();
+                    }
+                }
+            }
         }
 
-        private void HandleOutput(string text)
+        private async Task HandleOutput(string text)
         {
             foreach (char c in text)
-                HandleOutput(c);
+                await HandleOutput(c);
         }
 
-        private void HandleOutput(char c)
+        private async Task HandleOutput(char c)
         {
             if (rawMode)
             {
-                SendCurPlayer(c);
+                await SendCurPlayer(c);
                 return;
             }
 
@@ -415,7 +426,7 @@ namespace Guncho
                     if (c == '<')
                         tagstate++;
                     else
-                        SendCurPlayer(c);
+                        await SendCurPlayer(c);
                     break;
 
                 case 1:
@@ -430,7 +441,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer('<');
+                        await SendCurPlayer('<');
                         tagstate = 0;
                     }
                     break;
@@ -455,7 +466,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$");
+                        await SendCurPlayer("<$");
                         tagstate = 0;
                     }
                     break;
@@ -468,7 +479,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$t");
+                        await SendCurPlayer("<$t");
                         tagstate = 0;
                     }
                     break;
@@ -483,7 +494,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$t ");
+                        await SendCurPlayer("<$t ");
                         tagstate = 0;
                     }
                     break;
@@ -500,19 +511,19 @@ namespace Guncho
                         prevPlayers.Push(curPlayer);
 
                         int playerNum = int.Parse(tagParam.ToString());
-                        lock (players)
+                        using (await playersLock.ReaderLockAsync())
                             players.TryGetValue(playerNum, out curPlayer);
                         if (curPlayer != null)
-                            lock (curPlayer)
+                            using (await curPlayer.Lock.ReaderLockAsync())
                                 if (curPlayer.Connection != null)
-                                    curPlayer.Connection.WriteLine();
+                                    await curPlayer.Connection.WriteLineAsync();
                         tagParam = null;
                         tagstate = 0;
                     }
                     else
                     {
-                        SendCurPlayer("<$t ");
-                        SendCurPlayer(tagParam.ToString());
+                        await SendCurPlayer("<$t ");
+                        await SendCurPlayer(tagParam.ToString());
                         tagstate = 0;
                     }
                     break;
@@ -527,7 +538,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$a");
+                        await SendCurPlayer("<$a");
                         tagstate = 0;
                     }
                     break;
@@ -540,7 +551,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$b");
+                        await SendCurPlayer("<$b");
                         tagstate = 0;
                     }
                     break;
@@ -574,7 +585,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("<$d");
+                        await SendCurPlayer("<$d");
                         tagstate = 0;
                     }
                     break;
@@ -608,7 +619,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("</");
+                        await SendCurPlayer("</");
                         tagstate = 0;
                     }
                     break;
@@ -625,7 +636,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("</$");
+                        await SendCurPlayer("</$");
                         tagstate = 0;
                     }
                     break;
@@ -640,7 +651,7 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("</$t");
+                        await SendCurPlayer("</$t");
                         tagstate = 0;
                     }
                     break;
@@ -655,45 +666,45 @@ namespace Guncho
                     }
                     else
                     {
-                        SendCurPlayer("</$a");
+                        await SendCurPlayer("</$a");
                         tagstate = 0;
                     }
                     break;
             }
         }
 
-        private void SendCurPlayer(char c)
+        private async Task SendCurPlayer(char c)
         {
             if (curPlayer == Announcer)
             {
-                lock (players)
+                using (await playersLock.ReaderLockAsync())
                 {
                     if (c == '\n')
                     {
                         foreach (Player p in players.Values)
-                            lock (p)
+                            using (await p.Lock.ReaderLockAsync())
                                 if (p.Connection != null)
-                                    p.Connection.Write("\r\n");
+                                    await p.Connection.WriteAsync("\r\n");
                     }
                     else
                     {
                         foreach (Player p in players.Values)
-                            lock (p)
+                            using (await p.Lock.ReaderLockAsync())
                                 if (p.Connection != null)
-                                    p.Connection.Write(c);
+                                    await p.Connection.WriteAsync(c);
                     }
                 }
             }
             else if (curPlayer != null)
             {
-                lock (curPlayer)
+                using (await curPlayer.Lock.ReaderLockAsync())
                 {
                     if (curPlayer.Connection != null)
                     {
                         if (c == '\n')
-                            curPlayer.Connection.Write("\r\n");
+                            await curPlayer.Connection.WriteAsync("\r\n");
                         else
-                            curPlayer.Connection.Write(c);
+                            await curPlayer.Connection.WriteAsync(c);
                     }
                 }
             }
@@ -709,23 +720,25 @@ namespace Guncho
             }
         }
 
-        private void SendCurPlayer(string str)
+        private async Task SendCurPlayer(string str)
         {
             str = str.Replace("\n", "\r\n");
 
             if (curPlayer == Announcer)
             {
-                lock (players)
+                using (await playersLock.ReaderLockAsync())
                     foreach (Player p in players.Values)
-                        lock (p)
+                        using (await p.Lock.ReaderLockAsync())
                             if (p.Connection != null)
-                                p.Connection.Write(str);
+                                await p.Connection.WriteAsync(str);
             }
             else if (curPlayer != null)
             {
-                lock (curPlayer)
+                using (await curPlayer.Lock.ReaderLockAsync())
+                {
                     if (curPlayer.Connection != null)
-                        curPlayer.Connection.Write(str);
+                        await curPlayer.Connection.WriteAsync(str);
+                }
             }
             else
             {
@@ -760,7 +773,7 @@ namespace Guncho
             }
             else
             {
-                lock (curPlayer)
+                using (curPlayer.Lock.WriterLock())
                     curPlayer.Disambiguating = info;
             }
         }
@@ -818,7 +831,7 @@ namespace Guncho
 
             private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
 
-            private string GetInputLine()
+            private async Task<string> GetInputLine()
             {
                 if (specialResponses.Count > 0)
                     return specialResponses.Dequeue();
@@ -828,7 +841,7 @@ namespace Guncho
                 try
                 {
                     instance.prevPlayers.Clear();
-                    instance.FlushAll();
+                    await instance.FlushAll();
 
                     if (curTrans is DisambigHelper)
                         instance.curPlayer = ((DisambigHelper)curTrans).Player;
@@ -914,7 +927,7 @@ namespace Guncho
 
             public void FyreLineWanted(object sender, LineWantedEventArgs e)
             {
-                e.Line = GetInputLine();
+                e.Line = GetInputLine().Result;
             }
 
             public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
@@ -922,7 +935,7 @@ namespace Guncho
                 string line;
                 do
                 {
-                    line = GetInputLine();
+                    line = GetInputLine().Result;
                 }
                 while (line == null || line.Length < 1);
 
@@ -937,7 +950,7 @@ namespace Guncho
                     if (curTrans != null)
                         curTrans.Response.Append(main);
                     else
-                        instance.HandleOutput(main);
+                        instance.HandleOutput(main).Wait();
                 }
 
                 string special;
@@ -1013,7 +1026,7 @@ namespace Guncho
                 string[] parts = line.Split(':');
                 int num;
                 if (parts.Length >= 2 && int.TryParse(parts[0], out num))
-                    lock (instance.players)
+                    using (instance.playersLock.ReaderLock())
                         instance.players.TryGetValue(num, out this.Player);
             }
 
@@ -1129,7 +1142,7 @@ namespace Guncho
                 case "pq_id":
                 case "ls_playerid":
                     // select player to query
-                    lock (players)
+                    using (playersLock.ReaderLock())
                         players.TryGetValue(value, out queriedPlayer);
                     break;
 
@@ -1165,7 +1178,7 @@ namespace Guncho
                                 return realm.GetAccessLevel(queriedPlayer).ToString();
 
                             case "idletime":
-                                lock (queriedPlayer)
+                                using (queriedPlayer.Lock.ReaderLock())
                                 {
                                     if (queriedPlayer.Connection != null)
                                         return Server.FormatTimeSpan(queriedPlayer.Connection.IdleTime);
@@ -1173,7 +1186,7 @@ namespace Guncho
                                 return "";
                         }
 
-                        lock (queriedPlayer)
+                        using (queriedPlayer.Lock.ReaderLock())
                             return queriedPlayer.GetAttribute(queriedAttr);
                     }
                     return null;
@@ -1211,7 +1224,7 @@ namespace Guncho
                     if (queriedPlayer != null && queriedAttr != null &&
                         AllowSetPlayerAttribute(queriedAttr, value))
                     {
-                        lock (queriedPlayer)
+                        using (queriedPlayer.Lock.WriterLock())
                             queriedPlayer.SetAttribute(queriedAttr, value);
                     }
                     break;

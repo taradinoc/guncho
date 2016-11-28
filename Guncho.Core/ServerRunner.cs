@@ -75,7 +75,7 @@ namespace Guncho
             try
             {
                 Server = container.GetInstance<Server>();
-                Server.Run();
+                Server.RunAsync().Wait();
                 Logger.LogMessage(LogLevel.Notice, "Service terminating.");
             }
             finally
@@ -174,7 +174,7 @@ namespace Guncho
 
         public void Stop(string reason)
         {
-            Server?.Shutdown(reason);
+            Server?.ShutdownAsync(reason);
         }
     }
 }

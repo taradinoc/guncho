@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Nito.AsyncEx;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -51,53 +52,28 @@ namespace Guncho.Connections
             }
         }
 
-        public override void Write(char c)
-        {
-            outputBuffer.Append(c);
-        }
-
-        public override void Write(string text)
-        {
-            outputBuffer.Append(text);
-        }
-
         public override Task WriteAsync(char c)
         {
             outputBuffer.Append(c);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
 
         public override Task WriteAsync(string text)
         {
             outputBuffer.Append(text);
-            return Task.FromResult(0);
-        }
-
-        public override void WriteLine(string text)
-        {
-            outputBuffer.AppendLine(text);
+            return TaskConstants.Completed;
         }
 
         public override Task WriteLineAsync(string text)
         {
             outputBuffer.AppendLine(text);
-            return Task.FromResult(0);
+            return TaskConstants.Completed;
         }
 
-        public override void Terminate(bool wait)
+        public override async Task TerminateAsync()
         {
-            FlushOutput();
-
-            var task = manager.TerminateClientAsync(ConnectionId);
-            if (wait)
-            {
-                task.Wait();
-            }
-        }
-
-        public override void FlushOutput()
-        {
-            FlushOutputAsync().Wait();
+            await FlushOutputAsync();
+            await manager.TerminateClientAsync(ConnectionId);
         }
 
         private static readonly char[] LineDelimiters = { '\r', '\n' };

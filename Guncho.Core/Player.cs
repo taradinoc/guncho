@@ -3,18 +3,14 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net.Sockets;
 using Guncho.Connections;
+using Nito.AsyncEx;
 
 namespace Guncho
 {
     public class Player
     {
-        private readonly int id;
-        private readonly bool isAdmin, isGuest;
         private readonly Dictionary<string, string> attributes = new Dictionary<string, string>();
-        private string name, dab, again;
-        private string pwdSalt, pwdHash;
-        private Connection conn;
-        private Instance instance;
+        private string name;
 
         public Player(int id, string name, bool isAdmin)
             : this(id, name, isAdmin, false)
@@ -23,16 +19,23 @@ namespace Guncho
 
         public Player(int id, string name, bool isAdmin, bool isGuest)
         {
-            this.id = id;
+            ID = id;
             this.name = name;
-            this.isAdmin = isAdmin;
-            this.isGuest = isGuest;
+            IsAdmin = isAdmin;
+            IsGuest = isGuest;
         }
 
-        public int ID
-        {
-            get { return id; }
-        }
+        public AsyncReaderWriterLock Lock { get; } = new AsyncReaderWriterLock();
+        public int ID { get; }
+        public string PasswordSalt { get; set; }
+        public string PasswordHash { get; set; }
+        public bool IsAdmin { get; }
+        public bool IsGuest { get; }
+        public string Disambiguating { get; set; }
+        public string LastCommand { get; set; }
+        public Connection Connection { get; set; }
+        public Realm Realm => Instance?.Realm;
+        public Instance Instance { get; set; }
 
         public string Name
         {
@@ -44,57 +47,6 @@ namespace Guncho
 
                 name = value;
             }
-        }
-
-        public string PasswordSalt
-        {
-            get { return pwdSalt; }
-            set { pwdSalt = value; }
-        }
-
-        public string PasswordHash
-        {
-            get { return pwdHash; }
-            set { pwdHash = value; }
-        }
-
-        public bool IsAdmin
-        {
-            get { return isAdmin; }
-        }
-
-        public bool IsGuest
-        {
-            get { return isGuest; }
-        }
-
-        public string Disambiguating
-        {
-            get { return dab; }
-            set { dab = value; }
-        }
-
-        public string LastCommand
-        {
-            get { return again; }
-            set { again = value; }
-        }
-
-        public Connection Connection
-        {
-            get { return conn; }
-            set { conn = value; }
-        }
-
-        public Realm Realm
-        {
-            get { return instance.Realm; }
-        }
-
-        public Instance Instance
-        {
-            get { return instance; }
-            set { instance = value; }
         }
 
         public string GetAttribute(string name)

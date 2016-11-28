@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNet.Identity;
+using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -65,13 +66,13 @@ namespace Guncho.Api.Security
             return Task.FromResult(ToApiUser(player));
         }
 
-        public Task UpdateAsync(ApiUser user)
+        public async Task UpdateAsync(ApiUser user)
         {
             var player = server.GetPlayerById(user.Id);
 
             if (player != null)
             {
-                lock (player)
+                using (await player.Lock.WriterLockAsync())
                 {
                     player.Name = user.UserName;
                     
@@ -80,10 +81,8 @@ namespace Guncho.Api.Security
                     player.PasswordHash = parts[1];
                 }
 
-                server.SavePlayers();
+                await server.SavePlayers();
             }
-
-            return Task.FromResult(0);
         }
 
         #endregion
@@ -126,7 +125,7 @@ namespace Guncho.Api.Security
             }
             else
             {
-                return Task.FromResult(0);
+                return TaskConstants.Completed;
             }
         }
 
