@@ -1,19 +1,3 @@
-/* Define COVERUP to clone the starting realm for each new player, so each player's
- * experience is independent of the other players. This does the following:
- * 
- *      - Disables all I/O filtering (tags and commands)
- *      - Loads only from the cache instead of compiling realms on the fly (since
- *        coverup realms must be compiled with an unhacked library)
- *      - Skips the login sequence by logging everyone in as a new Guest automatically
- *      - Causes players to be disconnected when the realm ends, and deleted when
- *        they disconnect
- * 
- * COVERUP mode disguises the MUD as a single-player IF server.
- */
-//#define COVERUP
-
-// TODO: use reader/writer locks instead of lock() where appropriate
-
 using Guncho.Api;
 using Guncho.Api.Security;
 using Guncho.Connections;
@@ -531,11 +515,6 @@ namespace Guncho
             if (factories.TryGetValue(factoryName, out factory) == false)
                 throw new ArgumentException("Unrecognized realm factory", "factoryName");
 
-#if COVERUP
-                string cachedFile = Path.Combine(Properties.Settings.Default.CachePath, realmName + ".ulx");
-                if (!File.Exists(cachedFile))
-                    return;
-#else
                 if (!File.Exists(sourceFile))
                 {
                     logger.LogMessage(LogLevel.Error,
@@ -571,15 +550,11 @@ namespace Guncho
                     realms.TryRemove(realmName, out dummy);
                     return Task.FromResult(outcome);
                 }
-#endif
 
             //FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
             try
             {
                 Realm r = factory.LoadRealm(this, realmName, sourceFile, cachedFile, owner);
-#if COVERUP
-                    r.RawMode = true;
-#endif
                 realms.TryAdd(realmName.ToLower(), r);
             }
             catch (Exception ex)
@@ -675,10 +650,6 @@ namespace Guncho
 
         public async Task<Realm> CreateRealm(Player newOwner, string newName, RealmFactory factory)
         {
-#if COVERUP
-            // no realm creation in coverup mode
-            return null;
-#else
             string key = newName.ToLower();
 
             if (!IsValidRealmName(newName))
@@ -711,7 +682,6 @@ namespace Guncho
             }
             await SaveRealms();
             return GetRealm(newName);
-#endif
         }
 
         public async Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream newSource)
@@ -933,10 +903,6 @@ namespace Guncho
 
         public async Task<Player> CreatePlayer(string newName, string pwdSalt, string pwdHash)
         {
-#if COVERUP
-            // no player creation in coverup mode
-            return null;
-#else
             if (newName == null)
                 throw new ArgumentNullException("newName");
             if (pwdSalt == null)
@@ -972,7 +938,6 @@ namespace Guncho
 
             await SavePlayers();
             return result;
-#endif
         }
 
         public static bool IsValidRealmName(string name)
@@ -991,10 +956,6 @@ namespace Guncho
 
         public async Task<bool> DeleteRealm(Realm realm)
         {
-#if COVERUP
-            // no realm deletion in coverup mode
-            return false;
-#else
             Realm startRealm = GetRealm(Properties.Settings.Default.StartRealmName);
 
             if (realm == startRealm)
@@ -1037,7 +998,6 @@ namespace Guncho
 
             await SaveRealms();
             return true;
-#endif
         }
 
         private static string NewSourceFileName(string ownerName, string realmName, string ext)
@@ -1235,11 +1195,6 @@ namespace Guncho
             if (player == null || player.IsGuest)
                 return null;
 
-#if COVERUP
-            if (!player.IsAdmin)
-                return null;
-#endif
-
             string correctSalt, correctHash;
 
             using (player.Lock.ReaderLock())
@@ -1390,52 +1345,6 @@ namespace Guncho
             else
                 return "<not an IP endpoint>";
         }
-
-#if COVERUP
-        private Player MakeNewGuest()
-        {
-            lock (players)
-            {
-                int i = 1;
-                bool inuse;
-                string name;
-
-                do
-                {
-                    name = "Guest" + i.ToString();
-                    inuse = players.ContainsKey(name.ToLower());
-                    i++;
-                }
-                while (inuse);
-
-                Player result = new Player(100, name, false);
-                players.Add(name.ToLower(), result);
-                return result;
-            }
-        }
-
-        private Realm MakeNewRealm()
-        {
-            string startRealm = Properties.Settings.Default.StartRealmName;
-
-            lock (realms)
-            {
-                int i = 1;
-                string newName;
-                do
-                {
-                    newName = startRealm + "_" + i.ToString();
-                    i++;
-                } while (GetRealm(newName) != null);
-
-                Realm origRealm = GetRealm(startRealm);
-                Realm newRealm = new Realm(origRealm, newName);
-
-                realms.Add(newName.ToLower(), newRealm);
-                return newRealm;
-            }
-        }
-#endif
 
         private static string RewriteChatCommandsIfNeeded(string line)
         {
@@ -1611,18 +1520,6 @@ namespace Guncho
 
         private async Task HandleInstanceFinished(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
         {
-#if COVERUP
-            lock (realms)
-            {
-                // the realm might have been replaced while we were waiting for the lock...
-                Realm storedRealm = GetRealm(realm.Name);
-                if (storedRealm != null && storedRealm == realm)
-                {
-                    LogMessage(LogLevel.Verbose, "Removing realm '{0}' (finished).", realm.Name);
-                    realms.Remove(realm.Name.ToLower());
-                }
-            }
-#else // !COVERUP
             if (wasTerminated && !instance.RestartRequested)
             {
                 logger.LogMessage(LogLevel.Verbose, "Realm terminated: '{0}'", instance.Name);
@@ -1636,7 +1533,6 @@ namespace Guncho
 
                 instance.Activate();
             }
-#endif
 
             Instance initialRealm = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
 
@@ -1645,12 +1541,7 @@ namespace Guncho
                 using (await p.Lock.WriterLockAsync())
                 {
                     p.Instance = null;
-#if COVERUP
-                    if (p.Connection != null)
-                        p.Connection.Terminate();
-#else
                     await EnterInstance(p, initialRealm);
-#endif
                 }
             }
         }
@@ -1900,14 +1791,10 @@ namespace Guncho
         /// <returns>The complete input line.</returns>
         private string MakeInputLine(Connection conn, string line, bool silent)
         {
-#if COVERUP
-            return line;
-#else
             return string.Format("{0}{1}:{2}",
                 silent ? "$silent " : "",
                 conn.Player.ID,
                 line);
-#endif
         }
 
         public static string Sanitize(string str)
