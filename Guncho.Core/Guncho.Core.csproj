@@ -256,6 +256,7 @@
     <Compile Include="Connections\SignalRConnectionManager.cs" />
     <Compile Include="Api\Controllers\RealmsController.cs" />
     <Compile Include="FileAsync.cs" />
+    <Compile Include="ForEach.cs" />
     <Compile Include="ICommandDestination.cs" />
     <Compile Include="IInstance.cs" />
     <Compile Include="ILogger.cs" />

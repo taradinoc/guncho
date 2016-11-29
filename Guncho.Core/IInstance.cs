@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace Guncho
 {
@@ -11,8 +12,8 @@ namespace Guncho
         bool RestartRequested { get; set; }
         DateTime WatchdogTime { get; }
 
-        void Activate();
-        void Deactivate();
-        void PolitelyDispose();
+        Task Activate();
+        Task Deactivate();
+        Task PolitelyDispose();
     }
 }

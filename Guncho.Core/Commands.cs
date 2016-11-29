@@ -272,9 +272,9 @@ namespace Guncho
             }
 
             IInstance inst = await GetDefaultInstance(dest);
-            inst.Activate();
+            await inst.Activate();
 
-            string check = inst.SendAndGet("$knock default");
+            string check = await inst.SendAndGet("$knock default");
             switch (check)
             {
                 case "ok":

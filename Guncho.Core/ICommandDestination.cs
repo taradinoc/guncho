@@ -1,8 +1,12 @@
-﻿namespace Guncho
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace Guncho
 {
-    public interface ICommandDestination<in TInput, out TOutput>
+    public interface ICommandDestination<in TInput, TOutput>
     {
         void QueueInput(TInput line);
-        TOutput SendAndGet(TInput line);
+        Task<TOutput> SendAndGet(TInput line);
     }
 }

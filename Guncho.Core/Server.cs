@@ -83,7 +83,7 @@ namespace Guncho
         private readonly AsyncProducerConsumerQueue<Func<Task>> eventQueue = new AsyncProducerConsumerQueue<Func<Task>>();
         private Task eventTask;
         private readonly PriorityQueue<TimedEvent> timedEvents = new PriorityQueue<TimedEvent>();
-        private readonly ConcurrentDictionary<Instance, TimedEvent> timedEventsByInstance = new ConcurrentDictionary<Instance, TimedEvent>();
+        private readonly ConcurrentDictionary<IInstance, TimedEvent> timedEventsByInstance = new ConcurrentDictionary<IInstance, TimedEvent>();
         //private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
         public IResourceAuthorizationManager ResourceAuthorizationManager { get; set; }
@@ -158,12 +158,12 @@ namespace Guncho
 
         private class TimedEvent
         {
-            public readonly Instance Instance;
+            public readonly IInstance Instance;
             public readonly int Interval;
             public DateTime Time;
             public bool Deleted;
 
-            public TimedEvent(Instance instance, int interval)
+            public TimedEvent(IInstance instance, int interval)
             {
                 this.Instance = instance;
                 this.Time = DateTime.Now.AddSeconds(interval);
@@ -213,7 +213,7 @@ namespace Guncho
             }
         }
 
-        public void SetEventInterval(Instance instance, int seconds)
+        public void SetEventInterval(IInstance instance, int seconds)
         {
             if (instance == null)
                 throw new ArgumentNullException("realm");
@@ -777,37 +777,37 @@ namespace Guncho
 
             IInstance[] origInstances = GetAllInstances(original);
             IInstance[] replcInstances = GetAllInstances(replacement);
-            var saved = new Dictionary<string, Dictionary<Player, string>>();
+            var saved = new ConcurrentDictionary<string, ConcurrentDictionary<Player, string>>();
 
             // extract players from running original instances
-            IInstance dummyInstance;
+            await ForEach.Async(
+                origInstances,
+                async inst =>
+                {
+                    var dict = new ConcurrentDictionary<Player, string>();
+                    saved.TryAdd(inst.Name, dict);
+                    await inst.ExportPlayerPositions(dict);
+                    SetEventInterval(inst, 0);
+                    await inst.PolitelyDispose();
 
-            foreach (Instance inst in origInstances)
-            {
-                var dict = new Dictionary<Player, string>();
-                saved.Add(inst.Name, dict);
-                await inst.ExportPlayerPositions(dict);
-                SetEventInterval(inst, 0);
-                inst.PolitelyDispose();
-
-                instances.TryRemove(inst.Name.ToLower(), out dummyInstance);
-            }
+                    IInstance dummyInstance;
+                    instances.TryRemove(inst.Name.ToLower(), out dummyInstance);
+                });
 
             // there shouldn't be any players in replacement instances, but
             // if there are for some reason, dump them in the new default instance
-            foreach (Instance inst in replcInstances)
-            {
-                Dictionary<Player, string> dict;
-                if (saved.TryGetValue(toName, out dict) == false)
+            await ForEach.Async(
+                replcInstances,
+                async inst =>
                 {
-                    dict = new Dictionary<Player, string>();
-                    saved.Add(toName, dict);
-                }
-                await inst.ExportPlayerPositions(dict);
-                SetEventInterval(inst, 0);
-                inst.Dispose();
-                instances.TryRemove(inst.Name.ToLower(), out dummyInstance);
-            }
+                    var dict = saved.GetOrAdd(toName, _ => new ConcurrentDictionary<Player, string>());
+                    await inst.ExportPlayerPositions(dict);
+                    SetEventInterval(inst, 0);
+                    inst.Dispose();
+
+                    IInstance dummyInstance;
+                    instances.TryRemove(inst.Name.ToLower(), out dummyInstance);
+                });
 
             logger.LogMessage(LogLevel.Spam, "Removing realms '{0}' and '{1}'.", fromName, toName);
             Realm dummy;
@@ -865,7 +865,7 @@ namespace Guncho
                 logger.LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
                 IInstance startInst = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
-                foreach (Dictionary<Player, string> positions in saved.Values)
+                foreach (var positions in saved.Values)
                 {
                     foreach (KeyValuePair<Player, string> pair in positions)
                     {
@@ -967,17 +967,19 @@ namespace Guncho
 
             // close all instances
             IInstance startInstance = await GetDefaultInstance(startRealm);
-            foreach (Instance inst in GetAllInstances(realm))
-            {
-                if (inst.IsActive)
+            await ForEach.Async(
+                GetAllInstances(realm),
+                async inst =>
                 {
-                    await Task.WhenAll(from p in inst.ListPlayers()
-                                       select EnterInstance(p, startInstance));
-                }
+                    if (inst.IsActive)
+                    {
+                        await Task.WhenAll(from p in inst.ListPlayers()
+                                           select EnterInstance(p, startInstance));
+                    }
 
-                SetEventInterval(inst, 0);
-                inst.PolitelyDispose();
-            }
+                    SetEventInterval(inst, 0);
+                    await inst.PolitelyDispose();
+                });
 
             // delete the z-code and index, but leave the source just in case
             try
@@ -1310,8 +1312,8 @@ namespace Guncho
 
                 await eventTask;
 
-                foreach (Instance r in instances.Values)
-                    r.PolitelyDispose();
+                await Task.WhenAll(from r in instances.Values
+                                   select r.PolitelyDispose());
             }
             catch (Exception ex)
             {
@@ -1531,7 +1533,7 @@ namespace Guncho
                 instance.RestartRequested = false;
                 logger.LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", instance.Name);
 
-                instance.Activate();
+                await instance.Activate();
             }
 
             IInstance initialRealm = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
@@ -1620,7 +1622,7 @@ namespace Guncho
                     instance.Name);
 
                 if (!instance.IsActive)
-                    instance.Activate();
+                    await instance.Activate();
 
                 await instance.AddPlayer(player, position);
             }
@@ -1664,10 +1666,10 @@ namespace Guncho
                 }
                 else
                 {
-                    dest.Activate();
+                    await dest.Activate();
 
                     // TODO: let the destination know which realm is trying to send a player, so it can accept only from certain source realms
-                    string check = dest.SendAndGet("$knock " + token);
+                    string check = await dest.SendAndGet("$knock " + token);
                     switch (check)
                     {
                         case "ok":

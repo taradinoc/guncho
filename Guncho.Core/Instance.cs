@@ -28,6 +28,8 @@ namespace Guncho
         private DateTime watchdogTime = DateTime.MaxValue;
         private object watchdogLock = new object();
         private DateTime activationTime;
+
+        // TODO: replace terpThread with a Task
         private Thread terpThread;
         private object terpThreadLock = new object();
 
@@ -135,48 +137,54 @@ namespace Guncho
         /// <summary>
         /// Starts the instance's interpreter, if it isn't already running.
         /// </summary>
-        public void Activate()
+        public Task Activate()
         {
-            lock (terpThreadLock)
+            return Task.Run(() =>
             {
-                if (terpThread == null)
+                lock (terpThreadLock)
                 {
-                    terpThread = new Thread(TerpThreadProc);
-                    terpThread.IsBackground = true;
-                    terpThread.Name = "Realm: " + this.name;
-                    terpThread.Start();
+                    if (terpThread == null)
+                    {
+                        terpThread = new Thread(TerpThreadProc);
+                        terpThread.IsBackground = true;
+                        terpThread.Name = "Realm: " + this.name;
+                        terpThread.Start();
 
-                    activationTime = DateTime.Now;
+                        activationTime = DateTime.Now;
 
-                    logger.LogMessage(LogLevel.Verbose, "Activating realm '{0}'", name);
+                        logger.LogMessage(LogLevel.Verbose, "Activating realm '{0}'", name);
+                    }
                 }
-            }
+            });
         }
 
         /// <summary>
         /// Terminates the instance's interpreter, if it is running.
         /// </summary>
-        public void Deactivate()
+        public Task Deactivate()
         {
-            Thread theThread;
-            lock (terpThreadLock)
+            return Task.Run(() =>
             {
-                theThread = terpThread;
-                terpThread = null;
-            }
+                Thread theThread;
+                lock (terpThreadLock)
+                {
+                    theThread = terpThread;
+                    terpThread = null;
+                }
 
-            if (theThread != null)
-            {
-                try
+                if (theThread != null)
                 {
-                    theThread.Abort();
-                    theThread.Join();
+                    try
+                    {
+                        theThread.Abort();
+                        theThread.Join();
+                    }
+                    catch (ThreadStateException)
+                    {
+                        // ignore
+                    }
                 }
-                catch (ThreadStateException)
-                {
-                    // ignore
-                }
-            }
+            });
         }
 
         /// <summary>
@@ -250,12 +258,12 @@ namespace Guncho
         /// <summary>
         /// Informs the realm that it's about to be shut down, then shuts it down.
         /// </summary>
-        public void PolitelyDispose()
+        public async Task PolitelyDispose()
         {
             try
             {
                 if (IsActive)
-                    SendAndGet("$shutdown");
+                    await SendAndGet("$shutdown");
             }
             catch { }
 
@@ -277,17 +285,15 @@ namespace Guncho
         /// </summary>
         /// <param name="line">The line of input to send.</param>
         /// <returns>The text that was printed in response to the line, or
-        /// <b>null</b> if the realm timed out.</returns>
-        public string SendAndGet(string line)
+        /// an empty string if the transaction timed out.</returns>
+        public async Task<string> SendAndGet(string line)
         {
             Transaction trans = new Transaction(line);
+            io.QueueTransaction(trans);
 
-            lock (trans)
-            {
-                io.QueueTransaction(trans);
-                Monitor.Wait(trans, Properties.Settings.Default.TransactionTimeout);
-            }
+            var delay = Task.Delay(Properties.Settings.Default.TransactionTimeout);
 
+            await Task.WhenAny(trans.WhenCompleted, delay);
             return trans.Response.ToString().Trim();
         }
 
@@ -322,7 +328,7 @@ namespace Guncho
         {
             if (!rawMode)
             {
-                string result = SendAndGet(string.Format("$part {0}", player.ID));
+                string result = await SendAndGet(string.Format("$part {0}", player.ID));
                 await HandleOutput(result);
                 await FlushAll();
             }
@@ -377,7 +383,7 @@ namespace Guncho
                 string locationStr;
                 try
                 {
-                    locationStr = SendAndGet("$locate " + p.ID.ToString());
+                    locationStr = await SendAndGet("$locate " + p.ID.ToString());
                 }
                 catch
                 {
@@ -850,10 +856,8 @@ namespace Guncho
                     // is there a previous transaction?
                     if (curTrans != null)
                     {
-                        // response has already been collected, so just unblock the waiting thread
-                        lock (curTrans)
-                            Monitor.Pulse(curTrans);
-
+                        // response has already been collected, so just complete the task
+                        curTrans.Complete();
                         curTrans = null;
                     }
 
@@ -1002,6 +1006,8 @@ namespace Guncho
 
         private class Transaction
         {
+            private readonly TaskCompletionSource tcs = new TaskCompletionSource();
+
             public Transaction(string query)
             {
                 this.Query = query;
@@ -1009,6 +1015,13 @@ namespace Guncho
 
             public readonly string Query;
             public readonly StringBuilder Response = new StringBuilder();
+
+            public Task WhenCompleted => tcs.Task;
+
+            public void Complete()
+            {
+                tcs.SetResult();
+            }
         }
 
         private class DisambigHelper : Transaction
