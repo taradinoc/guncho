@@ -78,7 +78,7 @@ namespace Guncho
         private readonly ConcurrentDictionary<string, Player> players = new ConcurrentDictionary<string, Player>();
         private readonly ConcurrentDictionary<int, Player> playersById = new ConcurrentDictionary<int, Player>();
         private readonly ConcurrentDictionary<string, Realm> realms = new ConcurrentDictionary<string, Realm>();
-        private readonly ConcurrentDictionary<string, Instance> instances = new ConcurrentDictionary<string, Instance>();
+        private readonly ConcurrentDictionary<string, IInstance> instances = new ConcurrentDictionary<string, IInstance>();
         private readonly ConcurrentDictionary<string, RealmFactory> factories = new ConcurrentDictionary<string, RealmFactory>();
         private readonly AsyncProducerConsumerQueue<Func<Task>> eventQueue = new AsyncProducerConsumerQueue<Func<Task>>();
         private Task eventTask;
@@ -575,9 +575,9 @@ namespace Guncho
             return Task.FromResult(RealmEditingOutcome.Success);
         }
 
-        private Task<Instance> LoadInstance(Realm realm, string name)
+        private Task<IInstance> LoadInstance(Realm realm, string name)
         {
-            Instance result;
+            IInstance result;
 
             if (GetInstance(name) != null)
                 throw new ArgumentException("An instance with this name is already loaded", "name");
@@ -595,19 +595,19 @@ namespace Guncho
             return result;
         }
 
-        public Instance GetInstance(string name)
+        public IInstance GetInstance(string name)
         {
             if (name == null)
                 throw new ArgumentNullException("name");
 
-            Instance result;
+            IInstance result;
             instances.TryGetValue(name.ToLower(), out result);
             return result;
         }
 
-        private async Task<Instance> GetDefaultInstance(Realm realm)
+        private async Task<IInstance> GetDefaultInstance(Realm realm)
         {
-            Instance inst = GetInstance(realm.Name);
+            IInstance inst = GetInstance(realm.Name);
 
             if (inst != null)
                 return inst;
@@ -622,9 +622,9 @@ namespace Guncho
             }
         }
 
-        private Instance[] GetAllInstances(Realm realm)
+        private IInstance[] GetAllInstances(Realm realm)
         {
-            List<Instance> result = new List<Instance>();
+            List<IInstance> result = new List<IInstance>();
 
             return instances.Values.Where(inst => inst.Realm == realm).ToArray();
         }
@@ -775,12 +775,12 @@ namespace Guncho
             if (original == null)
                 throw new ArgumentException("No such realm", "toName");
 
-            Instance[] origInstances = GetAllInstances(original);
-            Instance[] replcInstances = GetAllInstances(replacement);
+            IInstance[] origInstances = GetAllInstances(original);
+            IInstance[] replcInstances = GetAllInstances(replacement);
             var saved = new Dictionary<string, Dictionary<Player, string>>();
 
             // extract players from running original instances
-            Instance dummyInstance;
+            IInstance dummyInstance;
 
             foreach (Instance inst in origInstances)
             {
@@ -848,7 +848,7 @@ namespace Guncho
 
                 foreach (var instPair in saved)
                 {
-                    Instance inst = await LoadInstance(newRealm, instPair.Key);
+                    IInstance inst = await LoadInstance(newRealm, instPair.Key);
                     foreach (KeyValuePair<Player, string> pair in instPair.Value)
                     {
                         using (await pair.Key.Lock.ReaderLockAsync())
@@ -864,7 +864,7 @@ namespace Guncho
             {
                 logger.LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
-                Instance startInst = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+                IInstance startInst = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
                 foreach (Dictionary<Player, string> positions in saved.Values)
                 {
                     foreach (KeyValuePair<Player, string> pair in positions)
@@ -966,7 +966,7 @@ namespace Guncho
             realms.TryRemove(realm.Name.ToLower(), out dummy);
 
             // close all instances
-            Instance startInstance = await GetDefaultInstance(startRealm);
+            IInstance startInstance = await GetDefaultInstance(startRealm);
             foreach (Instance inst in GetAllInstances(realm))
             {
                 if (inst.IsActive)
@@ -1436,7 +1436,7 @@ namespace Guncho
             {
                 line = TrimAndHandleBackspace(line);
 
-                Instance instance = null;
+                IInstance instance = null;
                 if (conn.Player != null)
                 {
                     using (await conn.Player.Lock.ReaderLockAsync())
@@ -1534,7 +1534,7 @@ namespace Guncho
                 instance.Activate();
             }
 
-            Instance initialRealm = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+            IInstance initialRealm = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
 
             foreach (Player p in abandonedPlayers)
             {
@@ -1584,9 +1584,9 @@ namespace Guncho
             return result;
         }
 
-        private async Task EnterInstance(Player player, Instance instance, string position = null, bool traveling = false)
+        private async Task EnterInstance(Player player, IInstance instance, string position = null, bool traveling = false)
         {
-            Instance prevRealm;
+            IInstance prevRealm;
             using (await player.Lock.WriterLockAsync())
             {
                 prevRealm = player.Instance;
@@ -1622,7 +1622,7 @@ namespace Guncho
                 if (!instance.IsActive)
                     instance.Activate();
 
-                instance.AddPlayer(player, position);
+                await instance.AddPlayer(player, position);
             }
         }
 
@@ -1647,7 +1647,7 @@ namespace Guncho
                 token = spec.Substring(0, idx);
             }
 
-            Instance dest = GetInstance(instanceName);
+            IInstance dest = GetInstance(instanceName);
             if (dest != null)
             {
                 if (dest == player.Instance)

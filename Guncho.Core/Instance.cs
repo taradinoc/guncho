@@ -11,7 +11,7 @@ using Nito.AsyncEx;
 
 namespace Guncho
 {
-    public class Instance
+    public class Instance : IInstance
     {
         private readonly Server server;
         private readonly Realm realm;
@@ -298,7 +298,7 @@ namespace Guncho
         /// <param name="position">A string describing the player's location,
         /// as returned by <see cref="ExportPlayerPositions"/>, or
         /// <b>null</b>.</param>
-        public void AddPlayer(Player player, string position)
+        public Task AddPlayer(Player player, string position)
         {
             using (playersLock.WriterLock())
             {
@@ -310,6 +310,8 @@ namespace Guncho
                     player.Name,
                     player.ID,
                     position == null ? "" : "," + position));
+
+            return TaskConstants.Completed;
         }
 
         /// <summary>
@@ -349,11 +351,10 @@ namespace Guncho
         /// player in the realm, and removes those players from the realm.
         /// </summary>
         /// <param name="results">The dictionary to fill.</param>
-        /// <returns>The number of players exported.</returns>
         /// <remarks>If an exception occurs while retrieving any player's
         /// location string, that player will be added to the dictionary
         /// with a <b>null</b> value.</remarks>
-        public async Task<int> ExportPlayerPositions(IDictionary<Player, string> results)
+        public async Task ExportPlayerPositions(IDictionary<Player, string> results)
         {
             if (results == null)
                 throw new ArgumentNullException("results");
@@ -386,8 +387,6 @@ namespace Guncho
 
                 results.Add(p, locationStr);
             }
-
-            return temp.Length;
         }
 
         private async Task FlushAll()

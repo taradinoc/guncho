@@ -256,9 +256,12 @@
     <Compile Include="Connections\SignalRConnectionManager.cs" />
     <Compile Include="Api\Controllers\RealmsController.cs" />
     <Compile Include="FileAsync.cs" />
+    <Compile Include="ICommandDestination.cs" />
+    <Compile Include="IInstance.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="InformRealmFactory.cs" />
     <Compile Include="Instance.cs" />
+    <Compile Include="IPlayerDestination.cs" />
     <Compile Include="Player.cs" />
     <Compile Include="PriorityQueue.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

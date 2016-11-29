@@ -35,7 +35,7 @@ namespace Guncho
         public string LastCommand { get; set; }
         public Connection Connection { get; set; }
         public Realm Realm => Instance?.Realm;
-        public Instance Instance { get; set; }
+        public IInstance Instance { get; set; }
 
         public string Name
         {

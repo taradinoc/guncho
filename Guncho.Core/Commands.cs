@@ -271,7 +271,7 @@ namespace Guncho
                 return;
             }
 
-            Instance inst = await GetDefaultInstance(dest);
+            IInstance inst = await GetDefaultInstance(dest);
             inst.Activate();
 
             string check = inst.SendAndGet("$knock default");
