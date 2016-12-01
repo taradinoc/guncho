@@ -82,7 +82,7 @@ namespace Guncho
         private readonly ConcurrentDictionary<string, RealmFactory> factories = new ConcurrentDictionary<string, RealmFactory>();
         private readonly AsyncProducerConsumerQueue<Func<Task>> eventQueue = new AsyncProducerConsumerQueue<Func<Task>>();
         private Task eventTask;
-        private readonly PriorityQueue<TimedEvent> timedEvents = new PriorityQueue<TimedEvent>();
+        private readonly ConcurrentPriorityQueue<TimedEvent> timedEvents = new ConcurrentPriorityQueue<TimedEvent>();
         private readonly ConcurrentDictionary<IInstance, TimedEvent> timedEventsByInstance = new ConcurrentDictionary<IInstance, TimedEvent>();
         //private readonly AutoResetEvent mainLoopEvent = new AutoResetEvent(false);
 
@@ -142,7 +142,7 @@ namespace Guncho
                     }
                     else
                     {
-                        CheckTimedEvents();
+                        await CheckTimedEvents();
 #if !DEBUG
                         CheckWatchdogs();
 #endif
@@ -171,31 +171,47 @@ namespace Guncho
             }
         }
 
-        private void CheckTimedEvents()
+        private async Task CheckTimedEvents()
         {
-            DateTime now = DateTime.Now;
+            var now = DateTime.Now;
 
-            lock (timedEvents)
+            while (true)
             {
-                while (timedEvents.Count > 0)
+                var peek = await timedEvents.TryPeekAsync();
+
+                if (!peek.Success || peek.Item.Time > now)
                 {
-                    TimedEvent ev = timedEvents.Peek();
-
-                    if (ev.Deleted)
-                    {
-                        timedEvents.Dequeue();
-                        continue;
-                    }
-
-                    if (ev.Time > now)
-                        break;
-
-                    timedEvents.Dequeue();
-                    ev.Instance.QueueInput("$rtevent");
-
-                    ev.Time = now.AddSeconds(ev.Interval);
-                    timedEvents.Enqueue(ev, ev.Time.ToFileTime());
+                    // no item to process
+                    break;
                 }
+
+                var dq = await timedEvents.TryDequeueAsync();
+
+                if (!dq.Success)
+                {
+                    // the peeked item is gone, and now there's nothing more to process
+                    break;
+                }
+
+                var ev = dq.Item;
+
+                if (ev.Deleted)
+                {
+                    // discard and try again
+                    continue;
+                }
+
+                if (ev.Time > now)
+                {
+                    // the peeked item is gone, and the one we dequeued isn't ready yet
+                    await timedEvents.EnqueueAsync(ev, dq.Priority);
+                    break;
+                }
+
+                ev.Instance.QueueInput("$rtevent");
+
+                ev.Time = now.AddSeconds(ev.Interval);
+                await timedEvents.EnqueueAsync(ev, ev.Time.ToFileTime());
             }
         }
 
@@ -213,35 +229,32 @@ namespace Guncho
             }
         }
 
-        public void SetEventInterval(IInstance instance, int seconds)
+        public async Task SetEventInterval(IInstance instance, int seconds)
         {
             if (instance == null)
                 throw new ArgumentNullException("realm");
             if (seconds < 0)
                 throw new ArgumentOutOfRangeException("seconds");
 
-            lock (timedEvents)
+            TimedEvent prev;
+            if (timedEventsByInstance.TryGetValue(instance, out prev))
             {
-                TimedEvent prev;
-                if (timedEventsByInstance.TryGetValue(instance, out prev))
-                {
-                    if (prev.Interval != seconds)
-                        prev.Deleted = true;
-                    else
-                        return;
-                }
-
-                if (seconds == 0)
-                {
-                    TimedEvent dummy;
-                    timedEventsByInstance.TryRemove(instance, out dummy);
-                }
+                if (prev.Interval != seconds)
+                    prev.Deleted = true;
                 else
-                {
-                    TimedEvent ev = new TimedEvent(instance, seconds);
-                    timedEventsByInstance[instance] = ev;
-                    timedEvents.Enqueue(ev, ev.Time.ToFileTime());
-                }
+                    return;
+            }
+
+            if (seconds == 0)
+            {
+                TimedEvent dummy;
+                timedEventsByInstance.TryRemove(instance, out dummy);
+            }
+            else
+            {
+                TimedEvent ev = new TimedEvent(instance, seconds);
+                timedEventsByInstance[instance] = ev;
+                await timedEvents.EnqueueAsync(ev, ev.Time.ToFileTime());
             }
         }
 
@@ -787,7 +800,7 @@ namespace Guncho
                     var dict = new ConcurrentDictionary<Player, string>();
                     saved.TryAdd(inst.Name, dict);
                     await inst.ExportPlayerPositions(dict);
-                    SetEventInterval(inst, 0);
+                    await SetEventInterval(inst, 0);
                     await inst.PolitelyDispose();
 
                     IInstance dummyInstance;
@@ -802,7 +815,7 @@ namespace Guncho
                 {
                     var dict = saved.GetOrAdd(toName, _ => new ConcurrentDictionary<Player, string>());
                     await inst.ExportPlayerPositions(dict);
-                    SetEventInterval(inst, 0);
+                    await SetEventInterval(inst, 0);
                     inst.Dispose();
 
                     IInstance dummyInstance;
@@ -977,7 +990,7 @@ namespace Guncho
                                            select EnterInstance(p, startInstance));
                     }
 
-                    SetEventInterval(inst, 0);
+                    await SetEventInterval(inst, 0);
                     await inst.PolitelyDispose();
                 });
 
@@ -1548,23 +1561,22 @@ namespace Guncho
             }
         }
 
-        private Task HandleInstanceFailure(Instance r, string reason)
+        private async Task HandleInstanceFailure(Instance inst, string reason)
         {
-            bool isCondemned = r.Realm.IncrementFailureCount();
+            bool isCondemned = inst.Realm.IncrementFailureCount();
 
             if (isCondemned)
             {
-                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed too many times and is now condemned", r.Name);
+                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed too many times and is now condemned", inst.Name);
             }
             else
             {
-                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed but will be restarted", r.Name);
-                r.RestartRequested = true;
+                logger.LogMessage(LogLevel.Warning, "Realm '{0}' failed but will be restarted", inst.Name);
+                inst.RestartRequested = true;
             }
 
-            SetEventInterval(r, 0);
-            r.Deactivate();
-            return TaskConstants.Completed;
+            await SetEventInterval(inst, 0);
+            await inst.Deactivate();
         }
 
         private static string GetToken(ref string str, char delim)

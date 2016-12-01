@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics.Contracts;
 
 namespace Guncho
 {
@@ -9,9 +9,9 @@ namespace Guncho
     /// the item with the lowest priority value.
     /// </summary>
     /// <typeparam name="T">The element type of the queue.</typeparam>
-    class PriorityQueue<T> : IEnumerable<T>, ICloneable, System.Collections.ICollection
+    class PriorityQueue<T> : IEnumerable<T>, ICloneable
     {
-        private struct Entry
+        protected struct Entry
         {
             public T Item;
             public long Priority;
@@ -23,8 +23,8 @@ namespace Guncho
             }
         }
 
-        private int count, capacity;
-        private Entry[] heap;
+        private int count;
+        protected Entry[] heap;
 
         /// <summary>
         /// Creates a new instance with the default initial capacity.
@@ -41,7 +41,8 @@ namespace Guncho
         /// initially be able to contain.</param>
         public PriorityQueue(int capacity)
         {
-            this.capacity = capacity;
+            Contract.Requires(capacity >= 0);
+
             heap = new Entry[capacity];
         }
 
@@ -51,10 +52,41 @@ namespace Guncho
         /// <param name="other">The other queue.</param>
         public PriorityQueue(PriorityQueue<T> other)
         {
-            count = capacity = other.count;
+            other.InternalExport(out heap, out count);
+        }
 
-            heap = new Entry[count];
-            Array.Copy(other.heap, this.heap, count);
+        protected PriorityQueue(Entry[] heap, int count)
+        {
+            Contract.Requires(heap != null);
+            Contract.Requires(count >= 0);
+            Contract.Requires(count <= heap.Length);
+
+            this.count = count;
+            this.heap = heap;
+        }
+
+        protected PriorityQueue<T> CloneAsPriorityQueue()
+        {
+            int count;
+            Entry[] heap;
+
+            InternalExport(out heap, out count);
+
+            return new PriorityQueue<T>(heap, count);
+        }
+
+        protected virtual void InternalExport(out Entry[] heap, out int count)
+        {
+            count = this.count;
+            heap = (Entry[])this.heap.Clone();
+        }
+
+        [ContractInvariantMethod]
+        private void ObjectInvariant()
+        {
+            Contract.Invariant(heap != null);
+            Contract.Invariant(Count >= 0);
+            Contract.Invariant(Count <= Capacity);
         }
 
         /// <summary>
@@ -63,35 +95,25 @@ namespace Guncho
         /// <param name="item">The item to add.</param>
         /// <param name="priority">The item's priority. A lower value means
         /// the item will be dequeued sooner.</param>
-        public void Enqueue(T item, long priority)
+        public virtual void Enqueue(T item, long priority)
         {
             count++;
 
-            if (count > capacity)
-            {
-                capacity = capacity * 2 + 1;
-                Entry[] newHeap = new Entry[capacity];
-                Array.Copy(heap, newHeap, heap.Length);
-                heap = newHeap;
-            }
+            if (count > Capacity)
+                Capacity = Capacity * 2 + 1;
 
             BubbleUp(count - 1, new Entry(item, priority));
         }
 
         /// <summary>
-        /// Removes the lowest-priority item from the queue and returns it.
+        /// Removes the lowest-priority item from the queue and returns it,
+        /// along with its priority value.
         /// </summary>
         /// <returns>The item that was dequeued.</returns>
         public T Dequeue()
         {
-            if (count == 0)
-                throw new InvalidOperationException("Queue is empty");
-
-            T result = heap[0].Item;
-            count--;
-            TrickleDown(0, heap[count]);
-            heap[count].Item = default(T);
-            return result;
+            long dummy;
+            return Dequeue(out dummy);
         }
 
         /// <summary>
@@ -102,7 +124,7 @@ namespace Guncho
         /// definition, no other item in the queue has a lower priority than this
         /// one.</param>
         /// <returns>The item that was dequeued.</returns>
-        public T Dequeue(out long priority)
+        public virtual T Dequeue(out long priority)
         {
             if (count == 0)
                 throw new InvalidOperationException("Queue is empty");
@@ -121,10 +143,8 @@ namespace Guncho
         /// <returns>The lowest-priority item.</returns>
         public T Peek()
         {
-            if (count == 0)
-                throw new InvalidOperationException("Queue is empty");
-            else
-                return heap[0].Item;
+            long dummy;
+            return Peek(out dummy);
         }
 
         /// <summary>
@@ -135,24 +155,19 @@ namespace Guncho
         /// definition, no other item in the queue has a lower priority than this
         /// one.</param>
         /// <returns>The lowest-priority item.</returns>
-        public T Peek(out long priority)
+        public virtual T Peek(out long priority)
         {
             if (count == 0)
                 throw new InvalidOperationException("Queue is empty");
-            else
-            {
-                priority = heap[0].Priority;
-                return heap[0].Item;
-            }
+
+            priority = heap[0].Priority;
+            return heap[0].Item;
         }
 
         /// <summary>
         /// Gets the number of items in the queue.
         /// </summary>
-        public int Count
-        {
-            get { return count; }
-        }
+        public int Count => count;
 
         /// <summary>
         /// Gets or sets the number of items the queue can currently hold
@@ -161,22 +176,23 @@ namespace Guncho
         /// <exception cref="ArgumentOutOfRangeException">
         /// The value being assigned is less than <see cref="Count"/>.
         /// </exception>
-        public int Capacity
+        public virtual int Capacity
         {
-            get { return capacity; }
+            get
+            {
+                return heap.Length;
+            }
             set
             {
                 if (value < count)
                     throw new ArgumentOutOfRangeException("value",
                         "Capacity may not be less than Count");
 
-                if (value != capacity)
+                if (value != heap.Length)
                 {
                     Entry[] newHeap = new Entry[value];
-                    Array.Copy(heap, newHeap, Math.Min(value, capacity));
+                    Array.Copy(heap, newHeap, Math.Min(value, heap.Length));
                     heap = newHeap;
-                    capacity = value;
-                    count = Math.Min(count, capacity);
                 }
             }
         }
@@ -242,32 +258,6 @@ namespace Guncho
 
         #endregion
 
-        #region ICollection Members
-
-        void System.Collections.ICollection.CopyTo(Array array, int index)
-        {
-            if (array == null)
-                throw new ArgumentNullException("array");
-
-            if (index < 0)
-                throw new ArgumentOutOfRangeException("index");
-
-            if (array.Rank > 1)
-                throw new ArgumentException("Array is multidimensional");
-            else if (index >= array.Length)
-                throw new ArgumentException("Index is past end of array");
-            else if (count > array.Length - index)
-                throw new ArgumentException("Array is too small");
-
-            if (!array.GetType().GetElementType().IsAssignableFrom(typeof(T)))
-                throw new InvalidCastException("Array element type is not assignable from queue element type");
-
-            // copy in order
-            foreach (T item in this)
-                array.SetValue(item, index++);
-        }
-
-        // strongly typed version
         public void CopyTo(T[] array, int index)
         {
             if (array == null)
@@ -287,17 +277,5 @@ namespace Guncho
             foreach (T item in this)
                 array[index++] = item;
         }
-
-        bool System.Collections.ICollection.IsSynchronized
-        {
-            get { return false; }
-        }
-
-        object System.Collections.ICollection.SyncRoot
-        {
-            get { return this; }
-        }
-
-        #endregion
     }
 }

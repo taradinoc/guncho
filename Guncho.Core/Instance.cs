@@ -1161,7 +1161,7 @@ namespace Guncho
                 case "rteinterval":
                     // change real-time event timer interval
                     timerInterval = value;
-                    server.SetEventInterval(this, value);
+                    server.SetEventInterval(this, value).Wait();
                     break;
             }
 

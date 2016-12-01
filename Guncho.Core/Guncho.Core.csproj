@@ -250,6 +250,7 @@
     <Compile Include="Api\UnsupportedMediaTypeResult.cs" />
     <Compile Include="Api\Controllers\ProfilesController.cs" />
     <Compile Include="Commands.cs" />
+    <Compile Include="ConcurrentPriorityQueue.cs" />
     <Compile Include="Connections\Connection.cs" />
     <Compile Include="Connections\IConnectionManager.cs" />
     <Compile Include="Connections\SignalRConnection.cs" />
