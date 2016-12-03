@@ -8,6 +8,8 @@ using System.Threading;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Nito.AsyncEx;
+using System.Collections.Concurrent;
+using System.Diagnostics.Contracts;
 
 namespace Guncho
 {
@@ -806,10 +808,9 @@ namespace Guncho
         private class RealmIO
         {
             private readonly Instance instance;
-            private readonly Queue<string> inputQueue = new Queue<string>();
-            private readonly Queue<Transaction> transQueue = new Queue<Transaction>();
-            private readonly Queue<string> specialResponses = new Queue<string>();
-            private readonly AutoResetEvent inputReady = new AutoResetEvent(false);
+            private readonly AsyncProducerConsumerQueue<object> inputQueue = new AsyncProducerConsumerQueue<object>();  // string
+            private readonly AsyncProducerConsumerQueue<object> transQueue = new AsyncProducerConsumerQueue<object>();  // Transaction
+            private readonly ConcurrentQueue<string> specialResponses = new ConcurrentQueue<string>();
             private Transaction curTrans;
 
             public RealmIO(Instance instance)
@@ -819,32 +820,21 @@ namespace Guncho
 
             public void QueueInput(string line)
             {
-                lock (inputQueue)
-                {
-                    inputQueue.Enqueue(line);
-
-                    if (inputQueue.Count == 1)
-                        inputReady.Set();
-                }
+                inputQueue.Enqueue(line);
             }
 
             public void QueueTransaction(Transaction trans)
             {
-                lock (transQueue)
-                {
-                    transQueue.Enqueue(trans);
-
-                    if (transQueue.Count == 1)
-                        inputReady.Set();
-                }
+                transQueue.Enqueue(trans);
             }
 
             private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
 
             private async Task<string> GetInputLineAsync()
             {
-                if (specialResponses.Count > 0)
-                    return specialResponses.Dequeue();
+                string specialResponse;
+                if (specialResponses.TryDequeue(out specialResponse))
+                    return specialResponse;
 
                 instance.DisableWatchdog();
 
@@ -866,65 +856,65 @@ namespace Guncho
                         curTrans = null;
                     }
 
+                    var queues = new AsyncProducerConsumerQueue<object>[] { transQueue, inputQueue };
+
                     do
                     {
-                        // is there a transaction waiting?
-                        lock (transQueue)
+                        // wait for a transaction or a line of player input
+                        var dqResult = await queues.TryDequeueFromAnyAsync();
+
+                        if (!dqResult.Success)
+                            throw new InvalidOperationException("failed to get input");
+
+                        if (dqResult.Queue == transQueue)
                         {
-                            if (transQueue.Count > 0)
-                            {
-                                curTrans = transQueue.Dequeue();
-                                instance.logger.LogMessage(LogLevel.Spam,
-                                    "Transaction in {0}: {1}",
-                                    instance.name, curTrans.Query);
-                                return curTrans.Query;
-                            }
+                            // got a transaction
+                            curTrans = (Transaction)dqResult.Item;
+                            instance.logger.LogMessage(LogLevel.Spam,
+                                "Transaction in {0}: {1}",
+                                instance.name, curTrans.Query);
+                            return curTrans.Query;
                         }
-
-                        // is there a line of player input waiting?
-                        lock (inputQueue)
+                        else
                         {
-                            if (inputQueue.Count > 0)
-                            {
-                                string line = inputQueue.Dequeue();
-                                instance.logger.LogMessage(LogLevel.Spam,
-                                    "Processing in {0}: {1}",
-                                    instance.name, line);
+                            Contract.Assert(dqResult.Queue == inputQueue);
 
-                                if (!instance.rawMode)
+                            // got a line of player input
+                            string line = (string)dqResult.Item;
+                            instance.logger.LogMessage(LogLevel.Spam,
+                                "Processing in {0}: {1}",
+                                instance.name, line);
+
+                            if (!instance.rawMode)
+                            {
+                                if (line.StartsWith("$silent "))
                                 {
-                                    if (line.StartsWith("$silent "))
+                                    // set up a fake transaction so the output will be hidden
+                                    // and the next line's output substituted instead
+                                    line = line.Substring(8);
+                                    curTrans = new DisambigHelper(instance, line);
+                                }
+                                else
+                                {
+                                    Match m = chatRegex.Match(line);
+                                    if (m.Success)
                                     {
-                                        // set up a fake transaction so the output will be hidden
-                                        // and the next line's output substituted instead
-                                        line = line.Substring(8);
-                                        curTrans = new DisambigHelper(instance, line);
-                                    }
-                                    else
-                                    {
-                                        Match m = chatRegex.Match(line);
-                                        if (m.Success)
-                                        {
-                                            string id = m.Groups[1].Value;
-                                            string type = m.Groups[2].Value;
-                                            string target = m.Groups[3].Value;
-                                            string msg = m.Groups[4].Value;
-                                            instance.chatTargetRegister = target;
-                                            instance.chatMsgRegister = msg;
-                                            line = id + ":$" + type;
-                                        }
+                                        string id = m.Groups[1].Value;
+                                        string type = m.Groups[2].Value;
+                                        string target = m.Groups[3].Value;
+                                        string msg = m.Groups[4].Value;
+                                        instance.chatTargetRegister = target;
+                                        instance.chatMsgRegister = msg;
+                                        line = id + ":$" + type;
                                     }
                                 }
-
-                                if (line.Length > MAX_LINE_LENGTH)
-                                    line = line.Substring(0, MAX_LINE_LENGTH);
-
-                                return line;
                             }
-                        }
 
-                        // wait for input and then continue the loop
-                        inputReady.WaitOne();
+                            if (line.Length > MAX_LINE_LENGTH)
+                                line = line.Substring(0, MAX_LINE_LENGTH);
+
+                            return line;
+                        }
                     } while (true);
                 }
                 finally
