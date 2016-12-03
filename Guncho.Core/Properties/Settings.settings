@@ -51,7 +51,7 @@
       <Value Profile="(Default)">5000</Value>
     </Setting>
     <Setting Name="CompilerTimeout" Type="System.Int32" Scope="Application">
-      <Value Profile="(Default)">10000</Value>
+      <Value Profile="(Default)">30000</Value>
     </Setting>
     <Setting Name="GuestMotdFileName" Type="System.String" Scope="Application">
       <Value Profile="(Default)">guest.txt</Value>

@@ -12,8 +12,8 @@ namespace Guncho
         bool RestartRequested { get; set; }
         DateTime WatchdogTime { get; }
 
-        Task Activate();
-        Task Deactivate();
-        Task PolitelyDispose();
+        Task ActivateAsync();
+        Task DeactivateAsync();
+        Task PolitelyDisposeAsync();
     }
 }

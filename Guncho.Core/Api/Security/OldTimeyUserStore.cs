@@ -45,7 +45,7 @@ namespace Guncho.Api.Security
                 pwdHash = parts[1];
             }
 
-            var player = server.CreatePlayer(user.UserName, pwdSalt, pwdHash);
+            var player = server.CreatePlayerAsync(user.UserName, pwdSalt, pwdHash);
             return Task.FromResult(player);
         }
 
@@ -81,7 +81,7 @@ namespace Guncho.Api.Security
                     player.PasswordHash = parts[1];
                 }
 
-                await server.SavePlayers();
+                await server.SavePlayersAsync();
             }
         }
 
@@ -121,7 +121,7 @@ namespace Guncho.Api.Security
                 player.PasswordSalt = parts[0];
                 player.PasswordHash = parts[1];
 
-                return Task.Run(() => server.SavePlayers());
+                return Task.Run(() => server.SavePlayersAsync());
             }
             else
             {

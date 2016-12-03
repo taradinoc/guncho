@@ -21,7 +21,7 @@ namespace Guncho
         /// <returns>A <see cref="HandleSystemCommandResult"/> whose <see cref="HandleSystemCommandResult.Handled"/>
         /// is <b>true</b> if the command was intercepted, or <b>false</b> if it should still be passed into the
         /// realm, and whose <see cref="HandleSystemCommandResult.Line"/> is the modified line.</returns>
-        private async Task<HandleSystemCommandResult> HandleSystemCommand(Connection conn, string line)
+        private async Task<HandleSystemCommandResult> HandleSystemCommandAsync(Connection conn, string line)
         {
             string trimmed = line.Trim();
             string command = GetToken(ref trimmed, ' ').ToLower();
@@ -44,7 +44,7 @@ namespace Guncho
             switch (command)
             {
                 case "who":
-                    await ShowWhoList(conn, player);
+                    await ShowWhoListAsync(conn, player);
                     return result;
 
                 case "quit":
@@ -71,7 +71,7 @@ namespace Guncho
                         }
                         else if (name.ToLower() == "guest")
                         {
-                            await LogInAsGuest(conn);
+                            await LogInAsGuestAsync(conn);
                         }
                         else
                         {
@@ -84,7 +84,7 @@ namespace Guncho
                             }
                             else
                             {
-                                await LogInAsPlayer(conn, player);
+                                await LogInAsPlayerAsync(conn, player);
                             }
                         }
                         return result;
@@ -96,25 +96,25 @@ namespace Guncho
                 switch (command)
                 {
                     case "@shutdown":
-                        await CmdShutdown(conn, player, trimmed);
+                        await CmdShutdownAsync(conn, player, trimmed);
                         return result;
 
                     case "@wall":
-                        await CmdWall(conn, player, trimmed);
+                        await CmdWallAsync(conn, player, trimmed);
                         return result;
 
                     case "@teleport":
                     case "@tel":
-                        await CmdTeleport(conn, player, trimmed);
+                        await CmdTeleportAsync(conn, player, trimmed);
                         return result;
 
                     case "@invite":
-                        await CmdInvite(conn, player, trimmed);
+                        await CmdInviteAsync(conn, player, trimmed);
                         return result;
 
                     case "page":
                     case "p":
-                        await CmdPage(conn, player, trimmed);
+                        await CmdPageAsync(conn, player, trimmed);
                         return result;
 
                     case "again":
@@ -142,7 +142,7 @@ namespace Guncho
             return result;
         }
 
-        private async Task LogInAsPlayer(Connection conn, Player player)
+        private async Task LogInAsPlayerAsync(Connection conn, Player player)
         {
             using (await conn.Lock.WriterLockAsync())
                 conn.Player = player;
@@ -169,11 +169,11 @@ namespace Guncho
             using (await player.Lock.WriterLockAsync())
                 player.Connection = conn;
 
-            await SendTextFile(conn, player.Name, Properties.Settings.Default.MotdFileName);
-            await EnterInstance(player, await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+            await SendTextFileAsync(conn, player.Name, Properties.Settings.Default.MotdFileName);
+            await EnterInstanceAsync(player, await GetDefaultInstanceAsync(GetRealm(Properties.Settings.Default.StartRealmName)));
         }
 
-        private async Task LogInAsGuest(Connection conn)
+        private async Task LogInAsGuestAsync(Connection conn)
         {
             Player guest;
 
@@ -194,11 +194,11 @@ namespace Guncho
             using (await conn.Lock.WriterLockAsync())
                 conn.Player = guest;
 
-            await SendTextFile(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
-            await EnterInstance(guest, await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName)));
+            await SendTextFileAsync(conn, guest.Name, Properties.Settings.Default.GuestMotdFileName);
+            await EnterInstanceAsync(guest, await GetDefaultInstanceAsync(GetRealm(Properties.Settings.Default.StartRealmName)));
         }
 
-        private async Task CmdShutdown(Connection conn, Player player, string args)
+        private async Task CmdShutdownAsync(Connection conn, Player player, string args)
         {
             if (player.IsAdmin)
             {
@@ -214,7 +214,7 @@ namespace Guncho
             }
         }
 
-        private async Task CmdWall(Connection conn, Player player, string args)
+        private async Task CmdWallAsync(Connection conn, Player player, string args)
         {
             if (player.IsAdmin)
             {
@@ -239,7 +239,7 @@ namespace Guncho
             }
         }
 
-        private async Task CmdTeleport(Connection conn, Player player, string args)
+        private async Task CmdTeleportAsync(Connection conn, Player player, string args)
         {
             Realm dest = GetRealm(args);
 
@@ -271,14 +271,14 @@ namespace Guncho
                 return;
             }
 
-            IInstance inst = await GetDefaultInstance(dest);
-            await inst.Activate();
+            IInstance inst = await GetDefaultInstanceAsync(dest);
+            await inst.ActivateAsync();
 
-            string check = await inst.SendAndGet("$knock default");
+            string check = await inst.SendAndGetAsync("$knock default");
             switch (check)
             {
                 case "ok":
-                    await EnterInstance(player, inst);
+                    await EnterInstanceAsync(player, inst);
                     break;
 
                 case "full":
@@ -291,13 +291,13 @@ namespace Guncho
             }
         }
 
-        private async Task CmdInvite(Connection conn, Player player, string args)
+        private async Task CmdInviteAsync(Connection conn, Player player, string args)
         {
             //XXX @invite
             await conn.WriteLineAsync("Not implemented.");
         }
 
-        private async Task CmdPage(Connection conn, Player player, string args)
+        private async Task CmdPageAsync(Connection conn, Player player, string args)
         {
             string target = GetToken(ref args, '=').Trim();
             string msg = args.Trim();

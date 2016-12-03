@@ -137,7 +137,7 @@ namespace Guncho
         /// <summary>
         /// Starts the instance's interpreter, if it isn't already running.
         /// </summary>
-        public Task Activate()
+        public Task ActivateAsync()
         {
             return Task.Run(() =>
             {
@@ -161,7 +161,7 @@ namespace Guncho
         /// <summary>
         /// Terminates the instance's interpreter, if it is running.
         /// </summary>
-        public Task Deactivate()
+        public Task DeactivateAsync()
         {
             return Task.Run(() =>
             {
@@ -249,7 +249,12 @@ namespace Guncho
 
         public void Dispose()
         {
-            Deactivate();
+            DisposeAsync().Wait();
+        }
+
+        public async Task DisposeAsync()
+        {
+            await DeactivateAsync();
 
             if (zfile != null)
                 zfile.Close();
@@ -258,16 +263,16 @@ namespace Guncho
         /// <summary>
         /// Informs the realm that it's about to be shut down, then shuts it down.
         /// </summary>
-        public async Task PolitelyDispose()
+        public async Task PolitelyDisposeAsync()
         {
             try
             {
                 if (IsActive)
-                    await SendAndGet("$shutdown");
+                    await SendAndGetAsync("$shutdown");
             }
             catch { }
 
-            Dispose();
+            await DisposeAsync();
         }
 
         /// <summary>
@@ -286,7 +291,7 @@ namespace Guncho
         /// <param name="line">The line of input to send.</param>
         /// <returns>The text that was printed in response to the line, or
         /// an empty string if the transaction timed out.</returns>
-        public async Task<string> SendAndGet(string line)
+        public async Task<string> SendAndGetAsync(string line)
         {
             Transaction trans = new Transaction(line);
             io.QueueTransaction(trans);
@@ -302,9 +307,9 @@ namespace Guncho
         /// </summary>
         /// <param name="player">The player who is joining.</param>
         /// <param name="position">A string describing the player's location,
-        /// as returned by <see cref="ExportPlayerPositions"/>, or
+        /// as returned by <see cref="ExportPlayerPositionsAsync"/>, or
         /// <b>null</b>.</param>
-        public Task AddPlayer(Player player, string position)
+        public Task AddPlayerAsync(Player player, string position)
         {
             using (playersLock.WriterLock())
             {
@@ -324,13 +329,13 @@ namespace Guncho
         /// Removes a player from the instance.
         /// </summary>
         /// <param name="player">The player who is leaving.</param>
-        public async Task RemovePlayer(Player player)
+        public async Task RemovePlayerAsync(Player player)
         {
             if (!rawMode)
             {
-                string result = await SendAndGet(string.Format("$part {0}", player.ID));
-                await HandleOutput(result);
-                await FlushAll();
+                string result = await SendAndGetAsync(string.Format("$part {0}", player.ID));
+                await HandleOutputAsync(result);
+                await FlushAllAsync();
             }
 
             using (await playersLock.WriterLockAsync())
@@ -360,7 +365,7 @@ namespace Guncho
         /// <remarks>If an exception occurs while retrieving any player's
         /// location string, that player will be added to the dictionary
         /// with a <b>null</b> value.</remarks>
-        public async Task ExportPlayerPositions(IDictionary<Player, string> results)
+        public async Task ExportPlayerPositionsAsync(IDictionary<Player, string> results)
         {
             if (results == null)
                 throw new ArgumentNullException("results");
@@ -383,7 +388,7 @@ namespace Guncho
                 string locationStr;
                 try
                 {
-                    locationStr = await SendAndGet("$locate " + p.ID.ToString());
+                    locationStr = await SendAndGetAsync("$locate " + p.ID.ToString());
                 }
                 catch
                 {
@@ -395,7 +400,7 @@ namespace Guncho
             }
         }
 
-        private async Task FlushAll()
+        private async Task FlushAllAsync()
         {
             using (await playersLock.ReaderLockAsync())
             {
@@ -410,17 +415,17 @@ namespace Guncho
             }
         }
 
-        private async Task HandleOutput(string text)
+        private async Task HandleOutputAsync(string text)
         {
             foreach (char c in text)
-                await HandleOutput(c);
+                await HandleOutputAsync(c);
         }
 
-        private async Task HandleOutput(char c)
+        private async Task HandleOutputAsync(char c)
         {
             if (rawMode)
             {
-                await SendCurPlayer(c);
+                await SendCurPlayerAsync(c);
                 return;
             }
 
@@ -431,7 +436,7 @@ namespace Guncho
                     if (c == '<')
                         tagstate++;
                     else
-                        await SendCurPlayer(c);
+                        await SendCurPlayerAsync(c);
                     break;
 
                 case 1:
@@ -446,7 +451,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer('<');
+                        await SendCurPlayerAsync('<');
                         tagstate = 0;
                     }
                     break;
@@ -471,7 +476,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$");
+                        await SendCurPlayerAsync("<$");
                         tagstate = 0;
                     }
                     break;
@@ -484,7 +489,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$t");
+                        await SendCurPlayerAsync("<$t");
                         tagstate = 0;
                     }
                     break;
@@ -499,7 +504,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$t ");
+                        await SendCurPlayerAsync("<$t ");
                         tagstate = 0;
                     }
                     break;
@@ -527,8 +532,8 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$t ");
-                        await SendCurPlayer(tagParam.ToString());
+                        await SendCurPlayerAsync("<$t ");
+                        await SendCurPlayerAsync(tagParam.ToString());
                         tagstate = 0;
                     }
                     break;
@@ -543,7 +548,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$a");
+                        await SendCurPlayerAsync("<$a");
                         tagstate = 0;
                     }
                     break;
@@ -556,7 +561,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$b");
+                        await SendCurPlayerAsync("<$b");
                         tagstate = 0;
                     }
                     break;
@@ -590,7 +595,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("<$d");
+                        await SendCurPlayerAsync("<$d");
                         tagstate = 0;
                     }
                     break;
@@ -624,7 +629,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("</");
+                        await SendCurPlayerAsync("</");
                         tagstate = 0;
                     }
                     break;
@@ -641,7 +646,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("</$");
+                        await SendCurPlayerAsync("</$");
                         tagstate = 0;
                     }
                     break;
@@ -656,7 +661,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("</$t");
+                        await SendCurPlayerAsync("</$t");
                         tagstate = 0;
                     }
                     break;
@@ -671,14 +676,14 @@ namespace Guncho
                     }
                     else
                     {
-                        await SendCurPlayer("</$a");
+                        await SendCurPlayerAsync("</$a");
                         tagstate = 0;
                     }
                     break;
             }
         }
 
-        private async Task SendCurPlayer(char c)
+        private async Task SendCurPlayerAsync(char c)
         {
             if (curPlayer == Announcer)
             {
@@ -725,7 +730,7 @@ namespace Guncho
             }
         }
 
-        private async Task SendCurPlayer(string str)
+        private async Task SendCurPlayerAsync(string str)
         {
             str = str.Replace("\n", "\r\n");
 
@@ -836,7 +841,7 @@ namespace Guncho
 
             private static Regex chatRegex = new Regex(@"^(-?\d+):\$(say|emote) (?:\>([^ ]*) )?(.*)$");
 
-            private async Task<string> GetInputLine()
+            private async Task<string> GetInputLineAsync()
             {
                 if (specialResponses.Count > 0)
                     return specialResponses.Dequeue();
@@ -846,7 +851,7 @@ namespace Guncho
                 try
                 {
                     instance.prevPlayers.Clear();
-                    await instance.FlushAll();
+                    await instance.FlushAllAsync();
 
                     if (curTrans is DisambigHelper)
                         instance.curPlayer = ((DisambigHelper)curTrans).Player;
@@ -930,7 +935,7 @@ namespace Guncho
 
             public void FyreLineWanted(object sender, LineWantedEventArgs e)
             {
-                e.Line = GetInputLine().Result;
+                e.Line = GetInputLineAsync().Result;
             }
 
             public void FyreKeyWanted(object sender, KeyWantedEventArgs e)
@@ -938,7 +943,7 @@ namespace Guncho
                 string line;
                 do
                 {
-                    line = GetInputLine().Result;
+                    line = GetInputLineAsync().Result;
                 }
                 while (line == null || line.Length < 1);
 
@@ -953,7 +958,7 @@ namespace Guncho
                     if (curTrans != null)
                         curTrans.Response.Append(main);
                     else
-                        instance.HandleOutput(main).Wait();
+                        instance.HandleOutputAsync(main).Wait();
                 }
 
                 string special;
@@ -1161,7 +1166,7 @@ namespace Guncho
                 case "rteinterval":
                     // change real-time event timer interval
                     timerInterval = value;
-                    server.SetEventInterval(this, value).Wait();
+                    server.SetEventIntervalAsync(this, value).Wait();
                     break;
             }
 

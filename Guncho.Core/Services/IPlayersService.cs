@@ -17,7 +17,7 @@ namespace Guncho.Services
 
         bool IsValidNameChange(string oldName, string newName);
 
-        Task<bool> TransactionalUpdate(Player player, Func<Player, bool> transaction);
+        Task<bool> TransactionalUpdateAsync(Player player, Func<Player, bool> transaction);
     }
 
     public static class PlayersServiceConstants
@@ -50,7 +50,7 @@ namespace Guncho.Services
             return default(bool);
         }
 
-        public Task<bool> TransactionalUpdate(Player player, Func<Player, bool> transaction)
+        public Task<bool> TransactionalUpdateAsync(Player player, Func<Player, bool> transaction)
         {
             Contract.Requires(player != null);
             Contract.Requires(transaction != null);

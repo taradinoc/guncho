@@ -5,9 +5,9 @@ namespace Guncho
 {
     public interface IPlayerDestination<TSavedPosition>
     {
-        Task AddPlayer(Player player, TSavedPosition position);
-        Task RemovePlayer(Player player);
+        Task AddPlayerAsync(Player player, TSavedPosition position);
+        Task RemovePlayerAsync(Player player);
         Player[] ListPlayers();
-        Task ExportPlayerPositions(IDictionary<Player, TSavedPosition> results);
+        Task ExportPlayerPositionsAsync(IDictionary<Player, TSavedPosition> results);
     }
 }

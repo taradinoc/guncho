@@ -31,7 +31,7 @@ namespace Guncho.Connections
             ConnectionClosed += delegate { };
         }
 
-        public async Task Run(CancellationToken cancellationToken)
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             hubContext = GlobalHost.ConnectionManager.GetHubContext<PlayHub, IClient>();
 

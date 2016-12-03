@@ -137,7 +137,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("asset/{*path}", Name = "PutRealmAssetByPath")]
-        public async Task<IHttpActionResult> PutRealmAssetByPath(string realmName, string path)
+        public async Task<IHttpActionResult> PutRealmAssetByPathAsync(string realmName, string path)
         {
             var realm = realmsService.GetRealmByName(realmName);
 

@@ -21,6 +21,6 @@ namespace Guncho.Connections
     {
         event EventHandler<ConnectionAcceptedEventArgs<TConnection>> ConnectionAccepted;
         event EventHandler<ConnectionEventArgs<TConnection>> ConnectionClosed;
-        Task Run(CancellationToken cancellationToken);
+        Task RunAsync(CancellationToken cancellationToken);
     }
 }

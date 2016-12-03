@@ -174,7 +174,7 @@ namespace Guncho
 
         public void Stop(string reason)
         {
-            Server?.ShutdownAsync(reason);
+            Server?.ShutdownAsync(reason).Wait();
         }
     }
 }

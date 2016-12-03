@@ -131,7 +131,7 @@ namespace Guncho.Api.Tests
                     .WithRequestUri("/api/profiles/Peon")
                     .WithMethod(HttpMethod.Put)
                     .WithJsonContent(@"{name: ""Peon"", attributes: {description: ""a peon""}"))
-                .To<ProfilesController>(c => c.PutProfileByName(
+                .To<ProfilesController>(c => c.PutProfileByNameAsync(
                     "Peon",
                     new ProfileDto()
                     {
@@ -146,7 +146,7 @@ namespace Guncho.Api.Tests
                 .Controller<ProfilesController>()
                 .WithTestRig(rig)
                 .WithAuthenticatedUser(rig.PeonUser())
-                .Calling(c => c.PutProfileByName(
+                .Calling(c => c.PutProfileByNameAsync(
                     "Peon",
                     new ProfileDto()
                     {
@@ -168,7 +168,7 @@ namespace Guncho.Api.Tests
                 .Controller<ProfilesController>()
                 .WithTestRig(rig)
                 .WithAuthenticatedUser(rig.PeonUser())
-                .Calling(c => c.PutProfileByName(
+                .Calling(c => c.PutProfileByNameAsync(
                     "Wizard",
                     new ProfileDto() { Name = "Wizard" }))
                 .ShouldReturn()
@@ -182,7 +182,7 @@ namespace Guncho.Api.Tests
                 .Controller<ProfilesController>()
                 .WithTestRig(rig)
                 .WithAuthenticatedUser(rig.WizardUser())
-                .Calling(c => c.PutProfileByName(
+                .Calling(c => c.PutProfileByNameAsync(
                     "Peon",
                     new ProfileDto() { Name = "Peon" }))
                 .ShouldReturn()
@@ -196,7 +196,7 @@ namespace Guncho.Api.Tests
                 .Controller<ProfilesController>()
                 .WithTestRig(rig)
                 .WithAuthenticatedUser(rig.PeonUser())
-                .Calling(c => c.PutProfileByName(
+                .Calling(c => c.PutProfileByNameAsync(
                     "Peon",
                     new ProfileDto()
                     {

@@ -86,7 +86,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("{name}", Name = "PutProfileByName")]
-        public async Task<IHttpActionResult> PutProfileByName(string name, [FromBody] ProfileDto newProfile)
+        public async Task<IHttpActionResult> PutProfileByNameAsync(string name, [FromBody] ProfileDto newProfile)
         {
             var player = playersService.GetPlayerByName(name);
 
@@ -156,7 +156,7 @@ namespace Guncho.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = await playersService.TransactionalUpdate(
+            var result = await playersService.TransactionalUpdateAsync(
                 player,
                 p =>
                 {
@@ -191,9 +191,9 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("my")]
-        public Task<IHttpActionResult> PutMy(ProfileDto newProfile)
+        public Task<IHttpActionResult> PutMyAsync(ProfileDto newProfile)
         {
-            return PutProfileByName(User.Identity.Name, newProfile);
+            return PutProfileByNameAsync(User.Identity.Name, newProfile);
         }
 
         private bool ValidateAttributeWrites(IDictionary<string, string> attributes)

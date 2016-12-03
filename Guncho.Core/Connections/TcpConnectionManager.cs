@@ -26,7 +26,7 @@ namespace Guncho.Connections
         public event EventHandler<ConnectionAcceptedEventArgs<TcpConnection>> ConnectionAccepted;
         public event EventHandler<ConnectionEventArgs<TcpConnection>> ConnectionClosed;
 
-        public async Task Run(CancellationToken cancellationToken)
+        public async Task RunAsync(CancellationToken cancellationToken)
         {
             listener.Start();
 
@@ -39,7 +39,7 @@ namespace Guncho.Connections
                     var tcpClient = await listener.AcceptTcpClientAsync().WithCancellation(cancellationToken);
 
                     // Start a background task to deal with the client.
-                    var clientTask = HandleTcpClient(tcpClient, connectionId, cancellationToken);
+                    var clientTask = HandleTcpClientAsync(tcpClient, connectionId, cancellationToken);
                     activeConnections[connectionId] = clientTask;
                     connectionId++;
                 }
@@ -52,7 +52,7 @@ namespace Guncho.Connections
             }
         }
 
-        private async Task HandleTcpClient(TcpClient tcpClient, int id, CancellationToken cancellationToken)
+        private async Task HandleTcpClientAsync(TcpClient tcpClient, int id, CancellationToken cancellationToken)
         {
             try
             {

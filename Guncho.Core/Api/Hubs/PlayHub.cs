@@ -46,7 +46,7 @@ namespace Guncho.Api.Hubs
             return base.OnDisconnected(stopCalled);
         }
 
-        public Task SendCommand(string command)
+        public Task SendCommandAsync(string command)
         {
             System.Diagnostics.Debug.WriteLine("SendCommand: id = {0}", new string[] { Context.ConnectionId });
             var connection = manager.GetConnectionById(Context.ConnectionId);

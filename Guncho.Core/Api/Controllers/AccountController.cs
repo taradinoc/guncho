@@ -56,7 +56,7 @@ namespace Guncho.Api.Controllers
 
         [AllowAnonymous]
         [Route("")]
-        public async Task<IHttpActionResult> Post(RegistrationDto registration)
+        public async Task<IHttpActionResult> PostAsync(RegistrationDto registration)
         {
             if (!ModelState.IsValid)
             {
@@ -81,7 +81,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("password/{name}")]
-        public async Task<IHttpActionResult> PostPasswordByName(string name, PasswordChangeDto passwords)
+        public async Task<IHttpActionResult> PostPasswordByNameAsync(string name, PasswordChangeDto passwords)
         {
             if (!Request.CheckAccess(
                 GunchoResources.UserActions.Edit,
@@ -109,9 +109,9 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("password/my")]
-        public Task<IHttpActionResult> PostMyPassword(PasswordChangeDto passwords)
+        public Task<IHttpActionResult> PostMyPasswordAsync(PasswordChangeDto passwords)
         {
-            return PostPasswordByName(User.Identity.Name, passwords);
+            return PostPasswordByNameAsync(User.Identity.Name, passwords);
         }
 
         // http://bitoftech.net/2014/06/01/token-based-authentication-asp-net-web-api-2-owin-asp-net-identity/

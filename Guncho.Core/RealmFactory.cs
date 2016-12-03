@@ -7,6 +7,8 @@ using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Web;
+using System.Threading.Tasks;
+using Nito.AsyncEx;
 
 namespace Guncho
 {
@@ -26,7 +28,7 @@ namespace Guncho
 
         public abstract string SourceFileExtension { get; }
         public abstract string GetInitialSourceText(string ownerName, string realmName);
-        public abstract RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile);
+        public abstract Task<RealmEditingOutcome> CompileRealmAsync(string realmName, string sourceFile, string outputFile);
 
         public Realm LoadRealm(Server server, string name, string sourceFile, string storyFile, Player owner)
         {
@@ -67,7 +69,7 @@ namespace Guncho
         /// <param name="args">The list of arguments.</param>
         /// <returns>A string containing the program's output, or
         /// <b>null</b> if the program timed out.</returns>
-        protected static string Execute(string exeName, params string[] args)
+        protected static /*async*/ Task<string> ExecuteAsync(string exeName, params string[] args)
         {
             StringBuilder argText = new StringBuilder();
             foreach (string arg in args)
@@ -87,6 +89,7 @@ namespace Guncho
 
             using (Process proc = new Process())
             {
+                //proc.EnableRaisingEvents = true;
                 proc.StartInfo.FileName = exeName;
                 proc.StartInfo.Arguments = argText.ToString();
                 proc.StartInfo.UseShellExecute = false;
@@ -97,30 +100,54 @@ namespace Guncho
                     proc.StartInfo.Arguments);*/
 
                 StringBuilder output = new StringBuilder();
-                proc.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e)
+                proc.OutputDataReceived += delegate (object sender, DataReceivedEventArgs e)
                 {
                     if (output.Length > 0)
                         output.AppendLine();
                     output.Append(e.Data);
                 };
 
+                //var tcs = new TaskCompletionSource();
+
+                //proc.Exited += delegate (object sender, EventArgs e)
+                //{
+                //    tcs.SetResult();
+                //};
+
                 proc.Start();
                 proc.BeginOutputReadLine();
 
-                bool exited = proc.WaitForExit(Properties.Settings.Default.CompilerTimeout);
-                if (exited)
+                if (proc.WaitForExit(Properties.Settings.Default.CompilerTimeout))
                 {
-                    return output.ToString();
+                    return Task.FromResult(output.ToString());
                 }
                 else
                 {
-                    try
-                    {
-                        proc.Kill();
-                    }
-                    catch { /* ignore */ }
-                    return null;
+                    try { proc.Kill(); }
+                    catch { }
+                    return Task.FromResult<string>(null);
                 }
+
+                //var timedOut = Task.Delay(Properties.Settings.Default.CompilerTimeout);
+
+                //if (await Task.WhenAny(tcs.Task, timedOut) != timedOut)
+                //{
+                //    // exited normally
+                //    return output.ToString();
+                //}
+                //else
+                //{
+                //    // timed out
+                //    try
+                //    {
+                //        proc.Kill();
+                //    }
+                //    catch
+                //    {
+                //        // ignore
+                //    }
+                //    return null;
+                //}
             }
         }
 

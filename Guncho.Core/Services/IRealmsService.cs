@@ -14,14 +14,14 @@ namespace Guncho.Services
     {
         IEnumerable<Realm> GetAllRealms();
         Realm GetRealmByName(string name);
-        Task<Realm> CreateRealm(Player owner, string name, RealmFactory factory);
+        Task<Realm> CreateRealmAsync(Player owner, string name, RealmFactory factory);
         Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm, Stream bodyStream);
 
         IEnumerable<RealmFactory> GetRealmFactories();
 
         bool IsValidNameChange(string oldName, string newName);
 
-        Task<bool> TransactionalUpdate(Realm realm, Func<Realm, bool> transaction);
+        Task<bool> TransactionalUpdateAsync(Realm realm, Func<Realm, bool> transaction);
     }
 
     [ContractClassFor(typeof(IRealmsService))]
@@ -39,7 +39,7 @@ namespace Guncho.Services
             return default(Realm);
         }
 
-        public Task<Realm> CreateRealm(Player player, string name, RealmFactory factory)
+        public Task<Realm> CreateRealmAsync(Player player, string name, RealmFactory factory)
         {
             Contract.Requires(player != null);
             Contract.Requires(!string.IsNullOrWhiteSpace(name));
@@ -71,7 +71,7 @@ namespace Guncho.Services
             return default(bool);
         }
 
-        public Task<bool> TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        public Task<bool> TransactionalUpdateAsync(Realm realm, Func<Realm, bool> transaction)
         {
             Contract.Requires(realm != null);
             Contract.Requires(transaction != null);

@@ -109,7 +109,7 @@ namespace Guncho
 
             try
             {
-                Task.WaitAll(LoadPlayers(), LoadRealms(allRealmFactories));
+                Task.WaitAll(LoadPlayersAsync(), LoadRealmsAsync(allRealmFactories));
 
                 if (GetRealm(Properties.Settings.Default.StartRealmName) == null)
                     throw new InvalidOperationException(
@@ -123,7 +123,7 @@ namespace Guncho
             }
         }
 
-        private async Task EventTaskProc()
+        private async Task ProcessEventsAsync()
         {
             try
             {
@@ -142,7 +142,7 @@ namespace Guncho
                     }
                     else
                     {
-                        await CheckTimedEvents();
+                        await CheckTimedEventsAsync();
 #if !DEBUG
                         CheckWatchdogs();
 #endif
@@ -171,7 +171,7 @@ namespace Guncho
             }
         }
 
-        private async Task CheckTimedEvents()
+        private async Task CheckTimedEventsAsync()
         {
             var now = DateTime.Now;
 
@@ -224,12 +224,12 @@ namespace Guncho
                 if (now >= r.WatchdogTime)
                 {
                     Instance failed = r;
-                    QueueEvent(() => HandleInstanceFailure(failed, "frozen"));
+                    QueueEvent(() => HandleInstanceFailureAsync(failed, "frozen"));
                 }
             }
         }
 
-        public async Task SetEventInterval(IInstance instance, int seconds)
+        public async Task SetEventIntervalAsync(IInstance instance, int seconds)
         {
             if (instance == null)
                 throw new ArgumentNullException("realm");
@@ -258,7 +258,7 @@ namespace Guncho
             }
         }
 
-        private async Task LoadRealms(IEnumerable<RealmFactory> allRealmFactories)
+        private async Task LoadRealmsAsync(IEnumerable<RealmFactory> allRealmFactories)
         {
             // build factories dict first
             string defaultFactory = null;
@@ -398,7 +398,7 @@ namespace Guncho
             }
         }
 
-        public Task SaveRealms()
+        public Task SaveRealmsAsync()
         {
             XML.realmIndex index = new Guncho.XML.realmIndex();
             List<XML.realmIndexRealm> entries = new List<Guncho.XML.realmIndexRealm>();
@@ -512,7 +512,7 @@ namespace Guncho
         /// <exception cref="RealmLoadingException">
         /// The realm was compiled, but an exception occurred while loading it.
         /// </exception>
-        public Task<RealmEditingOutcome> LoadRealmAsync(string realmName, string sourceFile, string factoryName,
+        public async Task<RealmEditingOutcome> LoadRealmAsync(string realmName, string sourceFile, string factoryName,
             Player owner)
         {
             if (realmName == null)
@@ -528,41 +528,41 @@ namespace Guncho
             if (factories.TryGetValue(factoryName, out factory) == false)
                 throw new ArgumentException("Unrecognized realm factory", "factoryName");
 
-                if (!File.Exists(sourceFile))
-                {
-                    logger.LogMessage(LogLevel.Error,
-                        "Skipping realm '{0}': source file '{1}' missing",
-                        realmName, sourceFile);
-                    return Task.FromResult(RealmEditingOutcome.Missing);
-                }
+            if (!File.Exists(sourceFile))
+            {
+                logger.LogMessage(LogLevel.Error,
+                    "Skipping realm '{0}': source file '{1}' missing",
+                    realmName, sourceFile);
+                return RealmEditingOutcome.Missing;
+            }
 
-                // check for a cached copy that's no older than the source
-                string cachePath = Properties.Settings.Default.CachePath;
-                string cachedFile = Path.Combine(cachePath, realmName + ".ulx");
-                bool needCompile = true;
-                RealmEditingOutcome outcome = RealmEditingOutcome.Success;
+            // check for a cached copy that's no older than the source
+            string cachePath = Properties.Settings.Default.CachePath;
+            string cachedFile = Path.Combine(cachePath, realmName + ".ulx");
+            bool needCompile = true;
+            RealmEditingOutcome outcome = RealmEditingOutcome.Success;
 
-                if (File.Exists(cachedFile))
-                {
-                    DateTime sourceTime = File.GetLastWriteTime(sourceFile);
-                    DateTime cacheTime = File.GetLastWriteTime(cachedFile);
-                    if (cacheTime >= sourceTime)
-                        needCompile = false;
-                }
+            if (File.Exists(cachedFile))
+            {
+                DateTime sourceTime = File.GetLastWriteTime(sourceFile);
+                DateTime cacheTime = File.GetLastWriteTime(cachedFile);
+                if (cacheTime >= sourceTime)
+                    needCompile = false;
+            }
 
             compile_realm:
 
-                if (needCompile)
-                    outcome = factory.CompileRealm(realmName, sourceFile, cachedFile);
+            if (needCompile)
+                outcome = await factory.CompileRealmAsync(realmName, sourceFile, cachedFile);
 
-                if (outcome != RealmEditingOutcome.Success)
-                {
-                    logger.LogMessage(LogLevel.Verbose,
-                        "Removing realm '{0}' (failed to compile in LoadRealm).", realmName);
-                    Realm dummy;
-                    realms.TryRemove(realmName, out dummy);
-                    return Task.FromResult(outcome);
-                }
+            if (outcome != RealmEditingOutcome.Success)
+            {
+                logger.LogMessage(LogLevel.Verbose,
+                    "Removing realm '{0}' (failed to compile in LoadRealm).", realmName);
+                Realm dummy;
+                realms.TryRemove(realmName, out dummy);
+                return outcome;
+            }
 
             //FileStream stream = new FileStream(cachedFile, FileMode.Open, FileAccess.Read);
             try
@@ -585,7 +585,7 @@ namespace Guncho
                 }
             }
 
-            return Task.FromResult(RealmEditingOutcome.Success);
+            return RealmEditingOutcome.Success;
         }
 
         private Task<IInstance> LoadInstance(Realm realm, string name)
@@ -618,7 +618,7 @@ namespace Guncho
             return result;
         }
 
-        private async Task<IInstance> GetDefaultInstance(Realm realm)
+        private async Task<IInstance> GetDefaultInstanceAsync(Realm realm)
         {
             IInstance inst = GetInstance(realm.Name);
 
@@ -661,7 +661,7 @@ namespace Guncho
             return result;
         }
 
-        public async Task<Realm> CreateRealm(Player newOwner, string newName, RealmFactory factory)
+        public async Task<Realm> CreateRealmAsync(Player newOwner, string newName, RealmFactory factory)
         {
             string key = newName.ToLower();
 
@@ -693,7 +693,7 @@ namespace Guncho
             {
                 return null;
             }
-            await SaveRealms();
+            await SaveRealmsAsync();
             return GetRealm(newName);
         }
 
@@ -726,7 +726,7 @@ namespace Guncho
                 }
 
                 // successfully changed
-                await ReplaceRealm(previewName, realm.Name);
+                await ReplaceRealmAsync(previewName, realm.Name);
                 return RealmEditingOutcome.Success;
             }
             finally
@@ -735,7 +735,7 @@ namespace Guncho
             }
         }
 
-        public async Task<bool> TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        public async Task<bool> TransactionalUpdateAsync(Realm realm, Func<Realm, bool> transaction)
         {
             bool success;
 
@@ -746,7 +746,7 @@ namespace Guncho
 
             if (success)
             {
-                await SaveRealms();
+                await SaveRealmsAsync();
             }
 
             return success;
@@ -768,7 +768,7 @@ namespace Guncho
         /// realm will have the same owner and other settings (e.g. privacy) as
         /// the old realm.
         /// </remarks>
-        public async Task ReplaceRealm(string fromName, string toName)
+        public async Task ReplaceRealmAsync(string fromName, string toName)
         {
             if (fromName == null)
                 throw new ArgumentNullException("fromName");
@@ -799,9 +799,9 @@ namespace Guncho
                 {
                     var dict = new ConcurrentDictionary<Player, string>();
                     saved.TryAdd(inst.Name, dict);
-                    await inst.ExportPlayerPositions(dict);
-                    await SetEventInterval(inst, 0);
-                    await inst.PolitelyDispose();
+                    await inst.ExportPlayerPositionsAsync(dict);
+                    await SetEventIntervalAsync(inst, 0);
+                    await inst.PolitelyDisposeAsync();
 
                     IInstance dummyInstance;
                     instances.TryRemove(inst.Name.ToLower(), out dummyInstance);
@@ -814,8 +814,8 @@ namespace Guncho
                 async inst =>
                 {
                     var dict = saved.GetOrAdd(toName, _ => new ConcurrentDictionary<Player, string>());
-                    await inst.ExportPlayerPositions(dict);
-                    await SetEventInterval(inst, 0);
+                    await inst.ExportPlayerPositionsAsync(dict);
+                    await SetEventIntervalAsync(inst, 0);
                     inst.Dispose();
 
                     IInstance dummyInstance;
@@ -869,7 +869,7 @@ namespace Guncho
                             if (pair.Key.Connection != null)
                                 await pair.Key.Connection.WriteLineAsync("[The realm shimmers for a moment...]");
                         }
-                        await EnterInstance(pair.Key, inst, pair.Value);
+                        await EnterInstanceAsync(pair.Key, inst, pair.Value);
                     }
                 }
             }
@@ -877,7 +877,7 @@ namespace Guncho
             {
                 logger.LogMessage(LogLevel.Error, "Failed to reload '{0}' in ReplaceRealm.", toName);
 
-                IInstance startInst = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+                IInstance startInst = await GetDefaultInstanceAsync(GetRealm(Properties.Settings.Default.StartRealmName));
                 foreach (var positions in saved.Values)
                 {
                     foreach (KeyValuePair<Player, string> pair in positions)
@@ -887,7 +887,7 @@ namespace Guncho
                             if (pair.Key.Connection != null)
                                 await pair.Key.Connection.WriteLineAsync("[The realm has failed.]");
                         }
-                        await EnterInstance(pair.Key, startInst, pair.Value);
+                        await EnterInstanceAsync(pair.Key, startInst, pair.Value);
                     }
                 }
             }
@@ -914,7 +914,7 @@ namespace Guncho
             return true;
         }
 
-        public async Task<Player> CreatePlayer(string newName, string pwdSalt, string pwdHash)
+        public async Task<Player> CreatePlayerAsync(string newName, string pwdSalt, string pwdHash)
         {
             if (newName == null)
                 throw new ArgumentNullException("newName");
@@ -949,7 +949,7 @@ namespace Guncho
             if (!players.TryUpdate(key, result, null) || !playersById.TryUpdate(id, result, null))
                 throw new InvalidOperationException("Another task stole our player ID or name");
 
-            await SavePlayers();
+            await SavePlayersAsync();
             return result;
         }
 
@@ -967,7 +967,7 @@ namespace Guncho
             return true;
         }
 
-        public async Task<bool> DeleteRealm(Realm realm)
+        public async Task<bool> DeleteRealmAsync(Realm realm)
         {
             Realm startRealm = GetRealm(Properties.Settings.Default.StartRealmName);
 
@@ -979,7 +979,7 @@ namespace Guncho
             realms.TryRemove(realm.Name.ToLower(), out dummy);
 
             // close all instances
-            IInstance startInstance = await GetDefaultInstance(startRealm);
+            IInstance startInstance = await GetDefaultInstanceAsync(startRealm);
             await ForEach.Async(
                 GetAllInstances(realm),
                 async inst =>
@@ -987,11 +987,11 @@ namespace Guncho
                     if (inst.IsActive)
                     {
                         await Task.WhenAll(from p in inst.ListPlayers()
-                                           select EnterInstance(p, startInstance));
+                                           select EnterInstanceAsync(p, startInstance));
                     }
 
-                    await SetEventInterval(inst, 0);
-                    await inst.PolitelyDispose();
+                    await SetEventIntervalAsync(inst, 0);
+                    await inst.PolitelyDisposeAsync();
                 });
 
             // delete the z-code and index, but leave the source just in case
@@ -1011,7 +1011,7 @@ namespace Guncho
             }
             catch (IOException) { }
 
-            await SaveRealms();
+            await SaveRealmsAsync();
             return true;
         }
 
@@ -1054,85 +1054,87 @@ namespace Guncho
             return path;
         }
 
-        private Task LoadPlayers()
+        private Task LoadPlayersAsync()
         {
-            XML.playerIndex index;
-
-            XmlSerializer ser = new XmlSerializer(typeof(XML.playerIndex));
-            using (FileStream fs = new FileStream(
-                Path.Combine(Properties.Settings.Default.RealmDataPath,
-                             Properties.Settings.Default.PlayersFileName),
-                FileMode.Open, FileAccess.Read))
+            return Task.Run(() =>
             {
-                index = (XML.playerIndex)ser.Deserialize(fs);
-            }
+                XML.playerIndex index;
 
-            players.Clear();
-            playersById.Clear();
+                XmlSerializer ser = new XmlSerializer(typeof(XML.playerIndex));
+                using (FileStream fs = new FileStream(
+                    Path.Combine(Properties.Settings.Default.RealmDataPath,
+                                 Properties.Settings.Default.PlayersFileName),
+                    FileMode.Open, FileAccess.Read))
+                {
+                    index = (XML.playerIndex)ser.Deserialize(fs);
+                }
 
-            foreach (XML.playerIndexPlayersPlayer entry in index.Item.player)
-            {
-                Player player = new Player(entry.id, entry.name,
-                    entry.adminSpecified && entry.admin);
-                player.PasswordSalt = entry.pwdSalt;
-                player.PasswordHash = entry.pwdHash;
-                players.TryAdd(player.Name.ToLower(), player);
-                playersById.TryAdd(player.ID, player);
+                players.Clear();
+                playersById.Clear();
 
-                if (entry.attribute != null)
-                    foreach (XML.playerIndexPlayersPlayerAttribute attr in entry.attribute)
-                        player.SetAttribute(attr.name, attr.Value);
-            }
+                foreach (XML.playerIndexPlayersPlayer entry in index.Item.player)
+                {
+                    Player player = new Player(entry.id, entry.name,
+                        entry.adminSpecified && entry.admin);
+                    player.PasswordSalt = entry.pwdSalt;
+                    player.PasswordHash = entry.pwdHash;
+                    players.TryAdd(player.Name.ToLower(), player);
+                    playersById.TryAdd(player.ID, player);
 
-            return TaskConstants.Completed;
+                    if (entry.attribute != null)
+                        foreach (XML.playerIndexPlayersPlayerAttribute attr in entry.attribute)
+                            player.SetAttribute(attr.name, attr.Value);
+                }
+            });
         }
 
-        public Task SavePlayers()
+        public Task SavePlayersAsync()
         {
-            XML.playerIndex index = new Guncho.XML.playerIndex();
-            index.Item = new Guncho.XML.playerIndexPlayers();
-            List<XML.playerIndexPlayersPlayer> entries = new List<Guncho.XML.playerIndexPlayersPlayer>();
-
-            foreach (Player p in players.Values)
+            return Task.Run(() =>
             {
-                if (p.IsGuest)
-                    continue;
+                XML.playerIndex index = new Guncho.XML.playerIndex();
+                index.Item = new Guncho.XML.playerIndexPlayers();
+                List<XML.playerIndexPlayersPlayer> entries = new List<Guncho.XML.playerIndexPlayersPlayer>();
 
-                XML.playerIndexPlayersPlayer item = new Guncho.XML.playerIndexPlayersPlayer();
-                if (p.IsAdmin)
+                foreach (Player p in players.Values)
                 {
-                    item.admin = true;
-                    item.adminSpecified = true;
-                }
-                item.id = p.ID;
-                item.name = p.Name;
-                item.pwdHash = p.PasswordHash;
-                item.pwdSalt = p.PasswordSalt;
+                    if (p.IsGuest)
+                        continue;
 
-                List<XML.playerIndexPlayersPlayerAttribute> attrs = new List<Guncho.XML.playerIndexPlayersPlayerAttribute>();
-                foreach (KeyValuePair<string, string> pair in p.GetAllAttributes())
+                    XML.playerIndexPlayersPlayer item = new Guncho.XML.playerIndexPlayersPlayer();
+                    if (p.IsAdmin)
+                    {
+                        item.admin = true;
+                        item.adminSpecified = true;
+                    }
+                    item.id = p.ID;
+                    item.name = p.Name;
+                    item.pwdHash = p.PasswordHash;
+                    item.pwdSalt = p.PasswordSalt;
+
+                    List<XML.playerIndexPlayersPlayerAttribute> attrs = new List<Guncho.XML.playerIndexPlayersPlayerAttribute>();
+                    foreach (KeyValuePair<string, string> pair in p.GetAllAttributes())
+                    {
+                        XML.playerIndexPlayersPlayerAttribute attr = new Guncho.XML.playerIndexPlayersPlayerAttribute();
+                        attr.name = pair.Key;
+                        attr.Value = pair.Value;
+                        attrs.Add(attr);
+                    }
+                    item.attribute = attrs.ToArray();
+
+                    entries.Add(item);
+                }
+
+                index.Item.player = entries.ToArray();
+
+                using (ReplacingStream stream = new ReplacingStream(
+                    Path.Combine(Properties.Settings.Default.RealmDataPath,
+                                 Properties.Settings.Default.PlayersFileName)))
                 {
-                    XML.playerIndexPlayersPlayerAttribute attr = new Guncho.XML.playerIndexPlayersPlayerAttribute();
-                    attr.name = pair.Key;
-                    attr.Value = pair.Value;
-                    attrs.Add(attr);
+                    XmlSerializer ser = new XmlSerializer(typeof(XML.playerIndex));
+                    ser.Serialize(stream, index);
                 }
-                item.attribute = attrs.ToArray();
-
-                entries.Add(item);
-            }
-
-            index.Item.player = entries.ToArray();
-
-            using (ReplacingStream stream = new ReplacingStream(
-                Path.Combine(Properties.Settings.Default.RealmDataPath,
-                             Properties.Settings.Default.PlayersFileName)))
-            {
-                XmlSerializer ser = new XmlSerializer(typeof(XML.playerIndex));
-                ser.Serialize(stream, index);
-            }
-
-            return TaskConstants.Completed;
+            });
         }
 
         #region IPlayersService
@@ -1176,7 +1178,7 @@ namespace Guncho
             return newName.Trim() == newName && GetRealmByName(newName) == null;
         }
         
-        public async Task<bool> TransactionalUpdate(Player player, Func<Player, bool> transaction)
+        public async Task<bool> TransactionalUpdateAsync(Player player, Func<Player, bool> transaction)
         {
             bool success;
 
@@ -1187,7 +1189,7 @@ namespace Guncho
 
             if (success)
             {
-                await SavePlayers();
+                await SavePlayersAsync();
             }
 
             return success;
@@ -1266,7 +1268,7 @@ namespace Guncho
 
                 running = true;
                 whenShutDown = new TaskCompletionSource<bool>();
-                eventTask = Task.Run(EventTaskProc);
+                eventTask = Task.Run(ProcessEventsAsync);
 
                 // TCP connections
                 //XXX break dependency
@@ -1274,7 +1276,7 @@ namespace Guncho
                 tcpManager.ConnectionAccepted += (sender, e) =>
                 {
                     logger.LogMessage(LogLevel.Verbose, "TCP: Accepting connection from {0}.", FormatEndPoint(e.Connection.OtherSide));
-                    var connTask = HandleConnection(e.Connection, cancellation.Token);
+                    var connTask = HandleConnectionAsync(e.Connection, cancellation.Token);
                     openConnections.TryAdd(e.Connection, connTask);
                 };
                 tcpManager.ConnectionClosed += (sender, e) =>
@@ -1285,14 +1287,14 @@ namespace Guncho
                 };
 
                 logger.LogMessage(LogLevel.Notice, "TCP: Listening on port {0}.", config.GamePort);
-                var tcpListenTask = tcpManager.Run(cancellation.Token);
+                var tcpListenTask = tcpManager.RunAsync(cancellation.Token);
 
                 // SignalR connections
                 EventHandler<ConnectionAcceptedEventArgs<SignalRConnection>> sigrAcceptedHandler =
                     (sender, e) =>
                     {
                         logger.LogMessage(LogLevel.Verbose, "SignalR: Accepting connection with ID {0}.", e.Connection.ConnectionId);
-                        var connTask = HandleConnection(e.Connection, cancellation.Token, e.AuthenticatedUserName);
+                        var connTask = HandleConnectionAsync(e.Connection, cancellation.Token, e.AuthenticatedUserName);
                         openConnections.TryAdd(e.Connection, connTask);
                     };
                 EventHandler<ConnectionEventArgs<SignalRConnection>> sigrClosedHandler =
@@ -1306,7 +1308,7 @@ namespace Guncho
                 sigrManager.ConnectionClosed += sigrClosedHandler;
 
                 logger.LogMessage(LogLevel.Notice, "SignalR: Listening.");  //XXX where?
-                var sigrListenTask = sigrManager.Run(cancellation.Token);
+                var sigrListenTask = sigrManager.RunAsync(cancellation.Token);
 
                 try
                 {
@@ -1326,7 +1328,7 @@ namespace Guncho
                 await eventTask;
 
                 await Task.WhenAll(from r in instances.Values
-                                   select r.PolitelyDispose());
+                                   select r.PolitelyDisposeAsync());
             }
             catch (Exception ex)
             {
@@ -1416,21 +1418,21 @@ namespace Guncho
             return result.Handled;
         }
 
-        private async Task HandleConnection(Connection conn, CancellationToken cancellationToken, string authenticatedUser = null)
+        private async Task HandleConnectionAsync(Connection conn, CancellationToken cancellationToken, string authenticatedUser = null)
         {
             if (authenticatedUser != null)
             {
                 // log them in immediately
                 if (authenticatedUser.ToLower() == "guest")
                 {
-                    await LogInAsGuest(conn);
+                    await LogInAsGuestAsync(conn);
                 }
                 else
                 {
                     var player = GetPlayerByName(authenticatedUser);
                     if (player != null)
                     {
-                        await LogInAsPlayer(conn, player);
+                        await LogInAsPlayerAsync(conn, player);
                     }
                     else
                     {
@@ -1463,14 +1465,14 @@ namespace Guncho
                 if (instance == null)
                 {
                     // only handle out-of-realm commands (connect, create, quit, who)
-                    if (!UnpackHandleSystemCommandResult(await HandleSystemCommand(conn, line), out line))
+                    if (!UnpackHandleSystemCommandResult(await HandleSystemCommandAsync(conn, line), out line))
                     {
                         await conn.WriteLineAsync("Unknown command.");
                         await conn.WriteLineAsync();
                         await GreetClientAsync(conn);
                     }
                 }
-                else if (UnpackHandleSystemCommandResult(await HandleSystemCommand(conn, line), out line))
+                else if (UnpackHandleSystemCommandResult(await HandleSystemCommandAsync(conn, line), out line))
                 {
                     // go on to the next line
                     continue;
@@ -1510,7 +1512,7 @@ namespace Guncho
                     conn.Player.Connection = null;
                 }
 
-                await EnterInstance(conn.Player, null);
+                await EnterInstanceAsync(conn.Player, null);
 
                 if (conn.Player.IsGuest)
                 {
@@ -1530,10 +1532,10 @@ namespace Guncho
 
         public void InstanceFinished(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
         {
-            QueueEvent(() => HandleInstanceFinished(instance, abandonedPlayers, wasTerminated));
+            QueueEvent(() => HandleInstanceFinishedAsync(instance, abandonedPlayers, wasTerminated));
         }
 
-        private async Task HandleInstanceFinished(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
+        private async Task HandleInstanceFinishedAsync(Instance instance, Player[] abandonedPlayers, bool wasTerminated)
         {
             if (wasTerminated && !instance.RestartRequested)
             {
@@ -1546,22 +1548,22 @@ namespace Guncho
                 instance.RestartRequested = false;
                 logger.LogMessage(LogLevel.Verbose, "Restarting realm '{0}'", instance.Name);
 
-                await instance.Activate();
+                await instance.ActivateAsync();
             }
 
-            IInstance initialRealm = await GetDefaultInstance(GetRealm(Properties.Settings.Default.StartRealmName));
+            IInstance initialRealm = await GetDefaultInstanceAsync(GetRealm(Properties.Settings.Default.StartRealmName));
 
             foreach (Player p in abandonedPlayers)
             {
                 using (await p.Lock.WriterLockAsync())
                 {
                     p.Instance = null;
-                    await EnterInstance(p, initialRealm);
+                    await EnterInstanceAsync(p, initialRealm);
                 }
             }
         }
 
-        private async Task HandleInstanceFailure(Instance inst, string reason)
+        private async Task HandleInstanceFailureAsync(Instance inst, string reason)
         {
             bool isCondemned = inst.Realm.IncrementFailureCount();
 
@@ -1575,8 +1577,8 @@ namespace Guncho
                 inst.RestartRequested = true;
             }
 
-            await SetEventInterval(inst, 0);
-            await inst.Deactivate();
+            await SetEventIntervalAsync(inst, 0);
+            await inst.DeactivateAsync();
         }
 
         private static string GetToken(ref string str, char delim)
@@ -1598,7 +1600,7 @@ namespace Guncho
             return result;
         }
 
-        private async Task EnterInstance(Player player, IInstance instance, string position = null, bool traveling = false)
+        private async Task EnterInstanceAsync(Player player, IInstance instance, string position = null, bool traveling = false)
         {
             IInstance prevRealm;
             using (await player.Lock.WriterLockAsync())
@@ -1619,7 +1621,7 @@ namespace Guncho
                     player.ID,
                     prevRealm.Name);
 
-                await prevRealm.RemovePlayer(player);
+                await prevRealm.RemovePlayerAsync(player);
             }
 
             using (await player.Lock.WriterLockAsync())
@@ -1634,18 +1636,18 @@ namespace Guncho
                     instance.Name);
 
                 if (!instance.IsActive)
-                    await instance.Activate();
+                    await instance.ActivateAsync();
 
-                await instance.AddPlayer(player, position);
+                await instance.AddPlayerAsync(player, position);
             }
         }
 
         public void TransferPlayer(Player player, string spec)
         {
-            QueueEvent(() => HandleTransferPlayer(player, spec));
+            QueueEvent(() => HandleTransferPlayerAsync(player, spec));
         }
 
-        private async Task HandleTransferPlayer(Player player, string spec)
+        private async Task HandleTransferPlayerAsync(Player player, string spec)
         {
             string instanceName, token;
 
@@ -1678,14 +1680,14 @@ namespace Guncho
                 }
                 else
                 {
-                    await dest.Activate();
+                    await dest.ActivateAsync();
 
                     // TODO: let the destination know which realm is trying to send a player, so it can accept only from certain source realms
-                    string check = await dest.SendAndGet("$knock " + token);
+                    string check = await dest.SendAndGetAsync("$knock " + token);
                     switch (check)
                     {
                         case "ok":
-                            await EnterInstance(player, dest, "=" + token, true);
+                            await EnterInstanceAsync(player, dest, "=" + token, true);
                             break;
 
                         case "full":
@@ -1724,7 +1726,7 @@ namespace Guncho
             }
         }
         
-        private async Task ShowWhoList(Connection conn, Player player)
+        private async Task ShowWhoListAsync(Connection conn, Player player)
         {
             var sb = new StringBuilder();
             sb.AppendFormat("{0,-25} {1,-6} {2,-6} {3}", "Player", "Conn", "Idle", "Realm");
@@ -1868,7 +1870,7 @@ namespace Guncho
             return sb.ToString();
         }
 
-        private async Task GreetClient(Connection conn)
+        private async Task GreetClientAsync(Connection conn)
         {
             string file = Path.Combine(
                 Properties.Settings.Default.RealmDataPath,
@@ -1878,7 +1880,8 @@ namespace Guncho
             {
                 try
                 {
-                    await conn.WriteAsync(await FileAsync.ReadAllText(file));
+                    //await conn.WriteAsync(await FileAsync.ReadAllText(file));
+                    await SendTextFileAsync(conn, "", file);
                     return;
                 }
                 catch
@@ -1893,37 +1896,7 @@ namespace Guncho
             await conn.WriteLineAsync("To create a new character, use the web site: " + Properties.Settings.Default.WebAddress);
         }
 
-        private async Task GreetClientAsync(Connection conn)
-        {
-            var file = Path.Combine(
-                Properties.Settings.Default.RealmDataPath,
-                Properties.Settings.Default.GreetingFileName);
-
-            if (File.Exists(file))
-            {
-                try
-                {
-                    // TODO: use SendTextFile?
-                    string greeting;
-                    using (var rdr = File.OpenText(file))
-                    {
-                        greeting = await rdr.ReadToEndAsync();
-                    }
-                    await conn.WriteAsync(greeting);
-                    return;
-                }
-                catch (IOException)
-                {
-                    // fall through to default greeting
-                }
-            }
-
-            await conn.WriteLineAsync("Welcome to the server!");
-            await conn.WriteLineAsync("Type \"connect <name> <password>\" to connect.");
-            await conn.WriteLineAsync("To create a new character, use the web site: " + Properties.Settings.Default.WebAddress);
-        }
-
-        private async Task SendTextFile(Connection conn, string playerName, string fileName)
+        private async Task SendTextFileAsync(Connection conn, string playerName, string fileName)
         {
             string path = Path.Combine(
                 Properties.Settings.Default.RealmDataPath,

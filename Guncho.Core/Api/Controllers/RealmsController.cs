@@ -148,7 +148,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("{realmName}", Name = "PutRealmByName")]
-        public async Task<IHttpActionResult> PutRealmByName(string realmName, RealmDto newSettings)
+        public async Task<IHttpActionResult> PutRealmByNameAsync(string realmName, RealmDto newSettings)
         {
             // TODO: use ETags for concurrency control
 
@@ -250,7 +250,7 @@ namespace Guncho.Api.Controllers
                 return BadRequest(ModelState);
             }
 
-            var result = await realmsService.TransactionalUpdate(
+            var result = await realmsService.TransactionalUpdateAsync(
                 realm,
                 r =>
                 {
@@ -321,7 +321,7 @@ namespace Guncho.Api.Controllers
         }
 
         [Route("", Name = "PostNewRealm")]
-        public async Task<IHttpActionResult> PostNewRealm(RealmDto newRealm)
+        public async Task<IHttpActionResult> PostNewRealmAsync(RealmDto newRealm)
         {
             // verify permission
             if (!Request.CheckAccess(GunchoResources.RealmActions.Create, GunchoResources.Realm, newRealm.Name))
@@ -360,7 +360,7 @@ namespace Guncho.Api.Controllers
             }
 
             // create the realm
-            var realm = await realmsService.CreateRealm(playersService.GetPlayerByName(User.Identity.Name), newRealm.Name, factory);
+            var realm = await realmsService.CreateRealmAsync(playersService.GetPlayerByName(User.Identity.Name), newRealm.Name, factory);
 
             if (realm == null)
             {
@@ -376,7 +376,7 @@ namespace Guncho.Api.Controllers
             }
 
             // invoke the PUT handler to update any other settings
-            var innerResult = (await PutRealmByName(newRealm.Name, newRealm)) as OkNegotiatedContentResult<RealmDto>;
+            var innerResult = (await PutRealmByNameAsync(newRealm.Name, newRealm)) as OkNegotiatedContentResult<RealmDto>;
 
             if (innerResult != null)
             {

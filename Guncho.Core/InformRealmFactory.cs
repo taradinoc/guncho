@@ -55,7 +55,7 @@ namespace Guncho
             return sb.ToString();
         }
 
-        public override RealmEditingOutcome CompileRealm(string realmName, string sourceFile, string outputFile)
+        public override async Task<RealmEditingOutcome> CompileRealmAsync(string realmName, string sourceFile, string outputFile)
         {
             string skeleton = Properties.Settings.Default.NiSkeletonPath;
             string uuid = MakeUUID(realmName);
@@ -67,7 +67,7 @@ namespace Guncho
             File.Delete(tempINF);
             File.Copy(sourceFile, tempNI);
 
-            string output = Execute(niCompilerPath,
+            string output = await ExecuteAsync(niCompilerPath,
                 "-release",
                 "-rules", niExtensionDir,
                 "-package", skeleton,
@@ -117,7 +117,7 @@ namespace Guncho
                     if (i > 0 && i < tempContent.Length)
                         File.WriteAllText(tempINF, tempContent.Substring(i));
 
-                    output = Execute(infCompilerPath,
+                    output = await ExecuteAsync(infCompilerPath,
                         "-Gw",
                         "+include_path=" + infLibraryDir,
                         tempINF,
