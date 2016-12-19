@@ -9,7 +9,7 @@ using System.Web;
 
 namespace Guncho
 {
-    class InformRealmFactory : RealmFactory
+    sealed class InformRealmFactory : RealmFactory
     {
         private readonly ILogger logger;
 
@@ -228,6 +228,12 @@ namespace Guncho
             }
 
             return result.ToArray();
+        }
+
+        public override IInstance LoadInstance(IInstanceSite site, Realm realm, string name, ILogger logger)
+        {
+            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
+            return new FyreVMInstance(site, realm, stream, name, logger);
         }
     }
 }

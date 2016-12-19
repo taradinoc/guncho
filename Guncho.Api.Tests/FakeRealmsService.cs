@@ -15,7 +15,7 @@ namespace Guncho.Api.Tests
             //XXX
         }
 
-        public Realm CreateRealm(Player owner, string name, RealmFactory factory)
+        public Task<Realm> CreateRealmAsync(Player owner, string name, RealmFactory factory)
         {
             throw new NotImplementedException();
         }
@@ -40,7 +40,7 @@ namespace Guncho.Api.Tests
             throw new NotImplementedException();
         }
 
-        public bool TransactionalUpdate(Realm realm, Func<Realm, bool> transaction)
+        public Task<bool> TransactionalUpdateAsync(Realm realm, Func<Realm, bool> transaction)
         {
             throw new NotImplementedException();
         }

@@ -12,12 +12,7 @@ namespace Guncho
         private readonly Dictionary<string, string> attributes = new Dictionary<string, string>();
         private string name;
 
-        public Player(int id, string name, bool isAdmin)
-            : this(id, name, isAdmin, false)
-        {
-        }
-
-        public Player(int id, string name, bool isAdmin, bool isGuest)
+        public Player(int id, string name, bool isAdmin, bool isGuest = false)
         {
             ID = id;
             this.name = name;
@@ -33,9 +28,6 @@ namespace Guncho
         public bool IsGuest { get; }
         public string Disambiguating { get; set; }
         public string LastCommand { get; set; }
-        public Connection Connection { get; set; }
-        public Realm Realm => Instance?.Realm;
-        public IInstance Instance { get; set; }
 
         public string Name
         {
@@ -52,7 +44,7 @@ namespace Guncho
         public string GetAttribute(string name)
         {
             if (name == null)
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
 
             string result;
             if (attributes.TryGetValue(name, out result))
@@ -69,7 +61,7 @@ namespace Guncho
         public void SetAttribute(string name, string value)
         {
             if (name == null)
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
 
             if (value == null || value.Length == 0)
                 attributes.Remove(name);

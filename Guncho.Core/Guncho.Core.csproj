@@ -260,9 +260,10 @@
     <Compile Include="ForEach.cs" />
     <Compile Include="ICommandDestination.cs" />
     <Compile Include="IInstance.cs" />
+    <Compile Include="IInstanceSite.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="InformRealmFactory.cs" />
-    <Compile Include="Instance.cs" />
+    <Compile Include="FyreVMInstance.cs" />
     <Compile Include="IPlayerDestination.cs" />
     <Compile Include="Player.cs" />
     <Compile Include="PriorityQueue.cs" />

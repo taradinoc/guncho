@@ -57,7 +57,7 @@ namespace Guncho.Connections
             try
             {
                 var tcpConnection = new TcpConnection(tcpClient);
-                ConnectionAccepted(this, new ConnectionAcceptedEventArgs<TcpConnection> { Connection = tcpConnection, AuthenticatedUserName = null });
+                ConnectionAccepted?.Invoke(this, new ConnectionAcceptedEventArgs<TcpConnection> { Connection = tcpConnection, AuthenticatedUserName = null });
 
                 try
                 {
@@ -65,7 +65,7 @@ namespace Guncho.Connections
                 }
                 finally
                 {
-                    ConnectionClosed(this, new ConnectionEventArgs<TcpConnection> { Connection = tcpConnection });
+                    ConnectionClosed?.Invoke(this, new ConnectionEventArgs<TcpConnection> { Connection = tcpConnection });
                 }
             }
             finally

@@ -70,7 +70,7 @@ namespace Guncho.Connections
         {
             var connection = new SignalRConnection(this, connectionId);
             connections[connectionId] = connection;
-            ConnectionAccepted(this, new ConnectionAcceptedEventArgs<SignalRConnection>()
+            ConnectionAccepted?.Invoke(this, new ConnectionAcceptedEventArgs<SignalRConnection>()
             {
                 Connection = connection,
                 AuthenticatedUserName = playerName ?? "Guest"
@@ -83,7 +83,7 @@ namespace Guncho.Connections
             if (connections.TryRemove(connectionId, out connection))
             {
                 connection.NotifyClosed();
-                ConnectionClosed(this, new ConnectionEventArgs<SignalRConnection>() { Connection = connection });
+                ConnectionClosed?.Invoke(this, new ConnectionEventArgs<SignalRConnection>() { Connection = connection });
             }
         }
     }

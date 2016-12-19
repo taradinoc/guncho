@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Guncho.Services;
+using System.Threading.Tasks;
 
 namespace Guncho.Api.Tests
 {
@@ -35,9 +36,9 @@ namespace Guncho.Api.Tests
             return false;
         }
 
-        public bool TransactionalUpdate(Player player, Func<Player, bool> transaction)
+        public Task<bool> TransactionalUpdateAsync(Player player, Func<Player, bool> transaction)
         {
-            return transaction(player);
+            return Task.FromResult(transaction(player));
         }
     }
 }

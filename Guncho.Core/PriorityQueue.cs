@@ -67,12 +67,12 @@ namespace Guncho
 
         protected PriorityQueue<T> CloneAsPriorityQueue()
         {
-            int count;
-            Entry[] heap;
+            int newCount;
+            Entry[] newHeap;
 
-            InternalExport(out heap, out count);
+            InternalExport(out newHeap, out newCount);
 
-            return new PriorityQueue<T>(heap, count);
+            return new PriorityQueue<T>(newHeap, newCount);
         }
 
         protected virtual void InternalExport(out Entry[] heap, out int count)
@@ -185,7 +185,7 @@ namespace Guncho
             set
             {
                 if (value < count)
-                    throw new ArgumentOutOfRangeException("value",
+                    throw new ArgumentOutOfRangeException(nameof(value),
                         "Capacity may not be less than Count");
 
                 if (value != heap.Length)
@@ -261,10 +261,10 @@ namespace Guncho
         public void CopyTo(T[] array, int index)
         {
             if (array == null)
-                throw new ArgumentNullException("array");
+                throw new ArgumentNullException(nameof(array));
 
             if (index < 0)
-                throw new ArgumentOutOfRangeException("index");
+                throw new ArgumentOutOfRangeException(nameof(index));
 
             if (array.Rank > 1)
                 throw new ArgumentException("Array is multidimensional");

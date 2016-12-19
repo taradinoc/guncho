@@ -4,12 +4,14 @@ using System.Threading.Tasks;
 
 namespace Guncho.Connections
 {
-    public class ConnectionEventArgs<TConnection> : EventArgs where TConnection : Connection
+    public class ConnectionEventArgs<TConnection> : EventArgs
+        where TConnection : Connection
     {
         public TConnection Connection { get; set; }
     }
-    
-    public class ConnectionAcceptedEventArgs<TConnection> : ConnectionEventArgs<TConnection> where TConnection : Connection
+
+    public class ConnectionAcceptedEventArgs<TConnection> : ConnectionEventArgs<TConnection>
+        where TConnection : Connection
     {
         /// <summary>
         /// The name of the user if the user's identity is already authenticated, otherwise null.

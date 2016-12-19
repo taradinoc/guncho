@@ -32,14 +32,10 @@ namespace Guncho
 
         public Realm LoadRealm(Server server, string name, string sourceFile, string storyFile, Player owner)
         {
-            return new Realm(server, this, name, sourceFile, storyFile, owner);
+            return new Realm(this, name, sourceFile, storyFile, owner);
         }
 
-        public IInstance LoadInstance(Server server, Realm realm, string name, ILogger logger)
-        {
-            FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
-            return new Instance(server, realm, stream, name, logger);
-        }
+        public abstract IInstance LoadInstance(IInstanceSite site, Realm realm, string name, ILogger logger);
 
         protected static string MakeUUID(string realmName)
         {

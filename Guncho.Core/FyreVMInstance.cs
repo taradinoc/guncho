@@ -13,9 +13,9 @@ using System.Diagnostics.Contracts;
 
 namespace Guncho
 {
-    public class Instance : IInstance
+    public class FyreVMInstance : IInstance
     {
-        private readonly Server server;
+        private readonly IInstanceSite site;
         private readonly Realm realm;
         private readonly Stream zfile;
         private readonly RealmIO io;
@@ -50,14 +50,14 @@ namespace Guncho
         /// <summary>
         /// Creates an new playable instance of a realm.
         /// </summary>
-        /// <param name="server">The Guncho server.</param>
+        /// <param name="site">The Guncho server.</param>
         /// <param name="realm">The realm to instantiate.</param>
         /// <param name="zfile">The compiled realm file.</param>
         /// <param name="name">The unique name of the instance.</param>
         /// <param name="logger">The logger.</param>
-        public Instance(Server server, Realm realm, Stream zfile, string name, ILogger logger)
+        public FyreVMInstance(IInstanceSite site, Realm realm, Stream zfile, string name, ILogger logger)
         {
-            this.server = server;
+            this.site = site;
             this.realm = realm;
             this.zfile = zfile;
             this.name = name;
@@ -234,12 +234,7 @@ namespace Guncho
                         players.Clear();
                     }
 
-                    foreach (Player p in abandoned)
-                        using (p.Lock.ReaderLock())
-                            if (p.Connection != null)
-                                p.Connection.FlushOutputAsync().Wait();
-
-                    server.InstanceFinished(this, abandoned, wasTerminated);
+                    site.NotifyInstanceFinished(this, abandoned, wasTerminated);
                 }
             }
             catch (Exception ex)
@@ -370,9 +365,9 @@ namespace Guncho
         public async Task ExportPlayerPositionsAsync(IDictionary<Player, string> results)
         {
             if (results == null)
-                throw new ArgumentNullException("results");
+                throw new ArgumentNullException(nameof(results));
             if (results.IsReadOnly)
-                throw new ArgumentException("Dictionary is read only", "results");
+                throw new ArgumentException("Dictionary is read only", nameof(results));
 
             Player[] temp;
             using (await playersLock.WriterLockAsync())
@@ -384,9 +379,6 @@ namespace Guncho
 
             foreach (Player p in temp)
             {
-                using (await p.Lock.WriterLockAsync())
-                    p.Instance = null;
-
                 string locationStr;
                 try
                 {
@@ -404,17 +396,14 @@ namespace Guncho
 
         private async Task FlushAllAsync()
         {
+            Task[] tasks;
+
             using (await playersLock.ReaderLockAsync())
             {
-                foreach (Player p in players.Values)
-                {
-                    using (await p.Lock.ReaderLockAsync())
-                    {
-                        if (p.Connection != null)
-                            await p.Connection.FlushOutputAsync();
-                    }
-                }
+                tasks = players.Values.Select(p => site.FlushPlayerAsync(p)).ToArray();
             }
+
+            await Task.WhenAll(tasks);
         }
 
         private async Task HandleOutputAsync(string text)
@@ -523,19 +512,15 @@ namespace Guncho
                         prevPlayers.Push(curPlayer);
 
                         int playerNum = int.Parse(tagParam.ToString());
-                        using (await playersLock.ReaderLockAsync())
-                            players.TryGetValue(playerNum, out curPlayer);
+                        players.TryGetValue(playerNum, out curPlayer);
                         if (curPlayer != null)
-                            using (await curPlayer.Lock.ReaderLockAsync())
-                                if (curPlayer.Connection != null)
-                                    await curPlayer.Connection.WriteLineAsync();
+                            await site.SendLineToPlayerAsync(curPlayer);
                         tagParam = null;
                         tagstate = 0;
                     }
                     else
                     {
-                        await SendCurPlayerAsync("<$t ");
-                        await SendCurPlayerAsync(tagParam.ToString());
+                        await SendCurPlayerAsync("<$t " + tagParam.ToString());
                         tagstate = 0;
                     }
                     break;
@@ -689,36 +674,28 @@ namespace Guncho
         {
             if (curPlayer == Announcer)
             {
+                Task[] tasks;
+
                 using (await playersLock.ReaderLockAsync())
                 {
                     if (c == '\n')
                     {
-                        foreach (Player p in players.Values)
-                            using (await p.Lock.ReaderLockAsync())
-                                if (p.Connection != null)
-                                    await p.Connection.WriteAsync("\r\n");
+                        tasks = players.Values.Select(p => site.SendLineToPlayerAsync(p)).ToArray();
                     }
                     else
                     {
-                        foreach (Player p in players.Values)
-                            using (await p.Lock.ReaderLockAsync())
-                                if (p.Connection != null)
-                                    await p.Connection.WriteAsync(c);
+                        tasks = players.Values.Select(p => site.SendToPlayerAsync(p, c)).ToArray();
                     }
                 }
+
+                await Task.WhenAll(tasks);
             }
             else if (curPlayer != null)
             {
-                using (await curPlayer.Lock.ReaderLockAsync())
-                {
-                    if (curPlayer.Connection != null)
-                    {
-                        if (c == '\n')
-                            await curPlayer.Connection.WriteAsync("\r\n");
-                        else
-                            await curPlayer.Connection.WriteAsync(c);
-                    }
-                }
+                if (c == '\n')
+                    await site.SendLineToPlayerAsync(curPlayer);
+                else
+                    await site.SendToPlayerAsync(curPlayer, c);
             }
             else
             {
@@ -738,19 +715,18 @@ namespace Guncho
 
             if (curPlayer == Announcer)
             {
+                Task[] tasks;
+
                 using (await playersLock.ReaderLockAsync())
-                    foreach (Player p in players.Values)
-                        using (await p.Lock.ReaderLockAsync())
-                            if (p.Connection != null)
-                                await p.Connection.WriteAsync(str);
+                {
+                    tasks = players.Values.Select(p => site.SendToPlayerAsync(p, str)).ToArray();
+                }
+
+                await Task.WhenAll(tasks);
             }
             else if (curPlayer != null)
             {
-                using (await curPlayer.Lock.ReaderLockAsync())
-                {
-                    if (curPlayer.Connection != null)
-                        await curPlayer.Connection.WriteAsync(str);
-                }
+                await site.SendToPlayerAsync(curPlayer, str);
             }
             else
             {
@@ -771,7 +747,7 @@ namespace Guncho
             }
             else
             {
-                server.TransferPlayer(curPlayer, spec);
+                site.TransferPlayer(curPlayer, spec);
             }
         }
 
@@ -807,13 +783,13 @@ namespace Guncho
 
         private class RealmIO
         {
-            private readonly Instance instance;
+            private readonly FyreVMInstance instance;
             private readonly AsyncProducerConsumerQueue<object> inputQueue = new AsyncProducerConsumerQueue<object>();  // string
             private readonly AsyncProducerConsumerQueue<object> transQueue = new AsyncProducerConsumerQueue<object>();  // Transaction
             private readonly ConcurrentQueue<string> specialResponses = new ConcurrentQueue<string>();
             private Transaction curTrans;
 
-            public RealmIO(Instance instance)
+            public RealmIO(FyreVMInstance instance)
             {
                 this.instance = instance;
             }
@@ -887,7 +863,7 @@ namespace Guncho
 
                             if (!instance.rawMode)
                             {
-                                if (line.StartsWith("$silent "))
+                                if (line.StartsWith("$silent ", StringComparison.Ordinal))
                                 {
                                     // set up a fake transaction so the output will be hidden
                                     // and the next line's output substituted instead
@@ -1024,10 +1000,10 @@ namespace Guncho
             /// <summary>
             /// Constructs a new DisambigHelper.
             /// </summary>
-            /// <param name="realm">The realm where disambiguation is occurring.</param>
+            /// <param name="instance">The instance where disambiguation is occurring.</param>
             /// <param name="line">The command that will need disambiguation, starting with
             /// the player ID and a colon.</param>
-            public DisambigHelper(Instance instance, string line)
+            public DisambigHelper(FyreVMInstance instance, string line)
                 : base("")
             {
                 string[] parts = line.Split(':');
@@ -1156,7 +1132,7 @@ namespace Guncho
                 case "rteinterval":
                     // change real-time event timer interval
                     timerInterval = value;
-                    server.SetEventIntervalAsync(this, value).Wait();
+                    site.SetEventIntervalAsync(this, value).Wait();
                     break;
             }
 
@@ -1185,11 +1161,9 @@ namespace Guncho
                                 return realm.GetAccessLevel(queriedPlayer).ToString();
 
                             case "idletime":
-                                using (queriedPlayer.Lock.ReaderLock())
-                                {
-                                    if (queriedPlayer.Connection != null)
-                                        return Server.FormatTimeSpan(queriedPlayer.Connection.IdleTime);
-                                }
+                                var idleTime = site.GetPlayerIdleTime(queriedPlayer);
+                                if (idleTime != null)
+                                    return Server.FormatTimeSpan(idleTime.Value);
                                 return "";
                         }
 

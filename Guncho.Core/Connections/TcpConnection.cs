@@ -50,7 +50,15 @@ namespace Guncho.Connections
             try
             {
                 await FlushOutputAsync();
+
                 var str = await rdr.ReadLineAsync().WithCancellation(cancellationToken);
+
+                if (str == null)
+                {
+                    whenClosed.TrySetResult(true);
+                    return null;
+                }
+
                 LastActivity = DateTime.Now;
                 return str;
             }

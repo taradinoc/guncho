@@ -110,7 +110,6 @@ namespace Guncho
 
     public class Realm
     {
-        private readonly Server server;
         private readonly string sourceFile, storyFile;
         private RealmAccessListEntry[] accessList;
 
@@ -120,17 +119,15 @@ namespace Guncho
         private int failureCount;
 
 
-        public Realm(Server server, RealmFactory factory, string name, string sourceFile,
-            string storyFile, Player owner)
+        public Realm(RealmFactory factory, string name, string sourceFile, string storyFile,
+            Player owner)
         {
-            Contract.Requires(server != null);
             Contract.Requires(factory != null);
             Contract.Requires(name != null);
             Contract.Requires(sourceFile != null);
             Contract.Requires(storyFile != null);
             Contract.Requires(owner != null);
 
-            this.server = server;
             this.Factory = factory;
             this.Name = name;
             this.sourceFile = sourceFile;
@@ -142,7 +139,7 @@ namespace Guncho
         }
 
         public Realm(Realm other, string newName)
-            : this(other.server, other.Factory, newName, other.sourceFile, other.storyFile, other.Owner)
+            : this(other.Factory, newName, other.sourceFile, other.storyFile, other.Owner)
         {
             Contract.Requires(other != null);
             Contract.Requires(newName != null);
