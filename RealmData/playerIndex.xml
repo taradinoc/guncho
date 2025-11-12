@@ -1,6 +1,17 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="utf-8"?>
 <playerIndex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <players>
-    <player name="Wizard" id="1" admin="true" pwdSalt="x9m" pwdHash="47XXSQ6hhZYLrqW/c45JqxIkF2Y=" />
+    <player name="Wizard" id="1" admin="true" pwdSalt="x9m" pwdHash="47XXSQ6hhZYLrqW/c45JqxIkF2Y=">
+      <attribute name="pronouns_1p">s=I|o=me|p=my|ps=mine|r=myself|v=am</attribute>
+      <attribute name="pronouns_2p">s=you|o=you|p=your|ps=yours|r=yourself|v=are</attribute>
+      <attribute name="pronouns_3p">s=she|o=her|p=her|ps=hers|r=herself|v=is</attribute>
+      <attribute name="description">Just a wizard.</attribute>
+    </player>
+    <player name="Wizard" id="1" admin="true" pwdSalt="x9m" pwdHash="47XXSQ6hhZYLrqW/c45JqxIkF2Y=">
+      <attribute name="pronouns_1p">s=I|o=me|p=my|ps=mine|r=myself|v=am</attribute>
+      <attribute name="pronouns_2p">s=you|o=you|p=your|ps=yours|r=yourself|v=are</attribute>
+      <attribute name="pronouns_3p">s=she|o=her|p=her|ps=hers|r=herself|v=is</attribute>
+      <attribute name="description">Just a wizard.</attribute>
+    </player>
   </players>
 </playerIndex>

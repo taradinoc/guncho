@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference the .NET 10 game engine -->
+    <ProjectReference Include="$(SolutionDir)\Guncho.Engine\Guncho.Engine.csproj" />
+    <ProjectReference Include="$(SolutionDir)\Guncho.Shared\Guncho.Shared.csproj" />
+    <!-- Reference Blazor client for proper static web assets -->
+    <ProjectReference Include="$(SolutionDir)\Guncho.Client\Guncho.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core packages -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="10.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+  </ItemGroup>
+
+</Project>

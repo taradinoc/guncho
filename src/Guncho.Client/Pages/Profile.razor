@@ -1,0 +1,366 @@
+@page "/profile"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Guncho.Client.Services
+@using Guncho.Shared.Auth
+@using Guncho.Shared.Models
+@inject PlayerService PlayerService
+@inject AuthService AuthService
+
+<PageTitle>Profile - Guncho</PageTitle>
+
+<div class="container py-4">
+    <h2 class="mb-4">Player Profile</h2>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (player is null)
+    {
+        <div class="alert alert-warning">Unable to load your profile. Please try again.</div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Character Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(characterMessage))
+                        {
+                            <div class="alert @(characterSaved ? "alert-success" : "alert-danger")">@characterMessage</div>
+                        }
+
+                        <EditForm Model="player" OnValidSubmit="SaveCharacterAsync">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label">Display Name</label>
+                                <InputText class="form-control" @bind-Value="player.Name" disabled />
+                                <div class="form-text">Player renaming will be handled separately.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <InputTextArea class="form-control" rows="3" @bind-Value="description" />
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">Self (1st person)</label>
+                                    @foreach (var field in PronounOrder)
+                                    {
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text">@field.Label</span>
+                                            <input class="form-control" value="@GetPronoun(pronouns1, field.Key)" @oninput="e => SetPronoun(pronouns1, field.Key, e.Value?.ToString() ?? string.Empty)" />
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Addressing You (2nd person)</label>
+                                    @foreach (var field in PronounOrder)
+                                    {
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text">@field.Label</span>
+                                            <input class="form-control" value="@GetPronoun(pronouns2, field.Key)" @oninput="e => SetPronoun(pronouns2, field.Key, e.Value?.ToString() ?? string.Empty)" />
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Talking About You (3rd person)</label>
+                                    @foreach (var field in PronounOrder)
+                                    {
+                                        <div class="input-group input-group-sm mb-2">
+                                            <span class="input-group-text">@field.Label</span>
+                                            <input class="form-control" value="@GetPronoun(pronouns3, field.Key)" @oninput="e => SetPronoun(pronouns3, field.Key, e.Value?.ToString() ?? string.Empty)" />
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Quick Presets</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var preset in Presets)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => ApplyPreset(preset)">@preset.Label</button>
+                                    }
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" disabled="@isSavingCharacter">
+                                @if (isSavingCharacter)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Save Character
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Password</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(passwordMessage))
+                        {
+                            <div class="alert @(passwordChanged ? "alert-success" : "alert-danger")">@passwordMessage</div>
+                        }
+
+                        <EditForm Model="passwords" OnValidSubmit="ChangePasswordAsync">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label class="form-label">Current Password</label>
+                                <InputText class="form-control" @bind-Value="passwords.OldPassword" type="password" autocomplete="current-password" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">New Password</label>
+                                <InputText class="form-control" @bind-Value="passwords.NewPassword" type="password" autocomplete="new-password" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Confirm New Password</label>
+                                <InputText class="form-control" @bind-Value="passwords.ConfirmNewPassword" type="password" autocomplete="new-password" />
+                            </div>
+
+                            <button type="submit" class="btn btn-outline-primary" disabled="@isChangingPassword">
+                                @if (isChangingPassword)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Change Password
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Account Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-4">Username</dt>
+                            <dd class="col-sm-8">@player.Name</dd>
+                            <dt class="col-sm-4">Player ID</dt>
+                            <dd class="col-sm-8">@player.Id</dd>
+                            <dt class="col-sm-4">Admin</dt>
+                            <dd class="col-sm-8">@(player.IsAdmin ? "Yes" : "No")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private PlayerDto? player;
+    private bool isLoading = true;
+    private bool isSavingCharacter;
+    private bool characterSaved;
+    private string? characterMessage;
+
+    private PasswordChangeDto passwords = new();
+    private bool isChangingPassword;
+    private bool passwordChanged;
+    private string? passwordMessage;
+
+    private Dictionary<string, string> pronouns1 = CreateEmptyPronouns();
+    private Dictionary<string, string> pronouns2 = CreateEmptyPronouns();
+    private Dictionary<string, string> pronouns3 = CreateEmptyPronouns();
+    private string? description;
+
+    private static readonly (string Key, string Label)[] PronounOrder =
+    {
+        ("s", "Subject"),
+        ("o", "Object"),
+        ("p", "Determiner"),
+        ("ps", "Possessive"),
+        ("r", "Reflexive"),
+        ("v", "Verb")
+    };
+
+    private static readonly PronounPreset[] Presets = new[]
+    {
+        new PronounPreset("Female", new("I","me","my","mine","myself","am"), new("you","you","your","yours","yourself","are"), new("she","her","her","hers","herself","is")),
+        new PronounPreset("Male", new("I","me","my","mine","myself","am"), new("you","you","your","yours","yourself","are"), new("he","him","his","his","himself","is")),
+        new PronounPreset("Nonbinary", new("I","me","my","mine","myself","am"), new("you","you","your","yours","yourself","are"), new("they","them","their","theirs","themselves","are")),
+        new PronounPreset("It/Its", new("I","me","my","mine","myself","am"), new("you","you","your","yours","yourself","are"), new("it","it","its","its","itself","is"))
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
+        player = await PlayerService.GetCurrentPlayerAsync();
+
+        if (player != null)
+        {
+            description = TryGetAttribute(player.Attributes, "description");
+            pronouns1 = ParsePronouns(TryGetAttribute(player.Attributes, "pronouns_1p"));
+            pronouns2 = ParsePronouns(TryGetAttribute(player.Attributes, "pronouns_2p"));
+            pronouns3 = ParsePronouns(TryGetAttribute(player.Attributes, "pronouns_3p"));
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SaveCharacterAsync()
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        isSavingCharacter = true;
+        characterMessage = null;
+
+        EnsureAttribute(player, "description", description ?? string.Empty);
+        EnsureAttribute(player, "pronouns_1p", PackPronouns(pronouns1));
+        EnsureAttribute(player, "pronouns_2p", PackPronouns(pronouns2));
+        EnsureAttribute(player, "pronouns_3p", PackPronouns(pronouns3));
+
+        var success = await PlayerService.UpdatePlayerAsync(player);
+        characterSaved = success;
+        characterMessage = success ? "Character saved successfully." : "Failed to save character.";
+        isSavingCharacter = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordMessage = null;
+        passwordChanged = false;
+        isChangingPassword = true;
+
+        var result = await AuthService.ChangePasswordAsync(passwords);
+        passwordChanged = result.IsSuccess;
+        passwordMessage = result.IsSuccess ? "Password changed successfully." : result.Error ?? "Failed to change password.";
+
+        if (result.IsSuccess)
+        {
+            passwords = new PasswordChangeDto();
+        }
+
+        isChangingPassword = false;
+    }
+
+    private void ApplyPreset(PronounPreset preset)
+    {
+        pronouns1 = preset.First.ToDictionary();
+        pronouns2 = preset.Second.ToDictionary();
+        pronouns3 = preset.Third.ToDictionary();
+    }
+
+    private static Dictionary<string, string> CreateEmptyPronouns()
+    {
+        return new Dictionary<string, string>
+        {
+            ["s"] = string.Empty,
+            ["o"] = string.Empty,
+            ["p"] = string.Empty,
+            ["ps"] = string.Empty,
+            ["r"] = string.Empty,
+            ["v"] = string.Empty
+        };
+    }
+
+    private static Dictionary<string, string> ParsePronouns(string? packed)
+    {
+        var result = CreateEmptyPronouns();
+        if (string.IsNullOrWhiteSpace(packed))
+        {
+            return result;
+        }
+
+        var pairs = packed.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var pair in pairs)
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length == 2 && result.ContainsKey(parts[0]))
+            {
+                result[parts[0]] = parts[1];
+            }
+        }
+
+        return result;
+    }
+
+    private static string PackPronouns(Dictionary<string, string> pronouns)
+    {
+        var parts = new List<string>(pronouns.Count);
+        foreach (var (key, value) in pronouns)
+        {
+            var sanitized = (value ?? string.Empty).Replace("|", string.Empty).Replace("=", string.Empty);
+            parts.Add($"{key}={sanitized}");
+        }
+
+        return string.Join('|', parts);
+    }
+
+    private static string GetPronoun(Dictionary<string, string> pronounSet, string key)
+    {
+        return pronounSet.TryGetValue(key, out var value) ? value : string.Empty;
+    }
+
+    private static void SetPronoun(Dictionary<string, string> pronounSet, string key, string value)
+    {
+        pronounSet[key] = value ?? string.Empty;
+    }
+
+    private static string? TryGetAttribute(Dictionary<string, string> attributes, string key)
+    {
+        if (attributes.TryGetValue(key, out var value))
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static void EnsureAttribute(PlayerDto player, string key, string value)
+    {
+        if (player.Attributes.ContainsKey(key))
+        {
+            player.Attributes[key] = value;
+        }
+        else
+        {
+            player.Attributes.Add(key, value);
+        }
+    }
+
+    private sealed record PronounPreset(string Label, PronounValues First, PronounValues Second, PronounValues Third);
+
+    private sealed record PronounValues(string S, string O, string P, string Ps, string R, string V)
+    {
+        public Dictionary<string, string> ToDictionary()
+        {
+            return new Dictionary<string, string>
+            {
+                ["s"] = S,
+                ["o"] = O,
+                ["p"] = P,
+                ["ps"] = Ps,
+                ["r"] = R,
+                ["v"] = V
+            };
+        }
+    }
+}

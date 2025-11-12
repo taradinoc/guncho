@@ -1,0 +1,80 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Guncho.Client.Auth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<div class="page">
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #4682b4;">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">Guncho</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <AuthorizeView>
+                        <Authorized>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/play">Play Now</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/realms">My Realms</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    @context.User.Identity?.Name
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="/profile">Edit Profile</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" @onclick="Logout" @onclick:preventDefault>Log Out</a></li>
+                                </ul>
+                            </li>
+                        </Authorized>
+                        <NotAuthorized>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/play">Play As Guest</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/login">Login</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/register">Sign Up</a>
+                            </li>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        <article>
+            @Body
+        </article>
+    </main>
+
+    <hr />
+    <div id="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="text-muted">
+                        Guncho web client version 2.0.<br />
+                        Powered by <a href="https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor">Blazor</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        var authProvider = (JwtAuthenticationStateProvider)AuthStateProvider;
+        await authProvider.MarkUserAsLoggedOut();
+        Navigation.NavigateTo("/");
+    }
+}

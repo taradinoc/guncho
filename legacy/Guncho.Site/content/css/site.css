@@ -1,0 +1,24 @@
+﻿body {
+    font-family: 'Segoe UI', sans-serif;
+    padding-top: 70px;
+}
+
+.tab-content {
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+}
+
+.nav-tabs {
+    margin-bottom: 0;
+}
+
+.form-inline .form-group {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.label-as-badge {
+    border-radius: 1em;
+}

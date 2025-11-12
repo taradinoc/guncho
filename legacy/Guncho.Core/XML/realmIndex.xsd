@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" id="realmIndex">
+	<xs:element name="realmIndex">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="realms">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="realm" minOccurs="0" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="access" minOccurs="0" maxOccurs="unbounded">
+											<xs:complexType>
+												<xs:attribute name="player" type="xs:string" use="required"/>
+												<xs:attribute name="level" type="levelType" use="required"/>
+											</xs:complexType>
+										</xs:element>
+									</xs:sequence>
+									<xs:attribute name="name" type="xs:string" use="required"/>
+									<xs:attribute name="src" type="xs:string" use="required"/>
+									<xs:attribute name="owner" type="xs:string" use="required"/>
+									<xs:attribute name="privacy" type="privacyType" use="optional" default="public"/>
+                  <xs:attribute name="factory" type="xs:string" use="optional"/>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:simpleType name="levelType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="banned"/>
+			<xs:enumeration value="hidden"/>
+			<xs:enumeration value="visible"/>
+			<xs:enumeration value="invited"/>
+			<xs:enumeration value="viewSource"/>
+			<xs:enumeration value="editSource"/>
+			<xs:enumeration value="editSettings"/>
+			<xs:enumeration value="editAccess"/>
+			<xs:enumeration value="safetyOff"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="privacyType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="private"/>
+			<xs:enumeration value="hidden"/>
+			<xs:enumeration value="public"/>
+			<xs:enumeration value="joinable"/>
+			<xs:enumeration value="viewable"/>
+		</xs:restriction>
+	</xs:simpleType>
+</xs:schema>

@@ -1,0 +1,82 @@
+@page "/register"
+@using Guncho.Shared.Auth
+@using Guncho.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Create Account</h3>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success">@successMessage</div>
+                    }
+
+                    <EditForm Model="registerModel" OnValidSubmit="HandleRegister">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <InputText @bind-Value="registerModel.UserName" class="form-control" />
+                            <small class="form-text text-muted">3-16 characters, start with a letter</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <InputText @bind-Value="registerModel.Password" type="password" class="form-control" />
+                            <small class="form-text text-muted">At least 8 characters</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Sign Up
+                        </button>
+                        <a href="/login" class="btn btn-link">Already have an account?</a>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegistrationDto registerModel = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading;
+
+    private async Task HandleRegister()
+    {
+        errorMessage = null;
+        successMessage = null;
+        isLoading = true;
+
+        var result = await AuthService.RegisterAsync(registerModel);
+        if (result.IsSuccess)
+        {
+            successMessage = "Account created! Redirecting to login...";
+            await Task.Delay(1500);
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            errorMessage = result.Error ?? "Registration failed.";
+        }
+
+        isLoading = false;
+    }
+}

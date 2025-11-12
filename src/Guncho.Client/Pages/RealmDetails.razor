@@ -1,0 +1,381 @@
+@page "/realms/{realmName}"
+@attribute [Authorize]
+@using System
+@using System.Linq
+@using Microsoft.AspNetCore.Authorization
+@using Guncho.Client.Services
+@using Guncho.Shared.Models
+@inject RealmsService RealmsService
+@inject RealmAssetsService RealmAssetsService
+@inject PlayerService PlayerService
+@inject NavigationManager Navigation
+
+<PageTitle>Realm Details - Guncho</PageTitle>
+
+<div class="container py-4">
+    <a class="btn btn-link px-0" href="/realms"><span class="bi bi-arrow-left"></span> Back to Realms</a>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (realm == null)
+    {
+        <div class="alert alert-danger mt-3">Realm not found or you do not have access.</div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-3">
+            <div>
+                <h2 class="mb-0">@realm.Name</h2>
+                <div class="text-muted">Owned by @realm.OwnerName</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-secondary align-self-start">@realm.PrivacyLevel</span>
+                @if (realm.IsCondemned)
+                {
+                    <span class="badge bg-danger align-self-start">Condemned</span>
+                }
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="alert @(statusIsSuccess ? "alert-success" : "alert-danger") mt-3">@statusMessage</div>
+        }
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button class="btn btn-primary" @onclick="NavigateToPlay">
+                <span class="bi bi-play-fill me-1"></span>Play
+            </button>
+            <button class="btn btn-outline-secondary" @onclick="NavigateToAssets" disabled="@(!CanEditAssets)">
+                <span class="bi bi-files me-1"></span>Manage Assets
+            </button>
+            <button class="btn btn-outline-primary" @onclick="NavigateToEdit" disabled="@(!CanManageRealm)">
+                <span class="bi bi-pencil-square me-1"></span>Edit Settings
+            </button>
+            <button class="btn btn-outline-danger" @onclick="ConfirmDelete" disabled="@(!CanDeleteRealm)">
+                <span class="bi bi-trash me-1"></span>Delete Realm
+            </button>
+        </div>
+
+        <div class="row g-4 mt-1">
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Factory</dt>
+                            <dd class="col-sm-8">@realm.FactoryName</dd>
+                            <dt class="col-sm-4">Privacy</dt>
+                            <dd class="col-sm-8">@realm.PrivacyLevel</dd>
+                            <dt class="col-sm-4">Owner</dt>
+                            <dd class="col-sm-8">@realm.OwnerName</dd>
+                            <dt class="col-sm-4">Your Role</dt>
+                            <dd class="col-sm-8">@DescribeAccess()</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Access List</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!realm.AccessList.Any())
+                        {
+                            <div class="text-muted">Only the owner currently has access.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Player</th>
+                                            <th scope="col">Level</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var entry in realm.AccessList.OrderBy(e => e.PlayerName))
+                                        {
+                                            <tr>
+                                                <td>@entry.PlayerName</td>
+                                                <td>@entry.Level</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if (CanManageRealm)
+                            {
+                                <div class="form-text">Edit access levels from the realm settings page.</div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Realm Assets</h5>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        @if (!assetManifest.Any())
+                        {
+                            <div class="text-muted">No assets have been uploaded yet.</div>
+                            @if (CanEditAssets)
+                            {
+                                <button class="btn btn-outline-primary btn-sm mt-3 align-self-start" @onclick="NavigateToAssets">
+                                    <span class="bi bi-file-earmark-plus me-1"></span>Create the first asset
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Path</th>
+                                            <th scope="col">Version</th>
+                                            <th scope="col">Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var asset in assetManifest)
+                                        {
+                                            <tr>
+                                                <td class="text-break">@asset.Path</td>
+                                                <td>@($"v{asset.Version}")</td>
+                                                <td>@asset.UpdatedAt.ToLocalTime().ToString("g")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if (CanEditAssets)
+                            {
+                                <div class="form-text">Use Manage Assets to edit or delete files.</div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (showDeleteModal)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Delete Realm</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete <strong>@realm?.Name</strong>? This cannot be undone.</p>
+                        @if (!string.IsNullOrEmpty(deleteError))
+                        {
+                            <div class="alert alert-danger">@deleteError</div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="DeleteRealmAsync" disabled="@isDeleting">
+                            @if (isDeleting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+</div>
+
+@code {
+    private RealmDto? realm;
+    private PlayerDto? currentPlayer;
+    private List<RealmAssetSummaryDto> assetManifest = new();
+
+    private bool isLoading = true;
+    private bool statusIsSuccess;
+    private string? statusMessage;
+
+    private bool showDeleteModal;
+    private bool isDeleting;
+    private string? deleteError;
+
+    [Parameter]
+    public string? RealmName { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        statusMessage = null;
+        deleteError = null;
+
+        currentPlayer = await PlayerService.GetCurrentPlayerAsync();
+
+        if (!string.IsNullOrWhiteSpace(RealmName))
+        {
+            realm = await RealmsService.GetRealmAsync(RealmName);
+        }
+        else
+        {
+            realm = null;
+        }
+
+        if (realm != null)
+        {
+            assetManifest = (await RealmAssetsService.GetManifestAsync(realm.Name)).ToList();
+        }
+        else
+        {
+            assetManifest.Clear();
+        }
+
+        isLoading = false;
+    }
+
+    private bool CanManageRealm =>
+        realm != null &&
+        currentPlayer != null &&
+        (currentPlayer.IsAdmin || string.Equals(realm.OwnerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanDeleteRealm => CanManageRealm;
+
+    private bool CanEditAssets
+    {
+        get
+        {
+            if (realm == null || currentPlayer == null)
+            {
+                return false;
+            }
+
+            if (CanManageRealm)
+            {
+                return true;
+            }
+
+            return realm.AccessList.Any(entry =>
+                HasEditSourceAccess(entry.Level) &&
+                (entry.PlayerId == currentPlayer.Id || string.Equals(entry.PlayerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private static bool HasEditSourceAccess(RealmAccessLevel level)
+    {
+        return level == RealmAccessLevel.EditSource
+            || level == RealmAccessLevel.EditSettings
+            || level == RealmAccessLevel.EditAccess
+            || level == RealmAccessLevel.SafetyOff;
+    }
+
+    private string DescribeAccess()
+    {
+        if (currentPlayer == null || realm == null)
+        {
+            return "Viewer";
+        }
+
+        if (currentPlayer.IsAdmin)
+        {
+            return "Administrator";
+        }
+
+        if (string.Equals(realm.OwnerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return "Owner";
+        }
+
+        var entry = realm.AccessList.FirstOrDefault(e => e.PlayerId == currentPlayer.Id)
+            ?? realm.AccessList.FirstOrDefault(e => string.Equals(e.PlayerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase));
+        return entry?.Level.ToString() ?? "Viewer";
+    }
+
+    private void NavigateToPlay()
+    {
+        if (realm != null)
+        {
+            Navigation.NavigateTo($"/play?realm={Uri.EscapeDataString(realm.Name)}");
+        }
+    }
+
+    private void NavigateToEdit()
+    {
+        if (realm != null)
+        {
+            Navigation.NavigateTo($"/realms/{Uri.EscapeDataString(realm.Name)}/edit");
+        }
+    }
+
+    private void NavigateToAssets()
+    {
+        if (realm != null)
+        {
+            Navigation.NavigateTo($"/realms/{Uri.EscapeDataString(realm.Name)}/edit#assets");
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        if (!CanDeleteRealm)
+        {
+            return;
+        }
+
+        showDeleteModal = true;
+        deleteError = null;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteModal = false;
+        isDeleting = false;
+        deleteError = null;
+    }
+
+    private async Task DeleteRealmAsync()
+    {
+        if (realm == null)
+        {
+            return;
+        }
+
+        isDeleting = true;
+        deleteError = null;
+
+        var success = await RealmsService.DeleteRealmAsync(realm.Name);
+        isDeleting = false;
+
+        if (!success)
+        {
+            deleteError = "Failed to delete realm.";
+            return;
+        }
+
+        showDeleteModal = false;
+        statusIsSuccess = true;
+        statusMessage = "Realm deleted.";
+        Navigation.NavigateTo("/realms", forceLoad: true);
+    }
+}

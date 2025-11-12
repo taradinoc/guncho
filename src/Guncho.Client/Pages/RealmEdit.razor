@@ -1,0 +1,690 @@
+@page "/realms/{realmName}/edit"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using System
+@using System.Linq
+@using Guncho.Client.Services
+@using Guncho.Shared.Models
+@inject RealmsService RealmsService
+@inject RealmAssetsService RealmAssetsService
+@inject PlayerService PlayerService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit Realm - Guncho</PageTitle>
+
+<div class="container py-4">
+    <a class="btn btn-link" href="/realms"><span class="bi bi-arrow-left"></span> Back to Realms</a>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (realm == null)
+    {
+        <div class="alert alert-danger">Realm not found or you do not have access.</div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+                <h2 class="mb-0">@realm.Name</h2>
+                <div class="text-muted">Manage realm settings and access control.</div>
+            </div>
+            <span class="badge bg-secondary">@realm.PrivacyLevel</span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="alert @(lastSaveSuccessful ? "alert-success" : "alert-danger")">@statusMessage</div>
+        }
+
+        <EditForm Model="editModel" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Realm Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Realm Name</label>
+                                <InputText class="form-control" @bind-Value="editModel.Name" />
+                                <div class="form-text">Changing the name updates URLs and requires reconnecting clients.</div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Factory</label>
+                                    <InputSelect class="form-select" @bind-Value="editModel.FactoryName">
+                                        @foreach (var factory in factories)
+                                        {
+                                            <option value="@factory.Name">@factory.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Privacy</label>
+                                    <InputSelect class="form-select" @bind-Value="editModel.PrivacyLevel">
+                                        @foreach (RealmPrivacyLevel level in Enum.GetValues(typeof(RealmPrivacyLevel)))
+                                        {
+                                            <option value="@level">@level</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4" id="assets">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Realm Assets</h5>
+                            @if (CanEditAssets)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="StartNewAsset">
+                                    <span class="bi bi-file-earmark-plus me-1"></span>New Asset
+                                </button>
+                            }
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(assetStatusMessage))
+                            {
+                                <div class="alert @(assetOperationSuccessful ? "alert-success" : "alert-warning")">@assetStatusMessage</div>
+                            }
+
+                            <div class="row g-3">
+                                <div class="col-xl-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong class="small text-uppercase text-muted">Files</strong>
+                                    </div>
+                                    <div class="border rounded overflow-auto" style="max-height: 24rem;">
+                                        @if (isLoadingAssets)
+                                        {
+                                            <div class="d-flex justify-content-center py-4">
+                                                <div class="spinner-border spinner-border-sm" role="status">
+                                                    <span class="visually-hidden">Loading assets...</span>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (!assetManifest.Any())
+                                            {
+                                                <div class="p-3">
+                                                    <div class="text-muted small">No assets available.</div>
+                                                    @if (CanEditAssets)
+                                                    {
+                                                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" @onclick="StartNewAsset">
+                                                            <span class="bi bi-file-earmark-plus me-1"></span>Create the first asset
+                                                        </button>
+                                                    }
+                                                </div>
+                                            }
+                                        else
+                                        {
+                                            <div class="list-group list-group-flush">
+                                                @foreach (var asset in assetManifest)
+                                                {
+                                                    <button type="button" class="list-group-item list-group-item-action d-flex flex-column align-items-start @(IsSelectedAsset(asset.Path) ? "active" : null)" @onclick="() => SelectAssetAsync(asset.Path)">
+                                                        <span class="fw-semibold text-truncate w-100">@asset.Path</span>
+                                                        <span class="small opacity-75">@($"v{asset.Version}") • @asset.UpdatedAt.ToLocalTime().ToString("g")</span>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="col-xl-8">
+                                    @if (isLoadingAssetContent)
+                                    {
+                                        <div class="d-flex justify-content-center py-5">
+                                            <div class="spinner-border" role="status">
+                                                <span class="visually-hidden">Loading asset...</span>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (!isNewAsset && string.IsNullOrWhiteSpace(assetEditorPath))
+                                    {
+                                        <div class="text-muted">Select a file or create a new one to get started.</div>
+                                    }
+                                    else if (isNewAsset && !CanEditAssets)
+                                    {
+                                        <div class="alert alert-info">You can view assets but do not have permission to create new files.</div>
+                                    }
+                                    else
+                                    {
+                                        if (!CanEditAssets && !isNewAsset)
+                                        {
+                                            <div class="alert alert-info">You are viewing this asset in read-only mode.</div>
+                                        }
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Asset Path</label>
+                                            <InputText class="form-control" @bind-Value="assetEditorPath" disabled="@(!CanEditAssets || !isNewAsset)" />
+                                            <div class="form-text">Paths use forward slashes relative to the realm root.</div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Content Type</label>
+                                            <InputText class="form-control form-control-sm" @bind-Value="assetContentType" disabled="@(!CanEditAssets)" />
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Content</label>
+                                            <textarea class="form-control font-monospace" rows="16" @bind="assetContent" @bind:event="oninput" readonly="@(!CanEditAssets)"></textarea>
+                                        </div>
+
+                                        @if (assetUpdatedAt.HasValue && !isNewAsset)
+                                        {
+                                            <div class="small text-muted mb-3">Last updated @assetUpdatedAt.Value.ToLocalTime().ToString("g") (v@assetVersion)</div>
+                                        }
+
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="button" class="btn btn-primary" @onclick="SaveAssetAsync" disabled="@(!CanEditAssets || isSavingAsset || string.IsNullOrWhiteSpace(assetEditorPath))">
+                                                @if (isSavingAsset)
+                                                {
+                                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                                }
+                                                Save Asset
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" @onclick="ResetAssetAsync" disabled="@isSavingAsset">Reset</button>
+                                            <button type="button" class="btn btn-outline-danger" @onclick="DeleteAssetAsync" disabled="@(!CanEditAssets || isSavingAsset || isNewAsset || string.IsNullOrWhiteSpace(selectedAssetPath))">Delete</button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Access List</h5>
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddAccessEntry">
+                                <span class="bi bi-plus-circle me-1"></span>Add Entry
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            @if (!accessEntries.Any())
+                            {
+                                <div class="alert alert-info">Only the owner currently has access.</div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Player</th>
+                                                <th scope="col">Access Level</th>
+                                                <th scope="col"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var entry in accessEntries)
+                                            {
+                                                <tr>
+                                                    <td class="w-50">
+                                                        <InputText class="form-control form-control-sm" @bind-Value="entry.PlayerName" />
+                                                    </td>
+                                                    <td>
+                                                        <InputSelect class="form-select form-select-sm" @bind-Value="entry.Level">
+                                                            @foreach (RealmAccessLevel level in Enum.GetValues(typeof(RealmAccessLevel)))
+                                                            {
+                                                                if (level == RealmAccessLevel.Invalid) { continue; }
+                                                                <option value="@level">@level</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" title="Remove" @onclick="() => RemoveAccessEntry(entry)">
+                                                            <span class="bi bi-trash"></span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            <div class="form-text">Player names are case-insensitive and must match existing accounts.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Save Changes
+                </button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="ResetChanges" disabled="@isSaving">Reset</button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private RealmDto? realm;
+    private RealmDto editModel = new();
+    private List<RealmFactoryDto> factories = new();
+    private List<RealmAccessListEntryDto> accessEntries = new();
+    private PlayerDto? currentPlayer;
+
+    private List<RealmAssetSummaryDto> assetManifest = new();
+    private string? selectedAssetPath;
+    private bool isLoadingAssets;
+    private bool isLoadingAssetContent;
+    private bool isSavingAsset;
+    private string assetEditorPath = string.Empty;
+    private string assetContent = string.Empty;
+    private string assetContentType = "text/plain";
+    private int? assetVersion;
+    private DateTimeOffset? assetUpdatedAt;
+    private bool isNewAsset;
+    private string? assetStatusMessage;
+    private bool assetOperationSuccessful;
+
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? statusMessage;
+    private bool lastSaveSuccessful;
+
+    [Parameter]
+    public string? RealmName { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadRealmAsync();
+    }
+
+    private async Task LoadRealmAsync()
+    {
+        isLoading = true;
+        statusMessage = null;
+
+        currentPlayer = await PlayerService.GetCurrentPlayerAsync();
+        factories = (await RealmsService.GetRealmFactoriesAsync()).ToList();
+
+        if (!string.IsNullOrWhiteSpace(RealmName))
+        {
+            realm = await RealmsService.GetRealmAsync(RealmName);
+        }
+
+        if (realm != null)
+        {
+            editModel = new RealmDto
+            {
+                Id = realm.Id,
+                Name = realm.Name,
+                OwnerId = realm.OwnerId,
+                OwnerName = realm.OwnerName,
+                PrivacyLevel = realm.PrivacyLevel,
+                FactoryName = realm.FactoryName,
+                IsCondemned = realm.IsCondemned,
+                AccessList = realm.AccessList.Select(entry => new RealmAccessListEntryDto
+                {
+                    PlayerId = entry.PlayerId,
+                    PlayerName = entry.PlayerName,
+                    Level = entry.Level
+                }).ToList()
+            };
+
+            accessEntries = editModel.AccessList.ToList();
+                    editModel.Id = realm.Id;
+
+            await LoadAssetManifestAsync();
+        }
+        else
+        {
+            assetManifest.Clear();
+            ClearAssetEditor();
+        }
+
+        if (!factories.Any())
+        {
+            factories.Add(new RealmFactoryDto { Name = realm?.FactoryName ?? "Inform7", Description = "Default" });
+        }
+
+        isLoading = false;
+    }
+
+    private bool CanEditAssets
+    {
+        get
+        {
+            if (realm == null || currentPlayer == null)
+            {
+                return false;
+            }
+
+            if (currentPlayer.IsAdmin || string.Equals(realm.OwnerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return realm.AccessList.Any(entry =>
+                HasEditSourceAccess(entry.Level) &&
+                (entry.PlayerId == currentPlayer.Id || string.Equals(entry.PlayerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private static bool HasEditSourceAccess(RealmAccessLevel level)
+    {
+        return level == RealmAccessLevel.EditSource
+            || level == RealmAccessLevel.EditSettings
+            || level == RealmAccessLevel.EditAccess
+            || level == RealmAccessLevel.SafetyOff;
+    }
+
+    private bool IsSelectedAsset(string path) =>
+        !string.IsNullOrWhiteSpace(selectedAssetPath) && string.Equals(selectedAssetPath, path, StringComparison.OrdinalIgnoreCase);
+
+    private async Task LoadAssetManifestAsync()
+    {
+        if (realm == null)
+        {
+            assetManifest.Clear();
+            ClearAssetEditor();
+            return;
+        }
+
+        isLoadingAssets = true;
+        var manifest = await RealmAssetsService.GetManifestAsync(realm.Name);
+        assetManifest = manifest.ToList();
+        isLoadingAssets = false;
+
+        if (selectedAssetPath != null && !assetManifest.Any(a => string.Equals(a.Path, selectedAssetPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            ClearAssetEditor();
+        }
+    }
+
+    private async Task SelectAssetAsync(string path)
+    {
+        if (realm == null)
+        {
+            return;
+        }
+
+        selectedAssetPath = path;
+        isNewAsset = false;
+        isLoadingAssetContent = true;
+        assetStatusMessage = null;
+
+        var asset = await RealmAssetsService.GetAssetAsync(realm.Name, path);
+
+        isLoadingAssetContent = false;
+
+        if (asset == null)
+        {
+            await LoadAssetManifestAsync();
+            assetOperationSuccessful = false;
+            assetStatusMessage = "Unable to load asset. It may have been removed.";
+            return;
+        }
+
+        assetEditorPath = asset.Path;
+        assetContent = asset.Content;
+        assetContentType = asset.ContentType;
+        assetVersion = asset.Version;
+        assetUpdatedAt = asset.UpdatedAt;
+    }
+
+    private void StartNewAsset()
+    {
+        if (!CanEditAssets)
+        {
+            return;
+        }
+
+        selectedAssetPath = null;
+        isNewAsset = true;
+        isLoadingAssetContent = false;
+        assetOperationSuccessful = false;
+        assetStatusMessage = null;
+        assetVersion = null;
+        assetUpdatedAt = null;
+        assetContent = string.Empty;
+        assetContentType = "text/plain";
+        assetEditorPath = SuggestNewAssetPath();
+    }
+
+    private async Task SaveAssetAsync()
+    {
+        if (realm == null || !CanEditAssets)
+        {
+            return;
+        }
+
+        var path = assetEditorPath?.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            assetStatusMessage = "Asset path is required.";
+            assetOperationSuccessful = false;
+            return;
+        }
+
+        isSavingAsset = true;
+        assetStatusMessage = null;
+
+        var update = new RealmAssetUpdateDto
+        {
+            Content = assetContent,
+            ContentType = string.IsNullOrWhiteSpace(assetContentType) ? "text/plain" : assetContentType,
+            ExpectedVersion = isNewAsset ? null : assetVersion
+        };
+
+        var result = await RealmAssetsService.UpsertAssetAsync(realm.Name, path, update);
+
+        isSavingAsset = false;
+
+        if (!result.IsSuccess || result.Value == null)
+        {
+            assetStatusMessage = result.Error ?? "Failed to save asset.";
+            assetOperationSuccessful = false;
+            return;
+        }
+
+        var saved = result.Value;
+        assetOperationSuccessful = true;
+        assetStatusMessage = "Asset saved successfully.";
+        isNewAsset = false;
+        selectedAssetPath = saved.Path;
+        assetEditorPath = saved.Path;
+        assetContent = saved.Content;
+        assetContentType = saved.ContentType;
+        assetVersion = saved.Version;
+        assetUpdatedAt = saved.UpdatedAt;
+
+        await LoadAssetManifestAsync();
+    }
+
+    private async Task ResetAssetAsync()
+    {
+        assetStatusMessage = null;
+        assetOperationSuccessful = false;
+
+        if (isNewAsset)
+        {
+            StartNewAsset();
+            return;
+        }
+
+        if (selectedAssetPath != null)
+        {
+            await SelectAssetAsync(selectedAssetPath);
+        }
+    }
+
+    private async Task DeleteAssetAsync()
+    {
+        if (realm == null || selectedAssetPath == null || !CanEditAssets || isNewAsset)
+        {
+            return;
+        }
+
+        isSavingAsset = true;
+        assetStatusMessage = null;
+
+        var result = await RealmAssetsService.DeleteAssetAsync(realm.Name, selectedAssetPath);
+
+        isSavingAsset = false;
+
+        if (!result.IsSuccess)
+        {
+            assetStatusMessage = result.Error ?? "Failed to delete asset.";
+            assetOperationSuccessful = false;
+            return;
+        }
+
+        ClearAssetEditor();
+        await LoadAssetManifestAsync();
+
+        if (CanEditAssets)
+        {
+            StartNewAsset();
+        }
+
+        assetOperationSuccessful = true;
+        assetStatusMessage = "Asset deleted.";
+    }
+
+    private void ClearAssetEditor()
+    {
+        selectedAssetPath = null;
+        assetEditorPath = string.Empty;
+        assetContent = string.Empty;
+        assetContentType = "text/plain";
+        assetVersion = null;
+        assetUpdatedAt = null;
+        isNewAsset = false;
+        isLoadingAssetContent = false;
+        isSavingAsset = false;
+        assetStatusMessage = null;
+        assetOperationSuccessful = false;
+    }
+
+    private string SuggestNewAssetPath()
+    {
+        const string defaultPath = "Source/story.ni";
+        if (!assetManifest.Any(a => string.Equals(a.Path, defaultPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            return defaultPath;
+        }
+
+        var counter = 1;
+        string candidate;
+        do
+        {
+            candidate = $"Source/file{counter}.txt";
+            counter++;
+        } while (assetManifest.Any(a => string.Equals(a.Path, candidate, StringComparison.OrdinalIgnoreCase)));
+
+        return candidate;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (realm == null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        statusMessage = null;
+
+        // Resolve player IDs from names when missing
+        foreach (var entry in accessEntries)
+        {
+            if (entry.PlayerId == 0 && !string.IsNullOrWhiteSpace(entry.PlayerName))
+            {
+                var player = await PlayerService.GetPlayerByNameAsync(entry.PlayerName);
+                if (player != null)
+                {
+                    entry.PlayerId = player.Id;
+                    entry.PlayerName = player.Name;
+                }
+                else
+                {
+                    statusMessage = $"Player '{entry.PlayerName}' does not exist.";
+                    lastSaveSuccessful = false;
+                    isSaving = false;
+                    return;
+                }
+            }
+        }
+
+        editModel.AccessList = accessEntries
+            .Where(e => !string.IsNullOrWhiteSpace(e.PlayerName))
+            .Select(e => new RealmAccessListEntryDto
+            {
+                PlayerId = e.PlayerId,
+                PlayerName = e.PlayerName,
+                Level = e.Level
+            }).ToList();
+
+        var result = await RealmsService.UpdateRealmAsync(realm.Name, editModel);
+        lastSaveSuccessful = result.IsSuccess;
+        statusMessage = result.IsSuccess ? "Realm updated successfully." : result.Error ?? "Failed to update realm.";
+
+        if (result.IsSuccess)
+        {
+            var newName = editModel.Name;
+            realm = await RealmsService.GetRealmAsync(newName);
+            if (!string.Equals(newName, RealmName, StringComparison.OrdinalIgnoreCase))
+            {
+                RealmName = newName;
+                Navigation.NavigateTo($"/realms/{Uri.EscapeDataString(newName)}/edit", forceLoad: true);
+            }
+            else if (realm != null)
+            {
+                editModel.Id = realm.Id;
+            }
+        }
+
+        isSaving = false;
+    }
+
+    private void ResetChanges()
+    {
+        if (realm == null)
+        {
+            return;
+        }
+
+        editModel.Id = realm.Id;
+        editModel.Name = realm.Name;
+        editModel.FactoryName = realm.FactoryName;
+        editModel.PrivacyLevel = realm.PrivacyLevel;
+        editModel.AccessList = realm.AccessList.Select(entry => new RealmAccessListEntryDto
+        {
+            PlayerId = entry.PlayerId,
+            PlayerName = entry.PlayerName,
+            Level = entry.Level
+        }).ToList();
+
+        accessEntries = editModel.AccessList.ToList();
+        statusMessage = null;
+    }
+
+    private void AddAccessEntry()
+    {
+        accessEntries.Add(new RealmAccessListEntryDto
+        {
+            PlayerName = string.Empty,
+            Level = RealmAccessLevel.Visible
+        });
+    }
+
+    private void RemoveAccessEntry(RealmAccessListEntryDto entry)
+    {
+        accessEntries.Remove(entry);
+    }
+}

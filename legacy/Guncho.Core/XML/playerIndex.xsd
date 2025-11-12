@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="playerIndex" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="playerIndex">
+    <xs:complexType>
+      <xs:choice>
+        <xs:element name="players">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="player" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="attribute" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:string">
+                            <xs:attribute name="name" type="xs:string" />
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                  <xs:attribute name="id" type="xs:int" use="required" />
+                  <xs:attribute name="admin" type="xs:boolean" use="optional" />
+                  <xs:attribute name="pwdSalt" type="xs:string" />
+                  <xs:attribute name="pwdHash" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

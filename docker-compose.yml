@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  guncho:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: guncho-webhost
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - DOTNET_MODIFIABLE_ASSEMBLIES=
+      - Guncho__CachePath=/app/Cache
+      - Guncho__RealmDataPath=/app/RealmData
+      - Guncho__LogPath=/app/Logs
+      - Guncho__NiInstallationsPath=/app/HackedI7
+      - Guncho__NiSkeletonPath=/app/Skeleton.inform
+    volumes:
+      # Persist game data
+      - guncho-cache:/app/Cache
+      - guncho-logs:/app/Logs
+      # Optionally mount RealmData for live editing
+      # - ./RealmData:/app/RealmData
+    restart: unless-stopped
+    networks:
+      - guncho-network
+
+networks:
+  guncho-network:
+    driver: bridge
+
+volumes:
+  guncho-cache:
+  guncho-logs:

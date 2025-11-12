@@ -1,0 +1,456 @@
+@page "/play"
+@using System.Linq
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using Guncho.Client.Services
+@using Blazored.LocalStorage
+@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject PlayConnectionService PlayConnection
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Play - Guncho</PageTitle>
+
+<div class="container py-4">
+    <div class="row mb-3">
+        <div class="col-lg-8">
+            <h2 class="mb-0">Play Now</h2>
+            <div class="text-muted">Connect to a realm to explore multiplayer interactive fiction.</div>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <div class="badge bg-secondary fs-6">
+                <span class="bi @(ConnectionState switch
+                {
+                    PlayConnectionState.Connected => "bi-plug-fill",
+                    PlayConnectionState.Connecting => "bi-broadcast",
+                    PlayConnectionState.Reconnecting => "bi-arrow-repeat",
+                    _ => "bi-exclamation-octagon"
+                })"></span>
+                @ConnectionState
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Transcript</strong>
+                    <div class="text-muted small">
+                        <span class="bi bi-lightning-charge me-1 @(ConnectionSlow ? "text-warning" : string.Empty)"></span>
+                        @(ConnectionSlow ? "Connection is slow" : "Live")
+                    </div>
+                </div>
+                <div class="card-body play-transcript" @ref="transcriptContainer">
+                    @if (!transcript.Any())
+                    {
+                        <div class="text-muted text-center py-5">No messages yet. Enter a command to get started.</div>
+                    }
+                    else
+                    {
+                        @foreach (var line in transcript)
+                        {
+                            <div class="play-line">@line</div>
+                        }
+                    }
+                </div>
+                <div class="card-footer">
+                    <EditForm Model="commandModel" OnValidSubmit="SendCommandAsync">
+                        <div class="input-group">
+                            <input type="text" class="form-control" @bind="commandModel.Command" placeholder="Enter command" autocomplete="off" @ref="commandInputRef" />
+                            <button type="submit" class="btn btn-primary" disabled="@isSending">
+                                @if (isSending)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Send
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <strong>Session</strong>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        @if (ConnectionState == PlayConnectionState.Disconnected)
+                        {
+                            <button class="btn btn-success" @onclick="ConnectAsync" disabled="@isConnecting">
+                                @if (isConnecting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Connect
+                            </button>
+                        }
+                        @if (ConnectionState == PlayConnectionState.Connected)
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="DisconnectAsync">Disconnect</button>
+                        }
+                    </div>
+                    @if (ConnectionState == PlayConnectionState.Connected && PlayConnection.CurrentRealm is { } realm)
+                    {
+                        <div class="mt-3 text-muted small">
+                            <span class="bi bi-geo-fill me-1"></span>Connected to <strong>@realm</strong>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <strong>Recent Commands</strong>
+                </div>
+                <div class="card-body">
+                    @if (!recentCommands.Any())
+                    {
+                        <div class="text-muted">Commands you send will appear here for quick reuse.</div>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var entry in recentCommands)
+                            {
+                                <button type="button" class="list-group-item list-group-item-action" @onclick="() => ReuseCommand(entry)">@entry</button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private class CommandModel
+    {
+        public string Command { get; set; } = string.Empty;
+    }
+
+    [SupplyParameterFromQuery(Name = "realm")]
+    public string? RealmFromQuery { get; set; }
+
+    private readonly List<string> transcript = new();
+    private readonly List<string> recentCommands = new();
+    private CommandModel commandModel = new();
+    private ElementReference transcriptContainer;
+    private IJSObjectReference? playModule;
+    private bool isConnecting;
+    private bool isSending;
+    // Default starting realm assumed; preserved variable for service call
+    private string selectedRealm = "The Outer Realm";
+    private bool autoConnectRequested;
+
+    private PlayConnectionState ConnectionState => PlayConnection.ConnectionState;
+    private bool ConnectionSlow => PlayConnection.ConnectionSlow;
+    private bool CanDisconnect => ConnectionState != PlayConnectionState.Disconnected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PlayConnection.StateChanged += HandleConnectionStateChanged;
+        PlayConnection.LineReceived += HandleLineReceived;
+        PlayConnection.GoodbyeReceived += HandleGoodbye;
+
+        if (!string.IsNullOrWhiteSpace(PlayConnection.CurrentRealm))
+        {
+            selectedRealm = PlayConnection.CurrentRealm!;
+        }
+
+        // Restore persistent state from local storage
+        await RestoreStateAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(RealmFromQuery))
+        {
+            var realm = SanitizeRealmFromQuery(RealmFromQuery);
+            if (!string.Equals(selectedRealm, realm, StringComparison.Ordinal))
+            {
+                selectedRealm = realm ?? string.Empty;
+                autoConnectRequested = true;
+            }
+        }
+        else
+        {
+            autoConnectRequested = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (autoConnectRequested && ConnectionState == PlayConnectionState.Disconnected && !isConnecting)
+        {
+            autoConnectRequested = false;
+            await ConnectAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ConnectAsync()
+    {
+        isConnecting = true;
+        StateHasChanged();
+
+        try
+        {
+            var realm = selectedRealm.Trim();
+            transcript.Clear();
+            await PlayConnection.ConnectToRealmAsync(realm);
+            transcript.Add("[system] Connecting...");
+            await ScrollTranscriptToEndAsync();
+        }
+        catch (Exception ex)
+        {
+            AddSystemMessage($"Failed to connect: {ex.Message}");
+        }
+        finally
+        {
+            isConnecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        await PlayConnection.DisconnectAsync();
+        isConnecting = false;
+        isSending = false;
+        transcript.Clear();
+        AddSystemMessage("Disconnected.");
+        await SaveStateAsync(); // Persist cleared transcript
+        StateHasChanged();
+        await ScrollTranscriptToEndAsync();
+    }
+
+    private async Task SendCommandAsync()
+    {
+        if (string.IsNullOrWhiteSpace(commandModel.Command))
+        {
+            return;
+        }
+
+        if (ConnectionState != PlayConnectionState.Connected)
+        {
+            AddSystemMessage("You are not connected.");
+            commandModel = new CommandModel();
+            StateHasChanged();
+            await ScrollTranscriptToEndAsync();
+            return;
+        }
+
+        var command = commandModel.Command;
+        isSending = true;
+        transcript.Add($"> {command}");
+    TrackRecentCommand(command);
+    commandModel = new CommandModel();
+    StateHasChanged();
+    await ScrollTranscriptToEndAsync();
+    await FocusCommandInputAsync();
+
+        try
+        {
+            await PlayConnection.SendCommandAsync(command);
+        }
+        catch (Exception ex)
+        {
+            AddSystemMessage($"Failed to send command: {ex.Message}");
+        }
+        finally
+        {
+            isSending = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TrackRecentCommand(string command)
+    {
+        recentCommands.Remove(command);
+        recentCommands.Insert(0, command);
+
+        if (recentCommands.Count > 10)
+        {
+            recentCommands.RemoveAt(recentCommands.Count - 1);
+        }
+
+        _ = SaveStateAsync(); // Fire and forget
+    }
+
+    private void ReuseCommand(string command)
+    {
+        commandModel = new CommandModel { Command = command };
+        _ = FocusCommandInputAsync();
+    }
+
+    private async Task ScrollTranscriptToEndAsync()
+    {
+        if (transcriptContainer.Context is null)
+        {
+            return;
+        }
+
+        await InvokeAsync(async () =>
+        {
+            var module = await EnsurePlayModuleAsync();
+            if (module != null)
+            {
+                await module.InvokeVoidAsync("scrollTranscriptToBottom", transcriptContainer);
+            }
+        });
+    }
+
+    private void AddSystemMessage(string message)
+    {
+        transcript.Add($"[system] {message}");
+    }
+
+    private async Task<IJSObjectReference?> EnsurePlayModuleAsync()
+    {
+        if (playModule != null)
+        {
+            return playModule;
+        }
+
+        try
+        {
+            playModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/play.js");
+        }
+        catch (JSException)
+        {
+            return null;
+        }
+
+        return playModule;
+    }
+
+    private void HandleLineReceived(string line)
+    {
+        transcript.Add(line);
+        _ = SaveStateAsync(); // Fire and forget
+        _ = InvokeAsync(async () =>
+        {
+            await ScrollTranscriptToEndAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void HandleGoodbye()
+    {
+        transcript.Add("[system] Session closed by server.");
+        _ = InvokeAsync(async () =>
+        {
+            await ScrollTranscriptToEndAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void HandleConnectionStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+        _ = FocusCommandInputAsync();
+    }
+
+    private static string? SanitizeRealmFromQuery(string? realm)
+    {
+        if (realm is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Uri.UnescapeDataString(realm);
+        }
+        catch
+        {
+            return realm;
+        }
+    }
+
+    private async Task RestoreStateAsync()
+    {
+        try
+        {
+            var savedTranscript = await LocalStorage.GetItemAsync<List<string>>("play_transcript");
+            if (savedTranscript != null && savedTranscript.Count > 0)
+            {
+                transcript.Clear();
+                transcript.AddRange(savedTranscript);
+            }
+
+            var savedCommands = await LocalStorage.GetItemAsync<List<string>>("play_recentCommands");
+            if (savedCommands != null && savedCommands.Count > 0)
+            {
+                recentCommands.Clear();
+                recentCommands.AddRange(savedCommands);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail if local storage isn't available
+            Console.WriteLine($"Failed to restore play state: {ex.Message}");
+        }
+    }
+
+    private async Task SaveStateAsync()
+    {
+        try
+        {
+            await LocalStorage.SetItemAsync("play_transcript", transcript);
+            await LocalStorage.SetItemAsync("play_recentCommands", recentCommands);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail if local storage isn't available
+            Console.WriteLine($"Failed to save play state: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        PlayConnection.StateChanged -= HandleConnectionStateChanged;
+        PlayConnection.LineReceived -= HandleLineReceived;
+        PlayConnection.GoodbyeReceived -= HandleGoodbye;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (playModule != null)
+        {
+            try
+            {
+                await playModule.DisposeAsync();
+            }
+            catch
+            {
+                // ignoring JS dispose errors during teardown
+            }
+
+            playModule = null;
+        }
+    }
+
+    private ElementReference commandInputRef;
+
+    private async Task FocusCommandInputAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            var module = await EnsurePlayModuleAsync();
+            if (module != null)
+            {
+                try
+                {
+                    await module.InvokeVoidAsync("focusElement", commandInputRef);
+                }
+                catch { }
+            }
+        });
+    }
+}

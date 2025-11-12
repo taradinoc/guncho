@@ -1,0 +1,54 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/publish/
+
+# IDE and editor files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userprefs
+*.sln.docstates
+
+# Node modules (if any)
+**/node_modules/
+
+# Logs
+**/Logs/
+*.log
+
+# Test results
+**/TestResults/
+
+# NuGet packages
+packages/
+*.nupkg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Mercurial
+.hg/
+.hgignore
+
+# Documentation
+docs/
+
+# Legacy projects (not needed for modern build)
+legacy/
+Guncho.Site/
+
+# Cache directory (will be created fresh)
+Cache/
+
+# Keep these for the Docker build:
+# !RealmData/
+# !Skeleton.inform/
+# !HackedI7/

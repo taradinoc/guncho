@@ -1,4 +1,4 @@
-"The Outer Realm"
+﻿"The Outer Realm"
 
 [ TODO: figure out why "try the robot offering X to Y" shows the offer message but doesn't set up the offering relation - I have to do that explicitly ]
 
@@ -7,7 +7,7 @@ Chapter 1 - Initial Remarks
 [ The default entrance is the first room defined. ]
 Small Pond is a room.
 
-A sign is here, fixed in place. "A wooden sign reads: '[description]'". The description is "All realms are now running on Glulx, courtesy of Textfyre, Inc.! Learn and share at http://wiki.guncho.com".
+A sign is here, fixed in place. "A wooden sign reads: '[description]'". The description is "All realms are now running on Glulx, courtesy of Textfyre, Inc.! Learn and share at <http://wiki.guncho.com>".
 
 Table of Entrances (continued)
 entrance room		entrance token

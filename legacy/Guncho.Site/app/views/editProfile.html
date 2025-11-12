@@ -1,0 +1,115 @@
+﻿<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <h1>Editing Profile</h1>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-10 col-md-offset-1">
+        <tabset>
+            <tab>
+                <tab-heading>Character</tab-heading>
+                <form name="characterForm" class="form-horizontal" ng-submit="saveCharacter()" novalidate>
+                    <div class="form-group">
+                        <label for="description" class="col-sm-2 control-label">Description:</label>
+                        <div class="col-sm-6">
+                            <textarea id="description" class="form-control" rows="3" ng-model="character.profile.attributes.description"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="gender" class="col-sm-2 control-label">Gender:</label>
+                        <div class="col-sm-6">
+                            <input type="text" class="form-control" ng-model="character.profile.attributes.gender"
+                                   typeahead="gender.key as gender.key for gender in genders | filter:$viewValue"
+                                   typeahead-on-select="setDefaultPronouns($item)" />
+                        </div>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th title="I, you, he/she, they">Subjective pronoun</th>
+                                <th title="me, you, him/her, them">Objective pronoun</th>
+                                <th title="my, your, his/her, their">Possessive determiner</th>
+                                <th title="mine, yours, his/hers, theirs">Possessive pronoun</th>
+                                <th title="myself, yourself, himself/herself, themselves">Reflexive pronoun</th>
+                                <th title="am, is, are">Is/are/am verb</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th>1st person</th>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.s" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.o" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.p" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.ps" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.r" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_1p.v" /></td>
+                            </tr>
+                            <tr>
+                                <th>2nd person</th>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.s" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.o" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.p" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.ps" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.r" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_2p.v" /></td>
+                            </tr>
+                            <tr>
+                                <th>3rd person</th>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.s" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.o" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.p" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.ps" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.r" /></td>
+                                <td><input type="text" class="form-control" ng-model="character.pronouns_3p.v" /></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="form-group">
+                        <div class="col-sm-12">
+                            <button type="submit" class="btn btn-primary">Save character</button>
+                        </div>
+                    </div>
+                    <div data-ng-hide="character.message == ''" data-ng-class="(character.savedSuccessfully) ? 'alert alert-success' : 'alert alert-danger'">
+                        {{character.message}}
+                    </div>
+                </form>
+            </tab>
+            <tab>
+                <tab-heading>Password</tab-heading>
+                <form name="passwordsForm" class="form-horizontal" ng-submit="changePassword()" novalidate>
+                    <div class="form-group" ng-class="{ 'has-error': passwordsForm.oldPassword.$invalid && passwordsForm.oldPassword.$dirty }">
+                        <label for="oldPassword" class="col-sm-2 control-label">Old password:</label>
+                        <div class="col-sm-6">
+                            <input id="oldPassword" name="oldPassword" class="form-control" type="password" ng-model="passwords.oldPassword" required>
+                        </div>
+                        <p class="help-block col-sm-4" ng-show="passwordsForm.oldPassword.$invalid">Old password is required.</p>
+                    </div>
+                    <div class="form-group" ng-class="{ 'has-error': passwordsForm.newPassword.$invalid && passwordsForm.newPassword.$dirty }">
+                        <label for="newPassword" class="col-sm-2 control-label">New password:</label>
+                        <div class="col-sm-6">
+                            <input id="newPassword" name="newPassword" class="form-control" type="password" ng-model="passwords.newPassword" required ng-minlength="8">
+                        </div>
+                        <p class="help-block col-sm-4" ng-show="passwordsForm.newPassword.$invalid">New password must be at least 8 characters.</p>
+                    </div>
+                    <div class="form-group" ng-class="{ 'has-error': passwordsForm.confirmNewPassword.$invalid && passwordsForm.confirmNewPassword.$dirty }">
+                        <label for="confirmNewPassword" class="col-sm-2 control-label">Confirm new password:</label>
+                        <div class="col-sm-6">
+                            <input id="confirmNewPassword" name="confirmNewPassword" class="form-control" type="password" ng-model="passwords.confirmNewPassword"
+                                   ui-validate=" '$value === passwords.newPassword' " ui-validate-watch=" 'passwords.newPassword' ">
+                        </div>
+                        <p class="help-block col-sm-4" ng-show="passwordsForm.confirmNewPassword.$invalid">New passwords do not match.</p>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-sm-12">
+                            <button type="submit" class="btn btn-primary" ng-disabled="passwordsForm.$invalid">Change password</button>
+                        </div>
+                    </div>
+                    <div data-ng-hide="passwords.message == ''" data-ng-class="(passwords.savedSuccessfully) ? 'alert alert-success' : 'alert alert-danger'">
+                        {{passwords.message}}
+                    </div>
+                </form>
+            </tab>
+        </tabset>
+    </div>
+</div>
