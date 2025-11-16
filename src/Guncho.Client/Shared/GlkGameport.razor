@@ -1,0 +1,80 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div id="gameport" style="height: 60vh;" @ref="root">
+    <div id="windowport">
+        <noscript>
+            <hr />
+            <p>You'll need to turn on JavaScript to play.</p>
+            <hr />
+        </noscript>
+    </div>
+    <div id="loadingpane">
+        <em>Loading...</em>
+    </div>
+    <div id="errorpane" style="display:none;"><div id="errorcontent">...</div></div>
+    <div id="layouttestpane" style="display:none;">
+        This should not be visible
+        <div id="layouttest_grid" class="WindowFrame GridWindow"><div id="layouttest_gridline" class="GridLine"><span id="layouttest_gridspan" class="Style_normal">12345678</span></div><div id="layouttest_gridline2" class="GridLine"><span class="Style_normal">12345678</span></div></div>
+        <div id="layouttest_buffer" class="WindowFrame BufferWindow"><div id="layouttest_bufferline" class="BufferLine"><span id="layouttest_bufferspan" class="Style_normal">12345678</span></div><div id="layouttest_bufferline2" class="BufferLine"><span class="Style_normal">12345678</span></div></div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnLineEntered { get; set; }
+
+    private ElementReference root;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<GlkGameport>? selfRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/glkWrapper.js");
+        selfRef = DotNetObjectReference.Create(this);
+        await module.InvokeVoidAsync("init", root, selfRef);
+    }
+
+    [JSInvokable]
+    public async Task OnGlkLineEntered(string line)
+    {
+        if (OnLineEntered.HasDelegate)
+        {
+            await OnLineEntered.InvokeAsync(line);
+        }
+    }
+
+    public async Task AppendServerLineAsync(string line)
+    {
+        if (module != null)
+        {
+            await module.InvokeVoidAsync("appendText", line);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (module != null)
+            {
+                await module.InvokeVoidAsync("dispose");
+                await module.DisposeAsync();
+                module = null;
+            }
+        }
+        catch { }
+        finally
+        {
+            selfRef?.Dispose();
+            selfRef = null;
+        }
+    }
+}

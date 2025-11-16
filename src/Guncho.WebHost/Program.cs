@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Ensure static web assets (Blazor client) are available when running locally
+builder.WebHost.UseStaticWebAssets();
+
 // Add services
 builder.Services.AddControllers()
     .AddNewtonsoftJson();

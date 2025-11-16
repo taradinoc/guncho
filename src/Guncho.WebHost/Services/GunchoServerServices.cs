@@ -1052,7 +1052,7 @@ namespace Guncho.WebHost.Services
                 if (instance == null)
                 {
                     // only handle out-of-realm commands (connect, create, quit, who)
-                    if (!UnpackHandleSystemCommandResult(await HandleSystemCommandAsync(conn, line), out line))
+                    if (!UnpackHandleSystemCommandResult(await HandleSystemCommandAsync(conn, line), out _))
                     {
                         await conn.WriteLineAsync("Unknown command.");
                         await conn.WriteLineAsync();
@@ -1064,7 +1064,7 @@ namespace Guncho.WebHost.Services
                     // go on to the next line
                     continue;
                 }
-                else
+                else if (conn.Player != null)
                 {
                     string? dabString;
 
@@ -1079,7 +1079,7 @@ namespace Guncho.WebHost.Services
                         // Repeat the previous command, but hide its output (the disambiguation question)
                         instance.QueueInput(MakeInputLine(conn, dabString, true));
                         // Provide the answer
-                        instance.QueueInput(line);
+                        if (line != null) instance.QueueInput(line);
                     }
                     else
                     {
@@ -1457,10 +1457,21 @@ namespace Guncho.WebHost.Services
 
             await SendTextFileAsync(conn, guest.Name, _config.GuestMotdPath);
             
-            // TODO: Get default realm and instance
-            //await EnterInstanceAsync(guest, await GetDefaultInstanceAsync(GetRealm(_config.StartRealmName)));
-            await conn.WriteLineAsync("Welcome, " + guest.Name + "!");
-            await conn.WriteLineAsync("(Realm loading not yet implemented)");
+            var startRealm = _realms.Values.FirstOrDefault(r => r.Name.Equals(_config.StartRealmName, StringComparison.OrdinalIgnoreCase));
+            if (startRealm != null)
+            {
+                _logger.LogMessage(LogLevel.Verbose, "Auto-entering start realm for guest: {0}", startRealm.Name);
+                var defaultInstance = await GetDefaultInstanceAsync(startRealm);
+                await EnterInstanceAsync(guest, defaultInstance);
+            }
+            else
+            {
+                _logger.LogMessage(LogLevel.Warning, "Start realm not found: {0}", _config.StartRealmName);
+                await conn.WriteLineAsync("Welcome, " + guest.Name + "!");
+                await conn.WriteLineAsync("(Start realm not available)");
+            }
+
+            await conn.FlushOutputAsync();
         }
 
         private async Task CmdTeleportAsync(Connection conn, Player player, string args)

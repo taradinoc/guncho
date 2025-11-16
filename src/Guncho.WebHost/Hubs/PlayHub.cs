@@ -72,15 +72,27 @@ namespace Guncho.WebHost.Hubs
             var connection = connectionManager.GetConnectionById(Context.ConnectionId);
             if (connection != null)
             {
-                // Only send the "connect" command if not already logged in
-                // Authenticated users are auto-logged in and should use @teleport to switch realms
+                var trimmedRealm = (realmName ?? string.Empty).Trim();
+                trimmedRealm = trimmedRealm.Replace('\r', ' ').Replace('\n', ' ');
+                var hasRealm = !string.IsNullOrWhiteSpace(trimmedRealm);
+
                 if (connection.Player == null)
                 {
-                    connection.EnqueueCommand($"connect {realmName}");
+                    // Establish a guest session, then move to the requested realm if provided
+                    connection.EnqueueCommand("connect guest");
+                    if (hasRealm)
+                    {
+                        connection.EnqueueCommand($"@tel {trimmedRealm}");
+                    }
+                }
+                else if (hasRealm)
+                {
+                    // Already authenticated: treat this as an explicit teleport request
+                    connection.EnqueueCommand($"@tel {trimmedRealm}");
                 }
                 else
                 {
-                    logger.LogDebug("Player already connected, ignoring ConnectToRealmAsync call");
+                    logger.LogDebug("ConnectToRealmAsync called without realm while already connected; ignoring.");
                 }
             }
             else

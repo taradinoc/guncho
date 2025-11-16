@@ -4,6 +4,7 @@
 @using Microsoft.JSInterop
 @using Guncho.Client.Services
 @using Blazored.LocalStorage
+@using Guncho.Client.Shared
 @implements IDisposable
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
@@ -42,32 +43,8 @@
                         @(ConnectionSlow ? "Connection is slow" : "Live")
                     </div>
                 </div>
-                <div class="card-body play-transcript" @ref="transcriptContainer">
-                    @if (!transcript.Any())
-                    {
-                        <div class="text-muted text-center py-5">No messages yet. Enter a command to get started.</div>
-                    }
-                    else
-                    {
-                        @foreach (var line in transcript)
-                        {
-                            <div class="play-line">@line</div>
-                        }
-                    }
-                </div>
-                <div class="card-footer">
-                    <EditForm Model="commandModel" OnValidSubmit="SendCommandAsync">
-                        <div class="input-group">
-                            <input type="text" class="form-control" @bind="commandModel.Command" placeholder="Enter command" autocomplete="off" @ref="commandInputRef" />
-                            <button type="submit" class="btn btn-primary" disabled="@isSending">
-                                @if (isSending)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2"></span>
-                                }
-                                Send
-                            </button>
-                        </div>
-                    </EditForm>
+                <div class="card-body p-0">
+                    <GlkGameport OnLineEntered="SendCommandFromGlk" @ref="glkPort" />
                 </div>
             </div>
         </div>
@@ -128,24 +105,15 @@
 </div>
 
 @code {
-    private class CommandModel
-    {
-        public string Command { get; set; } = string.Empty;
-    }
-
     [SupplyParameterFromQuery(Name = "realm")]
     public string? RealmFromQuery { get; set; }
 
-    private readonly List<string> transcript = new();
     private readonly List<string> recentCommands = new();
-    private CommandModel commandModel = new();
-    private ElementReference transcriptContainer;
-    private IJSObjectReference? playModule;
     private bool isConnecting;
-    private bool isSending;
     // Default starting realm assumed; preserved variable for service call
     private string selectedRealm = "The Outer Realm";
     private bool autoConnectRequested;
+    private GlkGameport? glkPort;
 
     private PlayConnectionState ConnectionState => PlayConnection.ConnectionState;
     private bool ConnectionSlow => PlayConnection.ConnectionSlow;
@@ -201,14 +169,18 @@
         try
         {
             var realm = selectedRealm.Trim();
-            transcript.Clear();
             await PlayConnection.ConnectToRealmAsync(realm);
-            transcript.Add("[system] Connecting...");
-            await ScrollTranscriptToEndAsync();
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync("[system] Connecting...");
+            }
         }
         catch (Exception ex)
         {
-            AddSystemMessage($"Failed to connect: {ex.Message}");
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync($"[system] Failed to connect: {ex.Message}");
+            }
         }
         finally
         {
@@ -221,51 +193,39 @@
     {
         await PlayConnection.DisconnectAsync();
         isConnecting = false;
-        isSending = false;
-        transcript.Clear();
-        AddSystemMessage("Disconnected.");
-        await SaveStateAsync(); // Persist cleared transcript
+        if (glkPort != null)
+        {
+            await glkPort.AppendServerLineAsync("[system] Disconnected.");
+        }
+        await SaveStateAsync();
         StateHasChanged();
-        await ScrollTranscriptToEndAsync();
     }
 
-    private async Task SendCommandAsync()
+    private async Task SendCommandFromGlk(string command)
     {
-        if (string.IsNullOrWhiteSpace(commandModel.Command))
+        if (string.IsNullOrWhiteSpace(command))
         {
             return;
         }
-
         if (ConnectionState != PlayConnectionState.Connected)
         {
-            AddSystemMessage("You are not connected.");
-            commandModel = new CommandModel();
-            StateHasChanged();
-            await ScrollTranscriptToEndAsync();
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync("[system] You are not connected.");
+            }
             return;
         }
-
-        var command = commandModel.Command;
-        isSending = true;
-        transcript.Add($"> {command}");
-    TrackRecentCommand(command);
-    commandModel = new CommandModel();
-    StateHasChanged();
-    await ScrollTranscriptToEndAsync();
-    await FocusCommandInputAsync();
-
+        TrackRecentCommand(command);
         try
         {
             await PlayConnection.SendCommandAsync(command);
         }
         catch (Exception ex)
         {
-            AddSystemMessage($"Failed to send command: {ex.Message}");
-        }
-        finally
-        {
-            isSending = false;
-            StateHasChanged();
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync($"[system] Failed to send command: {ex.Message}");
+            }
         }
     }
 
@@ -284,68 +244,32 @@
 
     private void ReuseCommand(string command)
     {
-        commandModel = new CommandModel { Command = command };
-        _ = FocusCommandInputAsync();
-    }
-
-    private async Task ScrollTranscriptToEndAsync()
-    {
-        if (transcriptContainer.Context is null)
-        {
-            return;
-        }
-
-        await InvokeAsync(async () =>
-        {
-            var module = await EnsurePlayModuleAsync();
-            if (module != null)
-            {
-                await module.InvokeVoidAsync("scrollTranscriptToBottom", transcriptContainer);
-            }
-        });
-    }
-
-    private void AddSystemMessage(string message)
-    {
-        transcript.Add($"[system] {message}");
-    }
-
-    private async Task<IJSObjectReference?> EnsurePlayModuleAsync()
-    {
-        if (playModule != null)
-        {
-            return playModule;
-        }
-
-        try
-        {
-            playModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/play.js");
-        }
-        catch (JSException)
-        {
-            return null;
-        }
-
-        return playModule;
+        _ = SendCommandFromGlk(command);
     }
 
     private void HandleLineReceived(string line)
     {
-        transcript.Add(line);
-        _ = SaveStateAsync(); // Fire and forget
         _ = InvokeAsync(async () =>
         {
-            await ScrollTranscriptToEndAsync();
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync(line);
+            }
             StateHasChanged();
         });
     }
 
     private void HandleGoodbye()
     {
-        transcript.Add("[system] Session closed by server.");
         _ = InvokeAsync(async () =>
         {
-            await ScrollTranscriptToEndAsync();
+            if (glkPort != null)
+            {
+                await glkPort.AppendServerLineAsync("[system] Session closed by server.");
+            }
+            isConnecting = false;
+            await PlayConnection.DisconnectAsync();
+            await SaveStateAsync();
             StateHasChanged();
         });
     }
@@ -353,7 +277,6 @@
     private void HandleConnectionStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
-        _ = FocusCommandInputAsync();
     }
 
     private static string? SanitizeRealmFromQuery(string? realm)
@@ -377,13 +300,6 @@
     {
         try
         {
-            var savedTranscript = await LocalStorage.GetItemAsync<List<string>>("play_transcript");
-            if (savedTranscript != null && savedTranscript.Count > 0)
-            {
-                transcript.Clear();
-                transcript.AddRange(savedTranscript);
-            }
-
             var savedCommands = await LocalStorage.GetItemAsync<List<string>>("play_recentCommands");
             if (savedCommands != null && savedCommands.Count > 0)
             {
@@ -402,7 +318,6 @@
     {
         try
         {
-            await LocalStorage.SetItemAsync("play_transcript", transcript);
             await LocalStorage.SetItemAsync("play_recentCommands", recentCommands);
         }
         catch (Exception ex)
@@ -421,36 +336,6 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (playModule != null)
-        {
-            try
-            {
-                await playModule.DisposeAsync();
-            }
-            catch
-            {
-                // ignoring JS dispose errors during teardown
-            }
-
-            playModule = null;
-        }
-    }
-
-    private ElementReference commandInputRef;
-
-    private async Task FocusCommandInputAsync()
-    {
-        await InvokeAsync(async () =>
-        {
-            var module = await EnsurePlayModuleAsync();
-            if (module != null)
-            {
-                try
-                {
-                    await module.InvokeVoidAsync("focusElement", commandInputRef);
-                }
-                catch { }
-            }
-        });
+        await Task.CompletedTask;
     }
 }
