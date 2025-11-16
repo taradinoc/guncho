@@ -1,25 +1,10 @@
-html, body {
+/* html, body {
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 14px;
     line-height: 1.42857143;
     color: #333;
-}
+} */
 
-/* Bootstrap 3 jumbotron styles for compatibility */
-.jumbotron {
-    padding: 2rem 1rem;
-    margin-bottom: 2rem;
-    background-color: #e9ecef;
-    border-radius: 0.3rem;
-}
-
-.jumbotron h1 {
-    font-size: 63px;
-    font-weight: 300;
-    line-height: 1.1;
-    margin-top: 20px;
-    margin-bottom: 10px;
-}
 .play-transcript {
     min-height: 320px;
     max-height: 520px;
@@ -32,25 +17,6 @@ html, body {
 }
 .play-line + .play-line {
     margin-top: .25rem;
-}
-
-.jumbotron h1 small {
-    font-size: 32px;
-    font-weight: 300;
-    color: #999;
-    display: block;
-    line-height: 1.4;
-}
-
-.jumbotron p {
-    margin-bottom: 15px;
-    font-size: 18px;
-    font-weight: 300;
-    line-height: 1.4;
-}
-
-.jumbotron .container {
-    max-width: 960px;
 }
 
 h1:focus {
