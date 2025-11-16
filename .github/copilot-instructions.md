@@ -2,26 +2,31 @@
 
 ## Project Overview
 
-Guncho is a **multiplayer Interactive Fiction (IF) server** that runs Inform 7 story files in shared persistent worlds. Players connect via browser, interact using text commands, and can build/edit realms in real-time. This is fundamentally a **multi-user dungeon (MUD) architecture** with collaborative authoring capabilities.
+Guncho is a **multiplayer Interactive Fiction (IF) server** that runs Inform 7 story files in shared persistent worlds. Players connect via browser or telnet, interact using text commands, and can build/edit realms in real-time. This is fundamentally a **multi-user dungeon (MUD) architecture** with collaborative authoring capabilities.
 
 **Critical architecture**: Game output is player-scoped using a custom tag protocol (`<$t N>`, `<$a>`, `<$b>`, etc.) parsed in `FyreVMInstance.cs` to route messages to specific players in shared game instances.
 
 ## Repository Structure
 
-- **Root (legacy .NET Framework 4.5.1)**: Original OWIN/Web API 2/AngularJS implementation
+- **`legacy/`**: Original .NET Framework 4.5.1 implementation (OWIN/Web API 2/AngularJS)
   - `Guncho.Core/`: Game engine, realm management, FyreVM integration, SignalR v2.2
-  - `Guncho.WebHost/`: ASP.NET Core 10 adapter hosting legacy engine (bridge architecture)
   - `Guncho.Site/`: Legacy AngularJS client (deprecated)
   - `GunchoConsole/`: Standalone console host
-  - `HackedI7/`: Modified Inform 7 compiler builds (5T18, 5Z71) with custom extensions
-  - `Skeleton.inform/`: Default shared world ("The Outer Realm")
-  - `RealmData/`: XML persistence for players/realms
+  - `Guncho.Api.Tests/`: Legacy test suite
+  
+- **`src/`**: Modern .NET 10 rewrite (**primary development focus**)
+  - `Guncho.Engine/`: Core game engine (ported from legacy `Guncho.Core`)
+  - `Guncho.WebHost/`: ASP.NET Core 10 host with SignalR and REST APIs
+  - `Guncho.Client/`: Blazor WebAssembly front-end (Bootstrap 5.3.8)
+  - `Guncho.Shared/`: DTOs and contracts shared between client/server
+  - `Guncho.Engine.Tests/`: xUnit tests with Moq
+  - `Guncho.WebHost.Tests/`: ASP.NET Core integration tests
 
-- **modernization/**: Clean .NET 10 rewrite (in progress)
-  - `Guncho.Engine/`: Modern game engine (porting from `Guncho.Core`)
-  - `Guncho.Client/`: Blazor WASM front-end (Bootstrap 5.3.8)
-  - `Guncho.Shared/`: DTOs/contracts
-  - See `modernization/README.md` for migration status
+- **Root data directories** (used by both legacy and modern):
+  - `HackedI7/`: Modified Inform 7 compiler builds (5T18, 5Z71) with custom extensions
+  - `Skeleton.inform/`: Default shared world template ("The Outer Realm")
+  - `RealmData/`: XML persistence for players/realms (`.ni` source files, `playerIndex.xml`)
+  - `Cache/`: Compiled `.ulx` game files
 
 ## Critical Concepts
 
@@ -61,16 +66,27 @@ Realms are **Inform 7 source files** (`.ni` extension) compiled to Glulx (`.ulx`
 
 Commands starting with `@` or digits (e.g., `123:command` for player-directed actions) are special protocol prefixes.
 
-### 4. SignalR Communication
+### 4. SignalR Communication & Service Architecture
 
-**Legacy**: `Microsoft.AspNet.SignalR` v2.2 (OWIN-based)
-**Modern**: `Microsoft.AspNetCore.SignalR` in `Guncho.WebHost/Hubs/PlayHub.cs`
+**Modern stack**: `Microsoft.AspNetCore.SignalR` in `Guncho.WebHost/Hubs/PlayHub.cs`
 
-Hub methods:
+**Service layer pattern**: `GunchoServerServices` implements multiple interfaces:
+- `IPlayerService`: Player management and authentication (BCrypt + legacy SHA1 support)
+- `IRealmService`: Realm CRUD operations and compilation
+- `IInstanceService`: Game instance lifecycle management
+- `IConnectionService`: SignalR/TCP connection tracking
+- `IInstanceSite`: Callback interface for VM-to-server communication
+
+All interfaces defined in `Guncho.Engine/Services/`. Single service instance registered in DI as all interfaces.
+
+**SignalR Hub methods**:
 - `SendCommandAsync(string command)`: Client sends command
 - `ConnectToRealmAsync(string realmName)`: Join realm (guest mode)
-- `WriteLine(string line)`: Server pushes output to client
-- `Goodbye()`: Disconnect notification
+- Client-callable: `WriteLine(string line)`, `Goodbye()`
+
+**TCP server**: `TcpServerHostedService` runs as `IHostedService` on port 4108 (configurable), supporting telnet clients.
+
+**Event queue pattern**: All game logic serialized through `AsyncProducerConsumerQueue<Func<Task>>` to prevent race conditions. Never modify player/realm state outside event queue context.
 
 ### 5. Data Persistence
 
@@ -84,34 +100,38 @@ Hub methods:
 
 ## Build & Development
 
-### Legacy Stack
+### Modern Stack (Primary)
 ```powershell
-# Build entire solution
-msbuild Guncho.sln /p:Configuration=Debug
-
-# Or use Make (Mono compatibility)
-make
-```
-
-### Modern Stack
-```powershell
-cd modernization
+# Build entire solution from src/ directory
+cd src
 dotnet build
 
-# Run development server (hosts API + Blazor WASM)
-cd Guncho.Next.WebHost  # TODO: verify path - may be Guncho.WebHost
-dotnet run  # Browse to http://localhost:5000
+# Run development server (hosts both API and Blazor WASM client)
+dotnet run --project Guncho.WebHost
+
+# Or use Docker (recommended for production-like environment)
+docker compose up -d
+# Server runs at http://localhost:5000
+
+# Run tests
+dotnet test                                    # All tests
+dotnet test Guncho.Engine.Tests                # Engine tests only
+dotnet test Guncho.WebHost.Tests               # Integration tests only
 ```
 
-**Important**: `Guncho.WebHost` is a **hybrid host** — it references the modern `Guncho.Engine` project but the modernization is incomplete. Check which implementation files exist before editing.
+**Default test credentials**: `admin` / `password123` (seeded in XML files)
 
-### Testing
+### Legacy Stack
 ```powershell
-cd Guncho.Api.Tests
-dotnet test
+cd legacy
+msbuild Guncho.sln /p:Configuration=Debug     # Or use 'make' for Mono compatibility
 ```
 
-Default credentials: `admin` / `password123` (seeded in modern stack)
+### Docker Deployment
+- `Dockerfile`: Multi-stage build for `src/Guncho.WebHost`
+- `docker-compose.yml`: Production setup with persistent volumes
+- Volumes: `guncho-cache` (compiled realms), `guncho-logs`
+- Environment variables: `Guncho__CachePath`, `Guncho__RealmDataPath`, etc.
 
 ## Coding Conventions
 
@@ -141,17 +161,20 @@ Default credentials: `admin` / `password123` (seeded in modern stack)
 
 2. **Realm compilation paths**: Skeleton path must match configured `NiSkeletonPath`. Compilers expect specific directory structure (`Source/story.ni`, `Build/auto.inf`).
 
-3. **Player instance tracking**: `Server.playerInstances` maps players to their current `IInstance`. Always check if player is connected before sending output.
+3. **Player instance tracking**: `_playerInstances` maps players to their current `IInstance`. Always check if player is connected before sending output.
 
-4. **XML serialization**: Generated classes in `Guncho.Core/XML/` are from XSD schemas. Don't hand-edit — regenerate from `.xsd` files if schema changes.
+4. **XML serialization**: Generated classes in `Guncho.Engine/XML/` are from XSD schemas. Don't hand-edit — regenerate from `.xsd` files if schema changes.
 
 5. **SignalR connection lifecycle**: Connections can drop and reconnect. Use `Connection.Player` to track authenticated sessions, not just `Context.ConnectionId`.
 
+6. **TextfyreVM.dll dependency**: Engine requires local reference to `TextfyreVM.dll` in repo root. Not on NuGet. Dockerfile copies it explicitly.
+
 ## Key Files Reference
 
-- **Game loop**: `Guncho.Core/Server.cs` (event queue processing)
-- **VM integration**: `Guncho.Core/FyreVMInstance.cs` (tag parsing, output routing)
-- **Realm factory**: `Guncho.Core/InformRealmFactory.cs` (compilation pipeline)
-- **Command dispatch**: `Guncho.Core/Commands.cs` (system command handlers)
+- **Game loop**: `Guncho.WebHost/Services/GunchoServerServices.cs` (event queue processing)
+- **VM integration**: `Guncho.Engine/FyreVMInstance.cs` (tag parsing, output routing)
+- **Realm factory**: `Guncho.Engine/InformRealmFactory.cs` (compilation pipeline)
+- **Command dispatch**: `Guncho.Engine/CommandProcessor.cs` (system command handlers)
 - **Modern API**: `Guncho.WebHost/Program.cs` (ASP.NET Core startup)
 - **Client hub**: `Guncho.WebHost/Hubs/PlayHub.cs` (SignalR communication)
+- **TCP server**: `Guncho.WebHost/Services/TcpServerHostedService.cs` (telnet support)
