@@ -82,9 +82,12 @@ ENV Guncho__NiSkeletonPath=/app/Skeleton.inform
 ENV Guncho__DefaultRealmName="The Outer Realm"
 ENV Guncho__StartRealmName="The Outer Realm"
 ENV Guncho__WebServerPort=5000
+ENV Guncho__GameServerPort=4108
 
-# Expose the web server port
-EXPOSE 5000
+# Expose ports:
+# - 5000: Web server (ASP.NET Core Kestrel with Blazor UI)
+# - 4108: TCP server (telnet/MUD protocol for game connections)
+EXPOSE 5000 4108
 
 # Run the application
 ENTRYPOINT ["dotnet", "Guncho.WebHost.dll"]

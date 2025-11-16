@@ -7,7 +7,10 @@ services:
       dockerfile: Dockerfile
     container_name: guncho-webhost
     ports:
+      # Web server (ASP.NET Core Kestrel with Blazor UI)
       - "5000:5000"
+      # TCP server (telnet/MUD protocol for game connections)
+      - "4108:4108"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - DOTNET_MODIFIABLE_ASSEMBLIES=
@@ -16,6 +19,9 @@ services:
       - Guncho__LogPath=/app/Logs
       - Guncho__NiInstallationsPath=/app/HackedI7
       - Guncho__NiSkeletonPath=/app/Skeleton.inform
+      # Configurable ports (uncomment and modify to override defaults)
+      # - Guncho__GameServerPort=4108
+      # Note: WebServerPort (5000) is configured in Program.cs Kestrel settings
     volumes:
       # Persist game data
       - guncho-cache:/app/Cache
