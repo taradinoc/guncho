@@ -8,10 +8,10 @@
 
   <ItemGroup>
     <!-- Reference the .NET 10 game engine -->
-    <ProjectReference Include="$(SolutionDir)\Guncho.Engine\Guncho.Engine.csproj" />
-    <ProjectReference Include="$(SolutionDir)\Guncho.Shared\Guncho.Shared.csproj" />
+    <ProjectReference Include="$(SolutionDir)\src\Guncho.Engine\Guncho.Engine.csproj" />
+    <ProjectReference Include="$(SolutionDir)\src\Guncho.Shared\Guncho.Shared.csproj" />
     <!-- Reference Blazor client for proper static web assets -->
-    <ProjectReference Include="$(SolutionDir)\Guncho.Client\Guncho.Client.csproj" />
+    <ProjectReference Include="$(SolutionDir)\src\Guncho.Client\Guncho.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

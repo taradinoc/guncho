@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="src/Guncho.Client/Guncho.Client.csproj" />
+  <Project Path="src/Guncho.Engine.Tests/Guncho.Engine.Tests.csproj" />
+  <Project Path="src/Guncho.Engine/Guncho.Engine.csproj" />
+  <Project Path="src/Guncho.Migrator/Guncho.Migrator.csproj" />
+  <Project Path="src/Guncho.Shared/Guncho.Shared.csproj" />
+  <Project Path="src/Guncho.WebHost.Tests/Guncho.WebHost.Tests.csproj" />
+  <Project Path="src/Guncho.WebHost/Guncho.WebHost.csproj" />
+</Solution>

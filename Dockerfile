@@ -6,8 +6,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution structure
-COPY src/Directory.Build.props src/
-COPY src/Guncho.slnx src/
+COPY Directory.Build.props .
+COPY Guncho.slnx .
 
 # Copy TextfyreVM dependency (required for Guncho.Engine)
 COPY TextfyreVM.dll ./
@@ -17,6 +17,7 @@ COPY src/Guncho.Engine/Guncho.Engine.csproj src/Guncho.Engine/
 COPY src/Guncho.Shared/Guncho.Shared.csproj src/Guncho.Shared/
 COPY src/Guncho.Client/Guncho.Client.csproj src/Guncho.Client/
 COPY src/Guncho.WebHost/Guncho.WebHost.csproj src/Guncho.WebHost/
+COPY src/Guncho.Migrator/Guncho.Migrator.csproj src/Guncho.Migrator/
 
 # Restore dependencies for WebHost (will also restore client as project reference)
 WORKDIR /src/src/Guncho.WebHost
@@ -74,6 +75,7 @@ RUN mkdir -p /app/Cache /app/Logs
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_MODIFIABLE_ASSEMBLIES=
+ENV ConnectionStrings__GunchoDatabase="Data Source=/app/RealmData/guncho.db"
 ENV Guncho__CachePath=/app/Cache
 ENV Guncho__RealmDataPath=/app/RealmData
 ENV Guncho__LogPath=/app/Logs

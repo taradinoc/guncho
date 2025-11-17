@@ -31,7 +31,12 @@
 
 ## Migrate to SQL
 
-[ ] Decide SQLite or SQL Server Express?
+[x] Decide SQLite ~~or SQL Server Express?~~
+[x] Create database schema with EF Core entities
+[x] Create migration utility to import from XML
+[x] Update Docker configuration for SQLite
+[ ] Migrate GunchoServerServices to use repositories (in progress)
+[ ] Full integration testing with SQLite backend
 
 # Long term
 

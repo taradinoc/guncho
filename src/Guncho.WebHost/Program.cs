@@ -1,3 +1,5 @@
+using Guncho.Data;
+using Guncho.Repositories;
 using Guncho.Services;
 using Guncho.WebHost.Configuration;
 using Guncho.WebHost.Hubs;
@@ -5,11 +7,25 @@ using Guncho.WebHost.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Ensure static web assets (Blazor client) are available when running locally
 builder.WebHost.UseStaticWebAssets();
+
+// Add database context
+builder.Services.AddDbContext<GunchoDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("GunchoDatabase");
+    options.UseSqlite(connectionString);
+}, ServiceLifetime.Transient); // Use Transient for thread-safety with concurrent access
+
+// Add repositories
+builder.Services.AddScoped<PlayerRepository>();
+builder.Services.AddScoped<RealmRepository>();
+builder.Services.AddScoped<RealmAssetRepository>();
+builder.Services.AddScoped<StorageRepository>();
 
 // Add services
 builder.Services.AddControllers()

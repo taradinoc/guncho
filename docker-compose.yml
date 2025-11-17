@@ -14,6 +14,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - DOTNET_MODIFIABLE_ASSEMBLIES=
+      - ConnectionStrings__GunchoDatabase=Data Source=/app/RealmData/guncho.db
       - Guncho__CachePath=/app/Cache
       - Guncho__RealmDataPath=/app/RealmData
       - Guncho__LogPath=/app/Logs
@@ -23,7 +24,8 @@ services:
       # - Guncho__GameServerPort=4108
       # Note: WebServerPort (5000) is configured in Program.cs Kestrel settings
     volumes:
-      # Persist game data
+      # Persist game data and database
+      - guncho-realmdata:/app/RealmData
       - guncho-cache:/app/Cache
       - guncho-logs:/app/Logs
       # Optionally mount RealmData for live editing
@@ -37,5 +39,6 @@ networks:
     driver: bridge
 
 volumes:
+  guncho-realmdata:
   guncho-cache:
   guncho-logs:
