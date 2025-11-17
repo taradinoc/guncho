@@ -1,0 +1,549 @@
+@page "/realms/{realmName}/assets"
+@layout FullScreenLayout
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using System
+@using System.Linq
+@using Guncho.Client.Services
+@using Guncho.Shared.Models
+@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using Microsoft.JSInterop
+@inject RealmsService RealmsService
+@inject RealmAssetsService RealmAssetsService
+@inject PlayerService PlayerService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Asset Editor - @RealmName - Guncho</PageTitle>
+
+<div class="asset-editor-shell d-flex flex-column flex-grow-1 overflow-hidden">
+    <!-- Top Bar -->
+    <div class="bg-dark text-white p-2 d-flex align-items-center gap-2" style="min-height: 3rem;">
+        <button type="button" class="btn btn-sm btn-outline-light" @onclick="NavigateBack" title="Back to Realm Settings">
+            <span class="bi bi-arrow-left"></span>
+        </button>
+        <h5 class="mb-0 flex-grow-1">Asset Editor - @RealmName</h5>
+        <button type="button" class="btn btn-sm btn-primary" @onclick="SaveCurrentAssetAsync" disabled="@(!CanEditAssets || isSaving || string.IsNullOrWhiteSpace(currentAssetPath))">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+            }
+            <span class="bi bi-floppy me-1"></span>
+            Save
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="alert @(lastOperationSuccessful ? "alert-success" : "alert-danger") mb-0 rounded-0">
+            @statusMessage
+            <button type="button" class="btn-close" @onclick="() => statusMessage = null"></button>
+        </div>
+    }
+
+    <!-- Main Content Area -->
+    <div class="asset-editor-body d-flex flex-grow-1 overflow-hidden">
+        <!-- Sidebar -->
+        <div class="bg-light border-end d-flex flex-column" style="width: 250px; min-width: 250px;">
+            <div class="p-2 border-bottom d-flex justify-content-between align-items-center">
+                <strong class="small text-uppercase text-muted">Assets</strong>
+                @if (CanEditAssets)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="StartNewAsset" title="New Asset">
+                        <span class="bi bi-file-earmark-plus"></span>
+                    </button>
+                }
+            </div>
+            
+            <div class="flex-grow-1 overflow-auto">
+                @if (isLoadingAssets)
+                {
+                    <div class="d-flex justify-content-center py-4">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                }
+                else if (!assetManifest.Any())
+                {
+                    <div class="p-3 text-muted small">
+                        No assets available.
+                        @if (CanEditAssets)
+                        {
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2 w-100" @onclick="StartNewAsset">
+                                <span class="bi bi-file-earmark-plus me-1"></span>Create First Asset
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var asset in assetManifest)
+                        {
+                            <button type="button" 
+                                    class="list-group-item list-group-item-action text-start @(IsSelectedAsset(asset.Path) ? "active" : "")"
+                                    @onclick="() => SelectAssetAsync(asset.Path)">
+                                <div class="d-flex flex-column">
+                                    <span class="small fw-semibold text-truncate">@GetFileName(asset.Path)</span>
+                                    <span class="text-muted" style="font-size: 0.75rem;">@GetDirectoryPath(asset.Path)</span>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (CanEditAssets && !isNewAsset && !string.IsNullOrWhiteSpace(currentAssetPath))
+            {
+                <div class="p-2 border-top">
+                    <button type="button" class="btn btn-sm btn-outline-danger w-100" @onclick="DeleteCurrentAssetAsync" disabled="@isSaving">
+                        <span class="bi bi-trash me-1"></span>Delete Asset
+                    </button>
+                </div>
+            }
+        </div>
+
+        <!-- Editor Area -->
+        <div class="asset-editor-main d-flex flex-column overflow-hidden">
+            @if (isLoadingContent)
+            {
+                <div class="d-flex justify-content-center align-items-center flex-grow-1">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else if (string.IsNullOrWhiteSpace(currentAssetPath) && !isNewAsset)
+            {
+                <div class="d-flex justify-content-center align-items-center flex-grow-1 text-muted">
+                    <div class="text-center">
+                        <span class="bi bi-file-earmark-text" style="font-size: 3rem;"></span>
+                        <p class="mt-2">Select an asset from the sidebar to begin editing</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Asset Info Bar -->
+                <div class="bg-white border-bottom p-2">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            <label class="form-label small mb-1">Asset Path</label>
+                            <input type="text" class="form-control form-control-sm" @bind="currentAssetPath" @bind:event="oninput" disabled="@(!CanEditAssets || !isNewAsset)" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1">Content Type</label>
+                            <input type="text" class="form-control form-control-sm" @bind="currentContentType" @bind:event="oninput" disabled="@(!CanEditAssets)" />
+                        </div>
+                        <div class="col-md-3">
+                            @if (currentVersion.HasValue && !isNewAsset)
+                            {
+                                <label class="form-label small mb-1">Version</label>
+                                <div class="small text-muted">@("v" + currentVersion) • @currentUpdatedAt?.ToLocalTime().ToString("g")</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monaco Editor -->
+                <div class="asset-editor-editor position-relative">
+                    @if (!CanEditAssets)
+                    {
+                        <div class="alert alert-info m-2">You are viewing this asset in read-only mode.</div>
+                    }
+                    <StandaloneCodeEditor @ref="monacoEditor"
+                                          Id="asset-editor"
+                                          ConstructionOptions="EditorConstructionOptions"
+                                          OnDidInit="OnEditorInit"
+                                          OnDidChangeModelContent="OnContentChanged"
+                                          CssClass="h-100 w-100" />
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private StandaloneCodeEditor? monacoEditor;
+    private RealmDto? realm;
+    private PlayerDto? currentPlayer;
+    private List<RealmAssetSummaryDto> assetManifest = new();
+    
+    private string? currentAssetPath;
+    private string currentContent = string.Empty;
+    private string currentContentType = "text/plain";
+    private int? currentVersion;
+    private DateTimeOffset? currentUpdatedAt;
+    private bool isNewAsset;
+    
+    private bool isLoadingAssets;
+    private bool isLoadingContent;
+    private bool isSaving;
+    private string? statusMessage;
+    private bool lastOperationSuccessful;
+
+    [Parameter]
+    public string? RealmName { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRealmAndAssetsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && monacoEditor != null)
+        {
+            await monacoEditor.SetValue(currentContent);
+            await UpdateEditorLanguageAsync();
+        }
+    }
+
+    private StandaloneEditorConstructionOptions EditorConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            Language = DetermineLanguage(currentAssetPath, currentContentType),
+            Theme = "vs",
+            AutomaticLayout = true,
+            ReadOnly = !CanEditAssets,
+            Value = currentContent,
+            FontFamily = "Consolas, 'Courier New', monospace",
+            FontSize = 14,
+            LineNumbers = "on",
+            RenderWhitespace = "selection",
+            WordWrap = "on",
+            Minimap = new EditorMinimapOptions { Enabled = true }
+        };
+    }
+
+    private async Task OnEditorInit()
+    {
+        if (monacoEditor != null)
+        {
+            await monacoEditor.SetValue(currentContent);
+            await UpdateEditorLanguageAsync();
+        }
+    }
+
+    private async Task OnContentChanged(ModelContentChangedEvent e)
+    {
+        if (monacoEditor != null)
+        {
+            currentContent = await monacoEditor.GetValue();
+        }
+    }
+
+    private bool CanEditAssets
+    {
+        get
+        {
+            if (realm == null || currentPlayer == null)
+            {
+                return false;
+            }
+
+            if (currentPlayer.IsAdmin || string.Equals(realm.OwnerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return realm.AccessList.Any(entry =>
+                HasEditSourceAccess(entry.Level) &&
+                (entry.PlayerId == currentPlayer.Id || string.Equals(entry.PlayerName, currentPlayer.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private static bool HasEditSourceAccess(RealmAccessLevel level)
+    {
+        return level == RealmAccessLevel.EditSource
+            || level == RealmAccessLevel.EditSettings
+            || level == RealmAccessLevel.EditAccess
+            || level == RealmAccessLevel.SafetyOff;
+    }
+
+    private bool IsSelectedAsset(string path) =>
+        !string.IsNullOrWhiteSpace(currentAssetPath) && string.Equals(currentAssetPath, path, StringComparison.OrdinalIgnoreCase);
+
+    private async Task LoadRealmAndAssetsAsync()
+    {
+        isLoadingAssets = true;
+        currentPlayer = await PlayerService.GetCurrentPlayerAsync();
+
+        if (!string.IsNullOrWhiteSpace(RealmName))
+        {
+            realm = await RealmsService.GetRealmAsync(RealmName);
+        }
+
+        if (realm != null)
+        {
+            var manifest = await RealmAssetsService.GetManifestAsync(realm.Name);
+            assetManifest = manifest.ToList();
+        }
+        else
+        {
+            assetManifest.Clear();
+        }
+
+        isLoadingAssets = false;
+    }
+
+    private async Task SelectAssetAsync(string path)
+    {
+        if (realm == null || string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        currentAssetPath = path;
+        isNewAsset = false;
+        isLoadingContent = true;
+        statusMessage = null;
+
+        var asset = await RealmAssetsService.GetAssetAsync(realm.Name, path);
+
+        isLoadingContent = false;
+
+        if (asset == null)
+        {
+            await LoadRealmAndAssetsAsync();
+            lastOperationSuccessful = false;
+            statusMessage = "Unable to load asset. It may have been removed.";
+            return;
+        }
+
+        currentAssetPath = asset.Path;
+        currentContent = asset.Content;
+        currentContentType = asset.ContentType;
+        currentVersion = asset.Version;
+        currentUpdatedAt = asset.UpdatedAt;
+
+        if (monacoEditor != null)
+        {
+            await monacoEditor.SetValue(currentContent);
+            await UpdateEditorLanguageAsync();
+        }
+    }
+
+    private void StartNewAsset()
+    {
+        if (!CanEditAssets)
+        {
+            return;
+        }
+
+        currentAssetPath = SuggestNewAssetPath();
+        isNewAsset = true;
+        isLoadingContent = false;
+        statusMessage = null;
+        currentContent = string.Empty;
+        currentContentType = currentAssetPath.EndsWith(".ni", StringComparison.OrdinalIgnoreCase)
+            ? "text/x-inform7"
+            : "text/plain";
+        currentVersion = null;
+        currentUpdatedAt = null;
+
+        if (monacoEditor != null)
+        {
+            _ = monacoEditor.SetValue(currentContent);
+            _ = UpdateEditorLanguageAsync();
+        }
+    }
+
+    private async Task SaveCurrentAssetAsync()
+    {
+        if (realm == null || !CanEditAssets || string.IsNullOrWhiteSpace(currentAssetPath))
+        {
+            return;
+        }
+
+        isSaving = true;
+        statusMessage = null;
+
+        // Get current content from Monaco editor
+        if (monacoEditor != null)
+        {
+            currentContent = await monacoEditor.GetValue();
+        }
+
+        var update = new RealmAssetUpdateDto
+        {
+            Content = currentContent,
+            ContentType = string.IsNullOrWhiteSpace(currentContentType) ? "text/plain" : currentContentType,
+            ExpectedVersion = isNewAsset ? null : currentVersion
+        };
+
+        var result = await RealmAssetsService.UpsertAssetAsync(realm.Name, currentAssetPath, update);
+
+        isSaving = false;
+
+        if (!result.IsSuccess || result.Value == null)
+        {
+            statusMessage = result.Error ?? "Failed to save asset.";
+            lastOperationSuccessful = false;
+            return;
+        }
+
+        var saved = result.Value;
+        lastOperationSuccessful = true;
+        statusMessage = "Asset saved successfully.";
+        isNewAsset = false;
+        currentAssetPath = saved.Path;
+        currentContent = saved.Content;
+        currentContentType = saved.ContentType;
+        currentVersion = saved.Version;
+        currentUpdatedAt = saved.UpdatedAt;
+
+        await LoadRealmAndAssetsAsync();
+    }
+
+    private async Task DeleteCurrentAssetAsync()
+    {
+        if (realm == null || string.IsNullOrWhiteSpace(currentAssetPath) || !CanEditAssets || isNewAsset)
+        {
+            return;
+        }
+
+        isSaving = true;
+        statusMessage = null;
+
+        var result = await RealmAssetsService.DeleteAssetAsync(realm.Name, currentAssetPath);
+
+        isSaving = false;
+
+        if (!result.IsSuccess)
+        {
+            statusMessage = result.Error ?? "Failed to delete asset.";
+            lastOperationSuccessful = false;
+            return;
+        }
+
+        ClearEditor();
+        await LoadRealmAndAssetsAsync();
+
+        lastOperationSuccessful = true;
+        statusMessage = "Asset deleted successfully.";
+
+        if (CanEditAssets)
+        {
+            StartNewAsset();
+        }
+    }
+
+    private void ClearEditor()
+    {
+        currentAssetPath = null;
+        currentContent = string.Empty;
+        currentContentType = "text/plain";
+        currentVersion = null;
+        currentUpdatedAt = null;
+        isNewAsset = false;
+        
+        if (monacoEditor != null)
+        {
+            _ = monacoEditor.SetValue(string.Empty);
+            _ = UpdateEditorLanguageAsync();
+        }
+    }
+
+    private string SuggestNewAssetPath()
+    {
+        const string defaultPath = "Source/story.ni";
+        if (!assetManifest.Any(a => string.Equals(a.Path, defaultPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            return defaultPath;
+        }
+
+        var counter = 1;
+        string candidate;
+        do
+        {
+            candidate = $"Source/file{counter}.txt";
+            counter++;
+        } while (assetManifest.Any(a => string.Equals(a.Path, candidate, StringComparison.OrdinalIgnoreCase)));
+
+        return candidate;
+    }
+
+    private void NavigateBack()
+    {
+        if (!string.IsNullOrWhiteSpace(RealmName))
+        {
+            Navigation.NavigateTo($"/realms/{Uri.EscapeDataString(RealmName)}/edit");
+        }
+        else
+        {
+            Navigation.NavigateTo("/realms");
+        }
+    }
+
+    private static string GetFileName(string path)
+    {
+        var lastSlash = path.LastIndexOf('/');
+        return lastSlash >= 0 ? path.Substring(lastSlash + 1) : path;
+    }
+
+    private static string GetDirectoryPath(string path)
+    {
+        var lastSlash = path.LastIndexOf('/');
+        return lastSlash >= 0 ? path.Substring(0, lastSlash) : string.Empty;
+    }
+
+    private async Task UpdateEditorLanguageAsync()
+    {
+        if (monacoEditor == null)
+        {
+            return;
+        }
+
+        var model = await monacoEditor.GetModel();
+        if (model == null)
+        {
+            return;
+        }
+
+        var language = DetermineLanguage(currentAssetPath, currentContentType);
+        await BlazorMonaco.Editor.Global.SetModelLanguage(JSRuntime, model, language);
+    }
+
+    private static string DetermineLanguage(string? path, string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            var extension = System.IO.Path.GetExtension(path).ToLowerInvariant();
+            return extension switch
+            {
+                ".ni" => "inform7",
+                ".i7x" => "inform7",
+                ".inf" => "inform7",
+                ".json" => "json",
+                ".xml" => "xml",
+                ".html" => "html",
+                ".htm" => "html",
+                ".css" => "css",
+                ".js" => "javascript",
+                ".ts" => "typescript",
+                ".md" => "markdown",
+                ".txt" => "plaintext",
+                ".yaml" => "yaml",
+                ".yml" => "yaml",
+                _ => "plaintext"
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            var lower = contentType.ToLowerInvariant();
+            if (lower.Contains("inform7") || lower.Contains("inform-7")) return "inform7";
+            if (lower.Contains("json")) return "json";
+            if (lower.Contains("xml")) return "xml";
+            if (lower.Contains("html")) return "html";
+            if (lower.Contains("javascript")) return "javascript";
+            if (lower.Contains("css")) return "css";
+        }
+
+        return "plaintext";
+    }
+}

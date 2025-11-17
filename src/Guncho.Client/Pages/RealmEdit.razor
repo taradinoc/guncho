@@ -83,12 +83,17 @@
                     <div class="card mt-4" id="assets">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Realm Assets</h5>
-                            @if (CanEditAssets)
-                            {
-                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="StartNewAsset">
-                                    <span class="bi bi-file-earmark-plus me-1"></span>New Asset
-                                </button>
-                            }
+                            <div class="d-flex gap-2">
+                                <a href="/realms/@Uri.EscapeDataString(RealmName ?? "")/assets" class="btn btn-sm btn-outline-secondary">
+                                    <span class="bi bi-code-square me-1"></span>Full Editor
+                                </a>
+                                @if (CanEditAssets)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="StartNewAsset">
+                                        <span class="bi bi-file-earmark-plus me-1"></span>New Asset
+                                    </button>
+                                }
+                            </div>
                         </div>
                         <div class="card-body">
                             @if (!string.IsNullOrEmpty(assetStatusMessage))
@@ -178,7 +183,7 @@
 
                                         @if (assetUpdatedAt.HasValue && !isNewAsset)
                                         {
-                                            <div class="small text-muted mb-3">Last updated @assetUpdatedAt.Value.ToLocalTime().ToString("g") (v@assetVersion)</div>
+                                            <div class="small text-muted mb-3">Last updated @assetUpdatedAt.Value.ToLocalTime().ToString("g") (@("v" + assetVersion))</div>
                                         }
 
                                         <div class="d-flex flex-wrap gap-2">

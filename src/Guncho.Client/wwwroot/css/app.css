@@ -130,3 +130,44 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+.full-screen-layout {
+    min-height: 100vh;
+    height: 100vh;
+}
+
+@supports (height: 100dvh) {
+    .full-screen-layout {
+        min-height: 100dvh;
+        height: 100dvh;
+    }
+}
+
+.full-screen-layout > main {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.asset-editor-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.asset-editor-body {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.asset-editor-body > * {
+    min-width: 0;
+}
+
+.asset-editor-main {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.asset-editor-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+}

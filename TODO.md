@@ -17,11 +17,11 @@
 [x] Transcript window should stay the same size and scroll correctly
    [x] Use GlkOte for rendering?
 
-[ ] Transcript shouldn't persist on page reload, or should be visibly "historical"
+[x] Transcript shouldn't persist on page reload, or should be visibly "historical"
   (it shouldn't give the impression we're currently connected when we aren't)
 
 [ ] Editor experience should be more like zilf.io or Borogove
-   [ ] Monaco editor
+   [x] Monaco editor
    [ ] File tree sidebar
    [ ] IntelliSense?
 
