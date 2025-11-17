@@ -9,84 +9,11 @@
 @inject PlayConnectionService PlayConnection
 
 <div class="full-screen-layout d-flex flex-column min-vh-100">
-    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: #4682b4;">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                Guncho
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavFull">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNavFull">
-                <ul class="navbar-nav ms-auto">
-                    <AuthorizeView>
-                        <Authorized>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/play">Play Now</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/realms">My Realms</a>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    @context.User.Identity?.Name
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="/profile">Edit Profile</a></li>
-                                    <li><hr class="dropdown-divider" /></li>
-                                    <li><a class="dropdown-item" href="#" @onclick="Logout" @onclick:preventDefault>Log Out</a></li>
-                                </ul>
-                            </li>
-                        </Authorized>
-                        <NotAuthorized>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/play">Play As Guest</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/login">Login</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="/register">Sign Up</a>
-                            </li>
-                        </NotAuthorized>
-                    </AuthorizeView>
-                </ul>
-            </div>
-        </div>
-    </nav>
+    <NavHeader Fluid="true" />
 
     <main class="flex-grow-1 d-flex flex-column overflow-hidden" style="min-height: 0;">
         @Body
     </main>
 
-    <hr class="my-0" />
-    <div id="footer" class="bg-light py-3">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="text-muted mb-0">
-                        Guncho web client version 2.0.<br />
-                        Powered by <a href="/credits">vaporware</a>.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <Footer Fluid="true" />
 </div>
-
-@code {
-    private async Task Logout()
-    {
-        try
-        {
-            await PlayConnection.DisconnectAsync();
-        }
-        catch
-        {
-            // Ignore disconnect failures; we're logging out anyway
-        }
-
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/", true);
-    }
-}

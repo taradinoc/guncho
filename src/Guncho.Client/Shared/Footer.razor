@@ -1,0 +1,18 @@
+<hr />
+<div id="footer">
+    <div class="@(Fluid ? "container-fluid" : "container")">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="text-muted">
+                    Guncho web client version 2.0.<br />
+                    Powered by <a href="/credits">vaporware</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public bool Fluid { get; set; } = false;
+}

@@ -381,7 +381,7 @@
 
         if (!result.IsSuccess || result.Value == null)
         {
-            statusMessage = result.Error ?? "Failed to save asset.";
+            statusMessage = "Failed to save asset.";
             lastOperationSuccessful = false;
             return;
         }
@@ -415,7 +415,7 @@
 
         if (!result.IsSuccess)
         {
-            statusMessage = result.Error ?? "Failed to delete asset.";
+            statusMessage = "Failed to delete asset.";
             lastOperationSuccessful = false;
             return;
         }
