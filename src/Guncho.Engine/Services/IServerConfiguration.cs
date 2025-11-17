@@ -11,7 +11,6 @@ namespace Guncho.Services
         string LogPath { get; }
         string NiInstallationsPath { get; }
         string NiSkeletonPath { get; }
-        string DefaultRealmName { get; }
         string StartRealmName { get; }
         int CompilerTimeout { get; }
         int TransactionTimeout { get; }
@@ -22,6 +21,7 @@ namespace Guncho.Services
         string GuestMotdFileName { get; }
         string ConnectTextFileName { get; }
         int GameServerPort { get; }
+        bool FilterBlankLines { get; }
         
         // Computed paths
         string MotdPath { get; }

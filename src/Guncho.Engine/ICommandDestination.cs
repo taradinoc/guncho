@@ -5,6 +5,6 @@ namespace Guncho
     public interface ICommandDestination<in TInput, TOutput>
     {
         void QueueInput(TInput line);
-        Task<TOutput> SendAndGetAsync(TInput line);
+        Task<TOutput> SendAndGetAsync(TInput line, bool trimResponse = true);
     }
 }

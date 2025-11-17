@@ -22,6 +22,8 @@ namespace Guncho.Connections
         public Player? Player { get; set; }
         public DateTime Started { get; set; }
         public DateTime LastActivity { get; set; }
+        public bool FilterBlankLines { get; set; }
+        protected bool LastLineWasBlank { get; set; }
 
         public TimeSpan ConnectedTime => DateTime.Now - Started;
         public TimeSpan IdleTime => DateTime.Now - LastActivity;

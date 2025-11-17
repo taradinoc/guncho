@@ -42,8 +42,21 @@ namespace Guncho
 
         private int tagstate = 0;
         private Player? curPlayer = null;
-        private Stack<Player?> prevPlayers = new Stack<Player?>();
+        private bool curLineDirty;
+        private readonly Stack<PlayerContext> prevPlayers = new();
         private StringBuilder? tagParam = new StringBuilder();
+
+        private struct PlayerContext
+        {
+            public PlayerContext(Player? player, bool lineDirty)
+            {
+                Player = player;
+                LineDirty = lineDirty;
+            }
+
+            public Player? Player { get; }
+            public bool LineDirty { get; }
+        }
 
         private const int MAX_LINE_LENGTH = 120;
         private const double WATCHDOG_SECONDS = 10.0;
@@ -293,7 +306,7 @@ namespace Guncho
         /// <param name="line">The line of input to send.</param>
         /// <returns>The text that was printed in response to the line, or
         /// an empty string if the transaction timed out.</returns>
-        public async Task<string> SendAndGetAsync(string line)
+        public async Task<string> SendAndGetAsync(string line, bool trimResponse = true)
         {
             Transaction trans = new Transaction(line);
             io.QueueTransaction(trans);
@@ -301,7 +314,8 @@ namespace Guncho
             var delay = Task.Delay(config.TransactionTimeout);
 
             await Task.WhenAny(trans.WhenCompleted, delay);
-            return trans.Response.ToString().Trim();
+            var response = trans.Response.ToString();
+            return trimResponse ? response.Trim() : response;
         }
 
         /// <summary>
@@ -337,7 +351,11 @@ namespace Guncho
             {
                 // Extra diagnostics to confirm that disconnect triggers $part and realm responds.
                 logger.LogMessage(LogLevel.Spam, "RemovePlayerAsync: sending $part for player {0} in instance '{1}'", player.ID, name);
-                string result = await SendAndGetAsync(string.Format("$part {0}", player.ID));
+                        string result = await SendAndGetAsync(string.Format("$part {0}", player.ID), trimResponse: false);
+                        if (!string.IsNullOrEmpty(result) && !result.EndsWith("\n"))
+                        {
+                            result += "\n";
+                        }
                 logger.LogMessage(LogLevel.Spam, "RemovePlayerAsync: received $part response (length {0}) for player {1} in '{2}'", result.Length, player.ID, name);
                 await HandleOutputAsync(result);
                 await FlushAllAsync();
@@ -520,12 +538,11 @@ namespace Guncho
                         if (tagParam != null)
                         {
                             // done
-                            prevPlayers.Push(curPlayer);
+                            prevPlayers.Push(new PlayerContext(curPlayer, curLineDirty));
 
                             int playerNum = int.Parse(tagParam.ToString());
                             players.TryGetValue(playerNum, out curPlayer!);
-                            if (curPlayer != null)
-                                await site.SendLineToPlayerAsync(curPlayer);
+                            curLineDirty = false;
                             tagParam = null;
                         }
                         tagstate = 0;
@@ -541,8 +558,9 @@ namespace Guncho
                     // got <$a
                     if (c == '>')
                     {
-                        prevPlayers.Push(curPlayer);
+                        prevPlayers.Push(new PlayerContext(curPlayer, curLineDirty));
                         curPlayer = Announcer;
+                        curLineDirty = false;
                         tagstate = 0;
                     }
                     else
@@ -660,8 +678,18 @@ namespace Guncho
                     // got </$t
                     if (c == '>')
                     {
+                        if (curLineDirty)
+                        {
+                            await SendCurPlayerAsync('\n');
+                            curLineDirty = false;
+                        }
+
                         if (prevPlayers.Count >= 1)
-                            curPlayer = prevPlayers.Pop();
+                        {
+                            var ctx = prevPlayers.Pop();
+                            curPlayer = ctx.Player;
+                            curLineDirty = ctx.LineDirty;
+                        }
                         tagstate = 0;
                     }
                     else
@@ -675,8 +703,18 @@ namespace Guncho
                     // got </$a
                     if (c == '>')
                     {
+                        if (curLineDirty)
+                        {
+                            await SendCurPlayerAsync('\n');
+                            curLineDirty = false;
+                        }
+
                         if (prevPlayers.Count >= 1)
-                            curPlayer = prevPlayers.Pop();
+                        {
+                            var ctx = prevPlayers.Pop();
+                            curPlayer = ctx.Player;
+                            curLineDirty = ctx.LineDirty;
+                        }
                         tagstate = 0;
                     }
                     else
@@ -724,6 +762,11 @@ namespace Guncho
                 else
                     Console.Write(c);
 #endif
+            }
+
+            if (curPlayer != null)
+            {
+                curLineDirty = c != '\n';
             }
         }
 

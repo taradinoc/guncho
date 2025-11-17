@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Guncho.WebHost.Services;
+using Guncho.Services;
 
 namespace Guncho.WebHost.Hubs
 {
@@ -13,17 +14,19 @@ namespace Guncho.WebHost.Hubs
     }
 
     /// <summary>
-    /// SignalR hub for real-time game communication.
+    /// SignalR hub for real-time game communication. Methods are called by the client.
     /// </summary>
     public class PlayHub : Hub<IPlayClient>
     {
         private readonly ISignalRConnectionManager connectionManager;
         private readonly ILogger<PlayHub> logger;
+        private readonly IServerConfiguration config;
 
-        public PlayHub(ISignalRConnectionManager connectionManager, ILogger<PlayHub> logger)
+        public PlayHub(ISignalRConnectionManager connectionManager, ILogger<PlayHub> logger, IServerConfiguration config)
         {
             this.connectionManager = connectionManager;
             this.logger = logger;
+            this.config = config;
         }
 
         public override Task OnConnectedAsync()
@@ -80,7 +83,7 @@ namespace Guncho.WebHost.Hubs
                 {
                     // Establish a guest session, then move to the requested realm if provided
                     connection.EnqueueCommand("connect guest");
-                    if (hasRealm)
+                    if (hasRealm && trimmedRealm != config.StartRealmName)
                     {
                         connection.EnqueueCommand($"@tel {trimmedRealm}");
                     }
@@ -88,7 +91,10 @@ namespace Guncho.WebHost.Hubs
                 else if (hasRealm)
                 {
                     // Already authenticated: treat this as an explicit teleport request
-                    connection.EnqueueCommand($"@tel {trimmedRealm}");
+                    if (trimmedRealm != config.StartRealmName)
+                    {
+                        connection.EnqueueCommand($"@tel {trimmedRealm}");
+                    }
                 }
                 else
                 {

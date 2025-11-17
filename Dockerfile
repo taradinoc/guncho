@@ -79,7 +79,6 @@ ENV Guncho__RealmDataPath=/app/RealmData
 ENV Guncho__LogPath=/app/Logs
 ENV Guncho__NiInstallationsPath=/app/HackedI7
 ENV Guncho__NiSkeletonPath=/app/Skeleton.inform
-ENV Guncho__DefaultRealmName="The Outer Realm"
 ENV Guncho__StartRealmName="The Outer Realm"
 ENV Guncho__WebServerPort=5000
 ENV Guncho__GameServerPort=4108

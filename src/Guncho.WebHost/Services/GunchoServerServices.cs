@@ -72,8 +72,7 @@ namespace Guncho.WebHost.Services
 
         public Task<bool> ValidateLogInAsync(Player player, string password)
         {
-            if (player == null)
-                throw new ArgumentNullException(nameof(player));
+            ArgumentNullException.ThrowIfNull(player);
 
             if (string.IsNullOrEmpty(player.PasswordHash))
                 return Task.FromResult(false);
@@ -114,8 +113,7 @@ namespace Guncho.WebHost.Services
 
         public async Task SavePlayerAsync(Player player)
         {
-            if (player == null)
-                throw new ArgumentNullException(nameof(player));
+            ArgumentNullException.ThrowIfNull(player);
 
             _players[player.Name] = player;
             _playersById[player.ID] = player;
@@ -126,8 +124,7 @@ namespace Guncho.WebHost.Services
 
         public async Task DeletePlayerAsync(Player player)
         {
-            if (player == null)
-                throw new ArgumentNullException(nameof(player));
+            ArgumentNullException.ThrowIfNull(player);
 
             _players.TryRemove(player.Name, out _);
             _playersById.TryRemove(player.ID, out _);
@@ -374,8 +371,7 @@ namespace Guncho.WebHost.Services
 
         public async Task SaveRealmAsync(Realm realm)
         {
-            if (realm == null)
-                throw new ArgumentNullException(nameof(realm));
+            ArgumentNullException.ThrowIfNull(realm);
 
             _realms[realm.Name] = realm;
 
@@ -451,8 +447,7 @@ namespace Guncho.WebHost.Services
 
         public async Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm)
         {
-            if (realm == null)
-                throw new ArgumentNullException(nameof(realm));
+            ArgumentNullException.ThrowIfNull(realm);
 
             _logger.LogMessage(LogLevel.Verbose, $"Updating source for realm '{realm.Name}'.");
 
@@ -701,8 +696,7 @@ namespace Guncho.WebHost.Services
 
         public IInstance? GetInstance(string name)
         {
-            if (name == null)
-                throw new ArgumentNullException(nameof(name));
+            ArgumentNullException.ThrowIfNull(name);
 
             // Try direct lookup first (for instance names like "RealmName:default")
             if (_instances.TryGetValue(name, out var instance))
@@ -725,8 +719,7 @@ namespace Guncho.WebHost.Services
 
         public async Task<IInstance> GetDefaultInstanceAsync(Realm realm)
         {
-            if (realm == null)
-                throw new ArgumentNullException(nameof(realm));
+            ArgumentNullException.ThrowIfNull(realm);
 
             // Use lowercase realm name as instance key (legacy compatibility)
             var instanceName = realm.Name.ToLower();
@@ -743,10 +736,8 @@ namespace Guncho.WebHost.Services
 
         public async Task EnterInstanceAsync(Player player, IInstance instance, string? savedPosition = null)
         {
-            if (player == null)
-                throw new ArgumentNullException(nameof(player));
-            if (instance == null)
-                throw new ArgumentNullException(nameof(instance));
+            ArgumentNullException.ThrowIfNull(player);
+            ArgumentNullException.ThrowIfNull(instance);
 
             // Remove from previous instance if needed
             if (_playerInstances.TryGetValue(player, out var prevInstance) && prevInstance != instance)
@@ -785,10 +776,8 @@ namespace Guncho.WebHost.Services
 
         public async Task<bool> WithPlayerConnectionsAsync(Player player, Func<Connection, Task> action)
         {
-            if (player == null)
-                throw new ArgumentNullException(nameof(player));
-            if (action == null)
-                throw new ArgumentNullException(nameof(action));
+            ArgumentNullException.ThrowIfNull(player);
+            ArgumentNullException.ThrowIfNull(action);
 
             var connections = _openConnections.Keys.Where(c => c.Player == player).ToList();
             if (connections.Count == 0)
@@ -800,8 +789,7 @@ namespace Guncho.WebHost.Services
 
         public async Task SendTextFileAsync(Connection connection, string filePath)
         {
-            if (connection == null)
-                throw new ArgumentNullException(nameof(connection));
+            ArgumentNullException.ThrowIfNull(connection);
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentNullException(nameof(filePath));
 
@@ -892,8 +880,7 @@ namespace Guncho.WebHost.Services
 
         public async Task SetEventIntervalAsync(IInstance instance, int seconds)
         {
-            if (instance == null)
-                throw new ArgumentNullException(nameof(instance));
+            ArgumentNullException.ThrowIfNull(instance);
             if (seconds < 0)
                 throw new ArgumentOutOfRangeException(nameof(seconds));
 
@@ -983,6 +970,7 @@ namespace Guncho.WebHost.Services
         /// </summary>
         public void RegisterConnection(Connection conn, string? authenticatedUser = null)
         {
+            conn.FilterBlankLines = _config.FilterBlankLines;
             var connTask = HandleConnectionAsync(conn, authenticatedUser);
             _openConnections.TryAdd(conn, connTask);
         }
@@ -998,6 +986,7 @@ namespace Guncho.WebHost.Services
         private void OnConnectionAccepted(object? sender, ConnectionAcceptedEventArgs e)
         {
             _logger.LogMessage(LogLevel.Verbose, "SignalR: Accepting connection with ID {0}.", e.Connection.ConnectionId);
+            e.Connection.FilterBlankLines = _config.FilterBlankLines;
             var connTask = HandleConnectionAsync(e.Connection, e.AuthenticatedUserName);
             _openConnections.TryAdd(e.Connection, connTask);
         }
@@ -1096,7 +1085,8 @@ namespace Guncho.WebHost.Services
 
             _logger.LogMessage(LogLevel.Notice, "HandleConnectionAsync: Connection lost");
             
-            if (conn.Player != null)
+            var disconnectedPlayer = conn.Player;
+            if (disconnectedPlayer != null)
             {
                 if (conn is TcpConnection tcpConn && tcpConn.OtherSide != null)
                 {
@@ -1105,21 +1095,21 @@ namespace Guncho.WebHost.Services
                 }
                 // If the player was in an instance, remove them so a subsequent
                 // reconnect can join cleanly and the VM sees a $part event.
-                if (_playerInstances.TryGetValue(conn.Player, out var inst))
+                if (_playerInstances.TryGetValue(disconnectedPlayer, out var inst))
                 {
                     try
                     {
-                        await inst.RemovePlayerAsync(conn.Player);
-                        _playerInstances.TryRemove(conn.Player, out _);
-                        _logger.LogMessage(LogLevel.Verbose, "Player {0} removed from instance {1} after connection loss.", conn.Player.Name, inst.Realm.Name);
+                        await inst.RemovePlayerAsync(disconnectedPlayer);
+                        _playerInstances.TryRemove(disconnectedPlayer, out _);
+                        _logger.LogMessage(LogLevel.Verbose, "Player {0} removed from instance {1} after connection loss.", disconnectedPlayer.Name, inst.Realm.Name);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogMessage(LogLevel.Error, "Failed to remove player {0} from instance on disconnect: {1}", conn.Player.Name, ex.Message);
+                        _logger.LogMessage(LogLevel.Error, "Failed to remove player {0} from instance on disconnect: {1}", disconnectedPlayer.Name, ex.Message);
                     }
                 }
 
-                // Additional guest cleanup could go here if necessary.
+                ReleaseGuest(disconnectedPlayer);
             }
         }
 
@@ -1138,6 +1128,20 @@ namespace Guncho.WebHost.Services
                 hidden ? "$silent " : "",
                 conn.Player.ID,
                 line);
+        }
+
+        private void ReleaseGuest(Player player)
+        {
+            if (player == null || !player.IsGuest)
+                return;
+
+            var key = player.Name.ToLowerInvariant();
+            if (_players.TryRemove(key, out _))
+            {
+                _logger.LogMessage(LogLevel.Verbose, "Released guest slot {0}.", player.Name);
+            }
+
+            _playersById.TryRemove(player.ID, out _);
         }
 
         private struct HandleSystemCommandResult
@@ -1202,6 +1206,11 @@ namespace Guncho.WebHost.Services
                     else
                     {
                         _logger.LogMessage(LogLevel.Notice, "Connection terminated on quit command (player {0}).", player?.Name ?? "<none>");
+                    }
+
+                    if (player != null)
+                    {
+                        ReleaseGuest(player);
                     }
                     return result;
             }
@@ -1660,7 +1669,7 @@ namespace Guncho.WebHost.Services
             string lower = line.ToLower();
 
             // Handle special chat command forms
-            if (line.StartsWith("\"", StringComparison.Ordinal))
+            if (line.StartsWith('"'))
                 line = "$say " + Sanitize(line.Substring(1));
             else if (lower.StartsWith("say ", StringComparison.Ordinal))
                 line = "$say " + Sanitize(line.Substring(4));

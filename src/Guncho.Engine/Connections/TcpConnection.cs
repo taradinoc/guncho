@@ -133,15 +133,64 @@ namespace Guncho.Connections
 
         public async override Task FlushOutputAsync()
         {
-            if (outputBuffer.Length > 0)
+            if (outputBuffer.Length == 0)
             {
-                string text = outputBuffer.ToString();
-                outputBuffer.Length = 0;
-                
-                string rawText = TextUtils.Desanitize(text);
-                await wtr.WriteAsync(rawText);
-                await wtr.FlushAsync();
+                return;
             }
+
+            string rawText = TextUtils.Desanitize(outputBuffer.ToString());
+            outputBuffer.Length = 0;
+
+            var lineBuffer = new StringBuilder();
+
+            async Task EmitLineAsync()
+            {
+                var line = lineBuffer.ToString();
+                lineBuffer.Clear();
+
+                if (line.Length == 0)
+                {
+                    if (FilterBlankLines)
+                        return;
+
+                    if (LastLineWasBlank)
+                        return;
+
+                    await wtr.WriteLineAsync(string.Empty);
+                    LastLineWasBlank = true;
+                    return;
+                }
+
+                await wtr.WriteLineAsync(line);
+                LastLineWasBlank = false;
+            }
+
+            foreach (var ch in rawText)
+            {
+                if (ch == '\r')
+                {
+                    continue;
+                }
+
+                if (ch == '\n')
+                {
+                    await EmitLineAsync();
+                }
+                else
+                {
+                    lineBuffer.Append(ch);
+                }
+            }
+
+            if (lineBuffer.Length > 0)
+            {
+                var remainder = lineBuffer.ToString();
+                lineBuffer.Clear();
+                await wtr.WriteAsync(remainder);
+                LastLineWasBlank = false;
+            }
+
+            await wtr.FlushAsync();
         }
     }
 }

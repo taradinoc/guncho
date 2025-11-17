@@ -21,7 +21,6 @@ namespace Guncho.WebHost.Configuration
         public string LogPath => _configuration["Guncho:LogPath"] ?? "e:\\guncho\\Logs";
         public string NiInstallationsPath => _configuration["Guncho:NiInstallationsPath"] ?? "e:\\guncho\\HackedI7";
         public string NiSkeletonPath => _configuration["Guncho:NiSkeletonPath"] ?? "e:\\guncho\\Skeleton.inform";
-        public string DefaultRealmName => _configuration["Guncho:DefaultRealmName"] ?? "The Outer Realm";
         public string StartRealmName => _configuration["Guncho:StartRealmName"] ?? "The Outer Realm";
         public int CompilerTimeout => int.Parse(_configuration["Guncho:CompilerTimeout"] ?? "300000");
         public int TransactionTimeout => int.Parse(_configuration["Guncho:TransactionTimeout"] ?? "5000");
@@ -32,6 +31,7 @@ namespace Guncho.WebHost.Configuration
         public string GuestMotdFileName => _configuration["Guncho:GuestMotdFileName"] ?? "guest.txt";
         public string ConnectTextFileName => _configuration["Guncho:ConnectTextFileName"] ?? "connect.txt";
         public int GameServerPort => int.Parse(_configuration["Guncho:GameServerPort"] ?? "4108");
+        public bool FilterBlankLines => bool.TryParse(_configuration["Guncho:FilterBlankLines"], out var filtered) && filtered;
         
         // Computed paths
         public string MotdPath => Path.Combine(RealmDataPath, MotdFileName);

@@ -75,18 +75,59 @@ namespace Guncho.WebHost.Connections
             await manager.TerminateClientAsync(ConnectionId);
         }
 
-        private static readonly char[] LineDelimiters = { '\r', '\n' };
-
         public override async Task FlushOutputAsync()
         {
-            var bufferContent = outputBuffer.ToString();
-            var lines = bufferContent.Split(LineDelimiters, StringSplitOptions.RemoveEmptyEntries);
+            if (outputBuffer.Length == 0)
+                return;
+
+            var rawText = TextUtils.Desanitize(outputBuffer.ToString());
             outputBuffer.Length = 0;
 
-            foreach (var line in lines)
+            var lineBuffer = new StringBuilder();
+            async Task EmitLineAsync()
             {
-                string rawLine = TextUtils.Desanitize(line);
-                await manager.SendToClientAsync(ConnectionId, rawLine);
+                var line = lineBuffer.ToString();
+                lineBuffer.Clear();
+
+                if (line.Length == 0)
+                {
+                    if (FilterBlankLines)
+                        return;
+
+                    if (LastLineWasBlank)
+                        return;
+
+                    await manager.SendToClientAsync(ConnectionId, string.Empty);
+                    LastLineWasBlank = true;
+                    return;
+                }
+
+                await manager.SendToClientAsync(ConnectionId, line);
+                LastLineWasBlank = false;
+            }
+
+            foreach (var ch in rawText)
+            {
+                if (ch == '\r')
+                {
+                    continue;
+                }
+
+                if (ch == '\n')
+                {
+                    await EmitLineAsync();
+                }
+                else
+                {
+                    lineBuffer.Append(ch);
+                }
+            }
+
+            if (lineBuffer.Length > 0)
+            {
+                await manager.SendToClientAsync(ConnectionId, lineBuffer.ToString());
+                lineBuffer.Clear();
+                LastLineWasBlank = false;
             }
         }
 

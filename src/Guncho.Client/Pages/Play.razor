@@ -20,16 +20,7 @@
             <div class="text-muted">Connect to a realm to explore multiplayer interactive fiction.</div>
         </div>
         <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-            <div class="badge bg-secondary fs-6">
-                <span class="bi @(ConnectionState switch
-                {
-                    PlayConnectionState.Connected => "bi-plug-fill",
-                    PlayConnectionState.Connecting => "bi-broadcast",
-                    PlayConnectionState.Reconnecting => "bi-arrow-repeat",
-                    _ => "bi-exclamation-octagon"
-                })"></span>
-                @ConnectionState
-            </div>
+
         </div>
     </div>
 
@@ -52,7 +43,19 @@
         <div class="col-lg-4">
             <div class="card shadow-sm mb-4">
                 <div class="card-header">
-                    <strong>Session</strong>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>Session</strong>
+                        <span>
+                            @ConnectionState
+                            <span class="bi @(ConnectionState switch
+                                            {
+                                                PlayConnectionState.Connected => "bi-plug-fill",
+                                                PlayConnectionState.Connecting => "bi-broadcast",
+                                                PlayConnectionState.Reconnecting => "bi-arrow-repeat",
+                                                _ => "bi-exclamation-octagon"
+                                            }) ms-1"></span>
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
