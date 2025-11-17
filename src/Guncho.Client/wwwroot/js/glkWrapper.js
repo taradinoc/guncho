@@ -4,6 +4,7 @@ let windowsCreated = false;
 let lastOutputWasPrompt = false;
 let dotnetRef = null;
 let pendingUpdate = null;
+// Sizing is driven by GlkOte's own arrange/init metrics.
 
 function removePrompts() {
     try {
@@ -119,7 +120,11 @@ export function init(element, dotnet) {
             let forcePrompt = false;
 
             switch (event.type) {
-                case 'init':
+                case 'init': {
+                    const m = event.metrics || {};
+                    // Make window fill the full viewport - GlkOte CSS has bottom margins we need to account for
+                    const width = Math.max(0, m.width || 500);
+                    const height = Math.max(0, m.height || 400);
                     appendUpdate({
                         type: 'update',
                         windows: [
@@ -127,16 +132,40 @@ export function init(element, dotnet) {
                                 id: bufferWindowId,
                                 type: 'buffer',
                                 rock: 69105,
-                                left: 1,
-                                top: 1,
-                                width: element.clientWidth || 500,
-                                height: element.clientHeight || 400
+                                left: 0,
+                                top: 0,
+                                width: width,
+                                height: height
                             }
                         ]
                     });
                     windowsCreated = true;
                     forcePrompt = true;
                     break;
+                }
+
+                case 'arrange': {
+                    if (!windowsCreated) break;
+                    const m = event.metrics || {};
+                    // Make window fill the full viewport - GlkOte CSS has bottom margins we need to account for
+                    const width = Math.max(0, m.width || 0);
+                    const height = Math.max(0, m.height || 0);
+                    appendUpdate({
+                        type: 'update',
+                        windows: [
+                            {
+                                id: bufferWindowId,
+                                type: 'buffer',
+                                rock: 69105,
+                                left: 0,
+                                top: 0,
+                                width: width,
+                                height: height
+                            }
+                        ]
+                    });
+                    break;
+                }
 
                 case 'line':
                     (function handleLineEvent() {

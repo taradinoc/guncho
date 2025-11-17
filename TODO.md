@@ -14,8 +14,8 @@
 
 ## Improve the web client UI
 
-[ ] Transcript window should stay the same size and scroll correctly
-   [ ] Use GlkOte for rendering?
+[x] Transcript window should stay the same size and scroll correctly
+   [x] Use GlkOte for rendering?
 
 [ ] Transcript shouldn't persist on page reload, or should be visibly "historical"
   (it shouldn't give the impression we're currently connected when we aren't)

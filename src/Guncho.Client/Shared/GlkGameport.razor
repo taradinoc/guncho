@@ -3,7 +3,14 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<div id="gameport" style="height: 60vh;" @ref="root">
+<style>
+    /* Override GlkOte's window positioning to fill the full viewport */
+    #gameport .WindowFrame.BufferWindow {
+        height: 100% !important;
+    }
+</style>
+
+<div id="gameport" style="height: 100%; width: 100%;" @ref="root">
     <div id="windowport">
         <noscript>
             <hr />

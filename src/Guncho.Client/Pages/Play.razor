@@ -34,7 +34,7 @@
                         @(ConnectionSlow ? "Connection is slow" : "Live")
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" style="height: calc(100vh - 350px); min-height: 400px;">
                     <GlkGameport OnLineEntered="SendCommandFromGlk" @ref="glkPort" />
                 </div>
             </div>
@@ -45,16 +45,16 @@
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <strong>Session</strong>
-                        <span>
-                            @ConnectionState
+                        <div>
                             <span class="bi @(ConnectionState switch
                                             {
                                                 PlayConnectionState.Connected => "bi-plug-fill",
                                                 PlayConnectionState.Connecting => "bi-broadcast",
                                                 PlayConnectionState.Reconnecting => "bi-arrow-repeat",
                                                 _ => "bi-exclamation-octagon"
-                                            }) ms-1"></span>
-                        </span>
+                                            }) me-1"></span>
+                            <strong>@ConnectionState</strong>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
