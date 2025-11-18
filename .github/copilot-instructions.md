@@ -8,21 +8,15 @@ Guncho is a **multiplayer Interactive Fiction (IF) server** that runs Inform 7 s
 
 ## Repository Structure
 
-- **`legacy/`**: Original .NET Framework 4.5.1 implementation (OWIN/Web API 2/AngularJS)
-  - `Guncho.Core/`: Game engine, realm management, FyreVM integration, SignalR v2.2
-  - `Guncho.Site/`: Legacy AngularJS client (deprecated)
-  - `GunchoConsole/`: Standalone console host
-  - `Guncho.Api.Tests/`: Legacy test suite
-  
-- **`src/`**: Modern .NET 10 rewrite (**primary development focus**)
-  - `Guncho.Engine/`: Core game engine (ported from legacy `Guncho.Core`)
+- **`src/`**: Modern .NET 10 web application
+  - `Guncho.Engine/`: Core game engine
   - `Guncho.WebHost/`: ASP.NET Core 10 host with SignalR and REST APIs
   - `Guncho.Client/`: Blazor WebAssembly front-end (Bootstrap 5.3.8)
   - `Guncho.Shared/`: DTOs and contracts shared between client/server
   - `Guncho.Engine.Tests/`: xUnit tests with Moq
   - `Guncho.WebHost.Tests/`: ASP.NET Core integration tests
 
-- **Root data directories** (used by both legacy and modern):
+- **Root data directories**:
   - `Factories/Inform7/`: Modified Inform 7 compiler builds (5T18, 5Z71) with custom extensions
   - `Factories/Inform7/Skeleton.inform/`: Default shared world template ("The Outer Realm")
   - `RealmData/`: persistence for players/realms (`guncho.db`) and miscellaneous text files (`motd.txt`, `connect.txt`, `guest.txt`)
@@ -95,8 +89,7 @@ All interfaces defined in `Guncho.Engine/Services/`. Single service instance reg
 - Per-realm XML files: Access control lists (ACLs), metadata
 
 **Path configuration**:
-- Legacy: `app.config` in `Guncho.Core` (example: `CachePath`, `RealmDataPath`)
-- Modern: `appsettings.json` in `Guncho.WebHost`
+- `appsettings.json` in `Guncho.WebHost`
 
 ## Build & Development
 
@@ -120,12 +113,6 @@ dotnet test Guncho.WebHost.Tests               # Integration tests only
 ```
 
 **Default test credentials**: `admin` / `password123` (seeded in XML files)
-
-### Legacy Stack
-```powershell
-cd legacy
-msbuild Guncho.sln /p:Configuration=Debug     # Or use 'make' for Mono compatibility
-```
 
 ### Docker Deployment
 - `Dockerfile`: Multi-stage build for `src/Guncho.WebHost`
