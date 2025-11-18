@@ -181,14 +181,18 @@ namespace Guncho.WebHost.Controllers
                 return NotFound();
             }
 
-            // TODO: Implement authorization check and realm deletion
             if (User?.Identity?.Name != realm.Owner.Name)
             {
                 return Forbidden();
             }
 
-            // TODO: Implement realm deletion in service
-            return StatusCode(501); // Not Implemented
+            var success = await _realmService.DeleteRealmAsync(realm);
+            if (!success)
+            {
+                return StatusCode(500, "Failed to delete realm due to server error.");
+            }
+
+            return NoContent();
         }
 
         [HttpPost("")]

@@ -352,6 +352,102 @@ namespace Guncho.WebHost.Services
             return _realmFactories;
         }
 
+        public async Task<bool> DeleteRealmAsync(Realm realm)
+        {
+            ArgumentNullException.ThrowIfNull(realm);
+
+            var key = realm.Name.ToLowerInvariant();
+            _realms.TryRemove(key, out _);
+
+            var instanceEntries = _instances
+                .Where(kvp => kvp.Value.Realm == realm)
+                .ToArray();
+
+            foreach (var entry in instanceEntries)
+            {
+                var instance = entry.Value;
+                try
+                {
+                    await SetEventIntervalAsync(instance, 0);
+                }
+                catch { }
+
+                try
+                {
+                    await instance.PolitelyDisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogMessage(LogLevel.Warning, $"Failed to dispose instance '{instance.Name}' while deleting realm '{realm.Name}': {ex.Message}");
+                }
+
+                _instances.TryRemove(entry.Key, out _);
+                _timedEventsByInstance.TryRemove(instance, out _);
+            }
+
+            var playersToRelease = _playerInstances
+                .Where(kvp => kvp.Value.Realm == realm)
+                .Select(kvp => kvp.Key)
+                .ToArray();
+
+            foreach (var player in playersToRelease)
+            {
+                _playerInstances.TryRemove(player, out _);
+            }
+
+            try
+            {
+                if (File.Exists(realm.StoryFile))
+                {
+                    File.Delete(realm.StoryFile);
+                }
+
+                if (File.Exists(realm.SourceFile))
+                {
+                    File.Delete(realm.SourceFile);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogMessage(LogLevel.Warning, $"Failed to remove files for realm '{realm.Name}': {ex.Message}");
+            }
+
+            try
+            {
+                using var scope = _services.CreateScope();
+                var realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+                var assetRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmAssetRepository>();
+
+                if (realmRepo != null)
+                {
+                    if (realm.DatabaseId == 0)
+                    {
+                        var meta = await realmRepo.GetByNameAsync(realm.Name);
+                        if (meta != null)
+                        {
+                            realm.DatabaseId = meta.Id;
+                        }
+                    }
+
+                    if (realm.DatabaseId != 0 && assetRepo != null)
+                    {
+                        await assetRepo.DeleteAllForRealmAsync(realm.DatabaseId);
+                    }
+
+                    await realmRepo.DeleteAsync(realm.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogMessage(LogLevel.Error, $"Failed to delete realm '{realm.Name}' from database: {ex.Message}");
+                _logger.LogException(ex);
+                return false;
+            }
+
+            _logger.LogMessage(LogLevel.Notice, $"Realm deleted: {realm.Name}");
+            return true;
+        }
+
         public async Task<Realm?> CreateRealmAsync(Player owner, string name, RealmFactory factory)
         {
             var key = name.ToLower();
