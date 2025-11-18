@@ -18,8 +18,8 @@ services:
       - Guncho__CachePath=/app/Cache
       - Guncho__RealmDataPath=/app/RealmData
       - Guncho__LogPath=/app/Logs
-      - Guncho__NiInstallationsPath=/app/HackedI7
-      - Guncho__NiSkeletonPath=/app/Skeleton.inform
+      - Guncho__NiInstallationsPath=/app/Factories/Inform7
+      - Guncho__NiSkeletonPath=/app/Factories/Inform7/Skeleton.inform
       # Configurable ports (uncomment and modify to override defaults)
       # - Guncho__GameServerPort=4108
       # Note: WebServerPort (5000) is configured in Program.cs Kestrel settings

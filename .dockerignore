@@ -50,5 +50,4 @@ Cache/
 
 # Keep these for the Docker build:
 # !RealmData/
-# !Skeleton.inform/
-# !HackedI7/
+# !Factories/

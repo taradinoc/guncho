@@ -19,8 +19,8 @@ namespace Guncho.WebHost.Configuration
         public string IndexPath => Path.Combine(CachePath, "Index");
         public string RealmDataPath => _configuration["Guncho:RealmDataPath"] ?? "e:\\guncho\\RealmData";
         public string LogPath => _configuration["Guncho:LogPath"] ?? "e:\\guncho\\Logs";
-        public string NiInstallationsPath => _configuration["Guncho:NiInstallationsPath"] ?? "e:\\guncho\\HackedI7";
-        public string NiSkeletonPath => _configuration["Guncho:NiSkeletonPath"] ?? "e:\\guncho\\Skeleton.inform";
+        public string NiInstallationsPath => _configuration["Guncho:NiInstallationsPath"] ?? "e:\\guncho\\Factories\\Inform7";
+        public string NiSkeletonPath => _configuration["Guncho:NiSkeletonPath"] ?? "e:\\guncho\\Factories\\Inform7\\Skeleton.inform";
         public string StartRealmName => _configuration["Guncho:StartRealmName"] ?? "The Outer Realm";
         public int CompilerTimeout => int.Parse(_configuration["Guncho:CompilerTimeout"] ?? "300000");
         public int TransactionTimeout => int.Parse(_configuration["Guncho:TransactionTimeout"] ?? "5000");

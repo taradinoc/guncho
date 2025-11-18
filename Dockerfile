@@ -65,8 +65,7 @@ fi
 # Copy runtime data and resources from the workspace
 # These are needed for realm compilation and game execution
 COPY RealmData/ /app/RealmData/
-COPY Skeleton.inform/ /app/Skeleton.inform/
-COPY HackedI7/ /app/HackedI7/
+COPY Factories/ /app/Factories/
 
 # Create necessary directories
 RUN mkdir -p /app/Cache /app/Logs
@@ -79,8 +78,8 @@ ENV ConnectionStrings__GunchoDatabase="Data Source=/app/RealmData/guncho.db"
 ENV Guncho__CachePath=/app/Cache
 ENV Guncho__RealmDataPath=/app/RealmData
 ENV Guncho__LogPath=/app/Logs
-ENV Guncho__NiInstallationsPath=/app/HackedI7
-ENV Guncho__NiSkeletonPath=/app/Skeleton.inform
+ENV Guncho__NiInstallationsPath=/app/Factories/Inform7
+ENV Guncho__NiSkeletonPath=/app/Factories/Inform7/Skeleton.inform
 ENV Guncho__StartRealmName="The Outer Realm"
 ENV Guncho__WebServerPort=5000
 ENV Guncho__GameServerPort=4108

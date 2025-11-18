@@ -23,9 +23,9 @@ Guncho is a **multiplayer Interactive Fiction (IF) server** that runs Inform 7 s
   - `Guncho.WebHost.Tests/`: ASP.NET Core integration tests
 
 - **Root data directories** (used by both legacy and modern):
-  - `HackedI7/`: Modified Inform 7 compiler builds (5T18, 5Z71) with custom extensions
-  - `Skeleton.inform/`: Default shared world template ("The Outer Realm")
-  - `RealmData/`: XML persistence for players/realms (`.ni` source files, `playerIndex.xml`)
+  - `Factories/Inform7/`: Modified Inform 7 compiler builds (5T18, 5Z71) with custom extensions
+  - `Factories/Inform7/Skeleton.inform/`: Default shared world template ("The Outer Realm")
+  - `RealmData/`: persistence for players/realms (`guncho.db`) and miscellaneous text files (`motd.txt`, `connect.txt`, `guest.txt`)
   - `Cache/`: Compiled `.ulx` game files
 
 ## Critical Concepts
@@ -44,12 +44,12 @@ Game stories run on **FyreVM** (Glulx interpreter). Output uses custom tags for 
 Realms are **Inform 7 source files** (`.ni` extension) compiled to Glulx (`.ulx`):
 
 1. Source stored in `RealmData/<RealmName>.ni`
-2. Compilation via `InformRealmFactory.CompileRealmAsync()` using hacked I7 builds in `HackedI7/`
+2. Compilation via `InformRealmFactory.CompileRealmAsync()` using hacked I7 builds in `Factories/Inform7/`
 3. Compiler path configured via `Settings.settings` or `appsettings.json`
 4. Compiled `.ulx` cached in `Cache/` directory
 5. Editing source files through the API triggers a recompile and restart
 
-**Custom Inform 7 Extensions** in `HackedI7/*/Inform7/Extensions/Guncho Cabal/`:
+**Custom Inform 7 Extensions** in `Factories/Inform7/*/Inform7/Extensions/Guncho Cabal/`:
 - `Guncho Realms.i7x`: Multiplayer command parsing, player switching
 - `Guncho Mockup (Client Version).i7x`: Client-side simulation helpers
 
