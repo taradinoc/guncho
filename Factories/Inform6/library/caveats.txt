@@ -1,0 +1,129 @@
+Occasionally it is discovered that the Inform 6 Designer's Manual (DM4)
+defines a part of the Inform 6 language that never was true.  That is,
+the DM4 has a broken specification for something.  So far, this has
+happened only once.
+
+If the dictionary spans the $8000 mark, and the first word in the
+dictionary starts at address a where ($8000 - a) % dict_entry_size == 0,
+the test to see if the value is a negative dictionary word may fail.  In
+most cases, this means that if the dictionary starts at the Z-machine
+memory location $7b82, then the bug will manifest.  This is not an issue
+with Glulx.
+
+
+To avoid trouble:
+
+If your game has some object that has a grammar property AND that
+property can return a negative value, then the global variable
+parser_one MUST be set to true before returning the negative value.
+
+This sort of thing is typically done for parsing commands given to
+non-player characters (NPCs).  The DM4 discusses this in Section 18 just
+before Exercises 19, 30, and 31.
+
+
+Backstory:
+
+Sometime when Graham Nelson was actively developing Inform 6, he or
+someone else noticed this potential trouble and added code to check for
+potential trouble when compiled with DEBUG active and print a warning
+when the game starts.  Unfortunately, the beginning of the dictionary
+changes depending on whether DEBUG is active or not.  It's not possible
+to change the beginning of the dictionary at any point either.
+
+It is impossible for a Z-machine interpreter to clearly know if the
+return value from a grammer property is positive or negative if
+$8000 - a is evenly divisible by the size of a dictionary entry.
+
+This could possibly be fixed by having the Inform 6 compiler avoid
+creating a dictionary aligned like this.  In the meantime, this
+workaround will have to do.
+
+For discussion about fixing the problem in the compiler, see
+https://github.com/DavidKinder/Inform6/issues/130
+
+For discussion about fixing the problem at the library level, see
+https://gitlab.com/DavidGriffith/inform6lib/-/issues/124
+
+
+Test game:
+
+This game illustrates how returning a negative from a grammar properly
+can be useful.
+
+Constant Story "Grammar property demo";
+Constant Headline "^a demonstration to illustrate how return^";
+
+Include "parser";
+Include "verblib";
+Include "grammar";
+
+! Target dictionary starting with $7b82
+! when using -z flag during compilation.
+Array dummy -> $5ee3;
+
+! Only BattleBot can take aim.  This is handled in its orders property,
+! so this routine should never be executed.
+[ TakeAimSub;
+	"No.";
+];
+
+! This is specific grammar for telling the robot to "TAKE AIM".
+Verb 'bot,' * 'take' 'aim' -> TakeAim;
+
+Object Room "Room"
+	with description "A room.",
+	has light;
+
+Object -> BattleBot "battle bot"
+	with
+	name 'battle' 'bot' 'battlebot' 'robot',
+	grammar [;
+		if(verb_word == 'take') {
+			parser_one = true;
+			return -'bot,';
+		}
+	],
+	orders [;
+	Take:
+		if(noun ~= self && ~~ObjectIsUntouchable(noun)) {
+			if(noun has static or scenery or animate ||
+				IndirectlyContains(self, noun) ||
+				IndirectlyContains(player, noun))
+					"~That's crazy talk.~";
+				move noun to self;
+				"~Taken.~";
+			}
+	! If noun is nothing, then the robot tells you that it is aiming.
+	! If it's garbage, like if you said "ROBOT, TAKE GURGLE", then you
+	! get told "That does not compute!".  That's because "GURGLE" boils
+	! down to an illegal object number.  If you said "ROBOT, TAKE BOX",
+	! then the normal TAKE grammer is invoked and the robot will attempt
+	! to take whatever you told it to take.
+	TakeAim:
+		"~Okay, I'm aiming.~";
+		default: "~That does not compute!~";
+	],
+	has animate transparent;
+
+Object -> Box "box"
+	with name 'box',
+	has container openable open;
+
+Object -> -> Ball "ball"
+	with name 'ball';
+
+Object -> -> Pen "pen"
+	with name 'pen';
+
+[ Initialise;
+	location = Room;
+	print "^^^You should be able to do:^
+	~ROBOT, TAKE AIM~ and the robot complies.^
+	or:^
+	~ROBOT, TAKE THE BOX~ and the robot complies.^
+	^
+	You can also ~TAKE BOX~ but there is no way for you to take aim,
+	as that grammar and action is reserved for the robot.
+	^^";
+];
