@@ -181,7 +181,7 @@ public class RealmMetadata
     public string Privacy { get; set; } = "public";
     public string Factory { get; set; } = "5Z71";
     public string? MainFile { get; set; }
-        public List<RealmAssetMetadata> Assets { get; set; } = new();
+    public List<RealmAssetMetadata> Assets { get; set; } = new();
     public List<RealmAccessMetadata> AccessList { get; set; } = new();
 }
     /// <summary>

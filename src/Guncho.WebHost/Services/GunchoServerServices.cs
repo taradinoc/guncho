@@ -121,8 +121,8 @@ namespace Guncho.WebHost.Services
             _players[player.Name] = player;
             _playersById[player.ID] = player;
 
-            // Save to XML file
-            await SavePlayerIndexAsync();
+            // Persist handled by database repositories elsewhere; avoid XML writes
+            await Task.CompletedTask;
         }
 
         public async Task DeletePlayerAsync(Player player)
@@ -132,8 +132,8 @@ namespace Guncho.WebHost.Services
             _players.TryRemove(player.Name, out _);
             _playersById.TryRemove(player.ID, out _);
 
-            // Save to XML file
-            await SavePlayerIndexAsync();
+            // Persist handled by database repositories elsewhere; avoid XML writes
+            await Task.CompletedTask;
         }
 
         public IEnumerable<Player> GetAllPlayers()
@@ -143,88 +143,25 @@ namespace Guncho.WebHost.Services
 
         private async Task LoadPlayersAsync()
         {
-            var dataPath = _config.RealmDataPath;
-            var playerIndexPath = Path.Combine(dataPath, "playerIndex.xml");
-
-            if (!File.Exists(playerIndexPath))
-            {
-                _logger.LogMessage(LogLevel.Warning, $"Player index file not found at {playerIndexPath}");
-                return;
-            }
-
+            // Load players from the database (no XML)
             try
             {
-                var serializer = new XmlSerializer(typeof(XML.playerIndex));
-                using var fs = new FileStream(playerIndexPath, FileMode.Open, FileAccess.Read);
-                var index = (XML.playerIndex?)serializer.Deserialize(fs);
-
-                if (index?.Item?.player != null)
+                using var scope = _services.CreateScope();
+                var repo = scope.ServiceProvider.GetService<Guncho.Repositories.PlayerRepository>();
+                if (repo == null)
                 {
-                    foreach (var entry in index.Item.player)
-                    {
-                        var player = new Player(entry.id, entry.name, entry.admin || entry.adminSpecified)
-                        {
-                            PasswordSalt = entry.pwdSalt ?? "",
-                            PasswordHash = entry.pwdHash ?? ""
-                        };
-
-                        // Load attributes
-                        if (entry.attribute != null)
-                        {
-                            foreach (var attr in entry.attribute)
-                            {
-                                player.SetAttribute(attr.name, attr.Value);
-                            }
-                        }
-
-                        // Store with lowercase key for case-insensitive lookups
-                        _players[player.Name.ToLower()] = player;
-                        _playersById[player.ID] = player;
-                    }
+                    _logger.LogMessage(LogLevel.Warning, "PlayerRepository not available; no players loaded");
+                    return;
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_players.Count} players");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogException(ex);
-                throw;
-            }
-        }
-
-        private async Task SavePlayerIndexAsync()
-        {
-            var dataPath = _config.RealmDataPath;
-            var playerIndexPath = Path.Combine(dataPath, "playerIndex.xml");
-
-            try
-            {
-                var index = new XML.playerIndex
+                var players = await repo.GetAllAsync();
+                foreach (var p in players)
                 {
-                    Item = new XML.playerIndexPlayers
-                    {
-                        player = _players.Values.Select(p => new XML.playerIndexPlayersPlayer
-                        {
-                            id = p.ID,
-                            name = p.Name,
-                            admin = p.IsAdmin,
-                            adminSpecified = p.IsAdmin,
-                            pwdSalt = p.PasswordSalt,
-                            pwdHash = p.PasswordHash,
-                            attribute = p.GetAllAttributes().Select(kvp => new XML.playerIndexPlayersPlayerAttribute
-                            {
-                                name = kvp.Key,
-                                Value = kvp.Value
-                            }).ToArray()
-                        }).ToArray()
-                    }
-                };
+                    _players[p.Name.ToLower()] = p;
+                    _playersById[p.ID] = p;
+                }
 
-                var serializer = new XmlSerializer(typeof(XML.playerIndex));
-                using var fs = new FileStream(playerIndexPath, FileMode.Create, FileAccess.Write);
-                serializer.Serialize(fs, index);
-
-                await Task.CompletedTask;
+                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_players.Count} players from database");
             }
             catch (Exception ex)
             {
@@ -232,6 +169,8 @@ namespace Guncho.WebHost.Services
                 throw;
             }
         }
+
+        // XML player index writes are disabled; persistence uses the database exclusively
 
         #endregion
 
@@ -239,122 +178,106 @@ namespace Guncho.WebHost.Services
 
         private async Task LoadRealmsAsync()
         {
+            // Load realms from the database (no XML)
             try
             {
-                var dataPath = _config.RealmDataPath;
-                var realmIndexPath = Path.Combine(dataPath, "realmIndex.xml");
-
-                if (!File.Exists(realmIndexPath))
+                using var scope = _services.CreateScope();
+                var repo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+                if (repo == null)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Realm index not found: {realmIndexPath}");
+                    _logger.LogMessage(LogLevel.Warning, "RealmRepository not available; no realms loaded");
                     return;
                 }
 
-                // Deserialize realm index
-                XML.realmIndex index;
-                var serializer = new XmlSerializer(typeof(XML.realmIndex));
-                using (var fs = new FileStream(realmIndexPath, FileMode.Open, FileAccess.Read))
-                {
-                    index = (XML.realmIndex)serializer.Deserialize(fs)!;
-                }
-
-                if (index.realms == null || index.realms.Length == 0)
-                {
-                    _logger.LogMessage(LogLevel.Verbose, "No realms to load");
-                    return;
-                }
-
-                // Load each realm
-                foreach (var entry in index.realms)
+                var metas = await repo.GetAllAsync();
+                foreach (var meta in metas)
                 {
                     try
                     {
-                        var owner = await GetPlayerByNameAsync(entry.owner);
-                        if (owner == null)
+                        // Find owner from in-memory cache populated earlier
+                        if (!_playersById.TryGetValue(meta.OwnerId, out var owner) || owner == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"Realm '{entry.name}' owner '{entry.owner}' not found, skipping");
+                            _logger.LogMessage(LogLevel.Warning, $"Realm '{meta.Name}' owner id {meta.OwnerId} not loaded; skipping realm");
                             continue;
                         }
 
-                        // Find factory
-                        var factory = _realmFactories.FirstOrDefault(f => f.Name == entry.factory) 
+                        // Pick factory by name
+                        var factory = _realmFactories.FirstOrDefault(f => f.Name.Equals(meta.Factory, StringComparison.OrdinalIgnoreCase))
                                     ?? _realmFactories.FirstOrDefault();
-                        
                         if (factory == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"No factory available for realm '{entry.name}', skipping");
+                            _logger.LogMessage(LogLevel.Warning, $"No realm factory available for '{meta.Name}' (factory '{meta.Factory}')");
                             continue;
                         }
 
-                        var sourceFile = Path.Combine(dataPath, entry.src);
-                        if (!File.Exists(sourceFile))
+                        // Virtual source path for legacy compatibility (no file IO)
+                        var virtualSource = Path.Combine(_config.RealmDataPath, NewSourceFileName(owner.Name, meta.Name, factory.SourceFileExtension));
+                        var storyFile = Path.Combine(_config.CachePath, meta.Name + ".ulx");
+                        var realm = new Realm(factory, _config, meta.Name, virtualSource, storyFile, owner, _services)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"Realm source file not found: {sourceFile}, skipping realm '{entry.name}'");
-                            continue;
-                        }
-
-                        // For now, just create a placeholder realm without loading the story file
-                        // Full compilation will happen when needed
-                        var storyFile = Path.Combine(_config.CachePath, entry.name + ".ulx");
-                        var realm = new Realm(factory, _config, entry.name, sourceFile, storyFile, owner);
-
-                        // Set privacy level
-                        realm.PrivacyLevel = entry.privacy switch
-                        {
-                            XML.privacyType.hidden => RealmPrivacyLevel.Hidden,
-                            XML.privacyType.@private => RealmPrivacyLevel.Private,
-                            XML.privacyType.@public => RealmPrivacyLevel.Public,
-                            XML.privacyType.joinable => RealmPrivacyLevel.Joinable,
-                            XML.privacyType.viewable => RealmPrivacyLevel.Viewable,
-                            _ => RealmPrivacyLevel.Joinable
+                            DatabaseId = meta.Id,
+                            MainFile = meta.MainFile,
+                            PrivacyLevel = ParsePrivacy(meta.Privacy)
                         };
 
-                        // Load ACL
-                        if (entry.access != null)
+                        // ACLs
+                        if (meta.AccessList.Count > 0)
                         {
-                            var aclEntries = new List<RealmAccessListEntry>();
-                            foreach (var accessEntry in entry.access)
+                            var acl = new List<RealmAccessListEntry>();
+                            foreach (var a in meta.AccessList)
                             {
-                                var player = await GetPlayerByNameAsync(accessEntry.player);
-                                if (player == null)
+                                if (_playersById.TryGetValue(a.PlayerId, out var p) && p != null)
                                 {
-                                    _logger.LogMessage(LogLevel.Warning, $"ACL player '{accessEntry.player}' not found for realm '{entry.name}'");
-                                    continue;
+                                    acl.Add(new RealmAccessListEntry(p, ParseAccess(a.AccessLevel)));
                                 }
-
-                                var level = accessEntry.level switch
-                                {
-                                    XML.levelType.banned => RealmAccessLevel.Banned,
-                                    XML.levelType.editAccess => RealmAccessLevel.EditAccess,
-                                    XML.levelType.editSettings => RealmAccessLevel.EditSettings,
-                                    XML.levelType.editSource => RealmAccessLevel.EditSource,
-                                    XML.levelType.hidden => RealmAccessLevel.Hidden,
-                                    XML.levelType.invited => RealmAccessLevel.Invited,
-                                    XML.levelType.safetyOff => RealmAccessLevel.SafetyOff,
-                                    _ => RealmAccessLevel.Invited
-                                };
-
-                                aclEntries.Add(new RealmAccessListEntry(player, level));
                             }
-                            realm.AccessList = aclEntries.ToArray();
+                            realm.AccessList = acl.ToArray();
                         }
 
-                        _realms[entry.name] = realm;
-                        _logger.LogMessage(LogLevel.Verbose, $"Loaded realm: {entry.name}");
+                        _realms[realm.Name] = realm;
+                        _logger.LogMessage(LogLevel.Verbose, $"Loaded realm: {realm.Name}");
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogMessage(LogLevel.Error, $"Error loading realm '{entry.name}': {ex.Message}");
+                        _logger.LogMessage(LogLevel.Error, $"Error loading realm '{meta.Name}': {ex.Message}");
                     }
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_realms.Count} realms");
+                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_realms.Count} realms from database");
             }
             catch (Exception ex)
             {
                 _logger.LogException(ex);
                 throw;
             }
+        }
+
+        private static RealmPrivacyLevel ParsePrivacy(string privacy)
+        {
+            return privacy.ToLowerInvariant() switch
+            {
+                "hidden" => RealmPrivacyLevel.Hidden,
+                "private" => RealmPrivacyLevel.Private,
+                "public" => RealmPrivacyLevel.Public,
+                "joinable" => RealmPrivacyLevel.Joinable,
+                "viewable" => RealmPrivacyLevel.Viewable,
+                _ => RealmPrivacyLevel.Joinable
+            };
+        }
+
+        private static RealmAccessLevel ParseAccess(string level)
+        {
+            return level.ToLowerInvariant() switch
+            {
+                "banned" => RealmAccessLevel.Banned,
+                "editaccess" => RealmAccessLevel.EditAccess,
+                "editsettings" => RealmAccessLevel.EditSettings,
+                "editsource" => RealmAccessLevel.EditSource,
+                "hidden" => RealmAccessLevel.Hidden,
+                "invited" => RealmAccessLevel.Invited,
+                "safetyoff" => RealmAccessLevel.SafetyOff,
+                _ => RealmAccessLevel.Invited
+            };
         }
 
         #endregion
@@ -420,21 +343,66 @@ namespace Guncho.WebHost.Services
                 }
             }
 
-            // Create source file
+            // Create virtual source path (no file write; DB-backed assets used for compilation)
             var sourceFileName = NewSourceFileName(owner.Name, name, factory.SourceFileExtension);
             var sourcePath = Path.Combine(_config.RealmDataPath, sourceFileName);
             var initialSource = factory.GetInitialSourceText(owner.Name, name);
-            await File.WriteAllTextAsync(sourcePath, initialSource);
 
             try
             {
                 // Create realm object
                 var storyFile = Path.Combine(_config.CachePath, name + ".ulx");
-                var realm = new Realm(factory, _config, name, sourcePath, storyFile, owner);
+                var realm = new Realm(factory, _config, name, sourcePath, storyFile, owner, _services);
                 realm.PrivacyLevel = RealmPrivacyLevel.Joinable;
 
                 _realms[key] = realm;
-                await SaveRealmsAsync();
+
+                // Persist initial source to the database as an asset for DB-first compilation
+                try
+                {
+                    using var scope = _services.CreateScope();
+                    var realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+                    var assetRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmAssetRepository>();
+                    if (realmRepo != null && assetRepo != null)
+                    {
+                        // Ensure realm exists in DB
+                        var meta = await realmRepo.GetByNameAsync(name);
+                        int realmId;
+                        if (meta == null)
+                        {
+                            var newMeta = new Guncho.Repositories.RealmMetadata
+                            {
+                                Name = name,
+                                OwnerId = owner.ID,
+                                OwnerName = owner.Name,
+                                Privacy = realm.PrivacyLevel.ToString().ToLower(),
+                                Factory = factory.Name,
+                                MainFile = factory.DefaultMainFileName,
+                                Assets = new List<Guncho.Repositories.RealmAssetMetadata>(),
+                                AccessList = new List<Guncho.Repositories.RealmAccessMetadata>()
+                            };
+                            realmId = await realmRepo.SaveAsync(newMeta);
+                        }
+                        else
+                        {
+                            realmId = meta.Id;
+                        }
+
+                        // Save initial source as DB asset using default main file name
+                        var mainFileName = factory.DefaultMainFileName;
+                        var contentBytes = System.Text.Encoding.UTF8.GetBytes(initialSource);
+                        await assetRepo.SaveAsync(realmId, mainFileName, contentBytes, "text/plain");
+                        // Also set main file explicitly (defensive)
+                        await realmRepo.SetMainFileAsync(realmId, mainFileName);
+
+                        // Link runtime realm to its database identity
+                        realm.DatabaseId = realmId;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogMessage(LogLevel.Warning, $"Failed to seed DB asset for realm '{name}': {ex.Message}");
+                }
 
                 _logger.LogMessage(LogLevel.Verbose, $"Created realm: {name}");
                 return realm;
@@ -442,8 +410,6 @@ namespace Guncho.WebHost.Services
             catch (Exception ex)
             {
                 _logger.LogException(ex);
-                // Clean up source file if realm creation failed
-                try { File.Delete(sourcePath); } catch { }
                 return null;
             }
         }

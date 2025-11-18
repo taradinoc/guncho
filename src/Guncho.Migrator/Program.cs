@@ -74,6 +74,7 @@ class Program
             optionsBuilder.UseSqlite($"Data Source={dbPath}");
 
         using var dbContext = new GunchoDbContext(optionsBuilder.Options);
+        await dbContext.Database.EnsureCreatedAsync();
 
         // Create logger
         var logger = new ConsoleLogger();
@@ -89,6 +90,10 @@ class Program
             Console.WriteLine();
             Console.WriteLine("IMPORTANT: The XML files are still in place for backup purposes.");
             Console.WriteLine("The new SQLite database will be used instead when you run the server.");
+
+            // Optional verification summary
+            Console.WriteLine();
+            await DbVerifier.VerifyAsync(dbPath);
         }
         catch (Exception ex)
         {

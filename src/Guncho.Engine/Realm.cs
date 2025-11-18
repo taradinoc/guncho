@@ -12,6 +12,8 @@ using Textfyre.VM;
 using System.ComponentModel;
 using System.Diagnostics.Contracts;
 using Nito.AsyncEx;
+using Guncho.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 using Guncho.Services;
 
 namespace Guncho
@@ -112,6 +114,7 @@ namespace Guncho
     public class Realm
     {
         private readonly IServerConfiguration config = null!;
+        private readonly IServiceProvider? services;
         private readonly string sourceFile = null!, storyFile = null!;
         private RealmAccessListEntry[] accessList = null!;
 
@@ -133,7 +136,7 @@ namespace Guncho
 
 
         public Realm(RealmFactory factory, IServerConfiguration config, string name, string sourceFile, string storyFile,
-            Player owner)
+            Player owner, IServiceProvider? services = null)
         {
             this.Factory = factory;
             this.config = config;
@@ -142,12 +145,12 @@ namespace Guncho
             this.storyFile = storyFile;
             this.Owner = owner;
             this.accessList = [];
-
-            LoadStorage();
+            this.services = services;
+            // Storage is DB-backed; do not touch XML here
         }
 
         public Realm(Realm other, string newName)
-            : this(other.Factory, other.config, newName, other.sourceFile, other.storyFile, other.Owner)
+            : this(other.Factory, other.config, newName, other.sourceFile, other.storyFile, other.Owner, other.services)
         {
             CopySettingsFrom(other);
         }
@@ -255,38 +258,8 @@ namespace Guncho
 
         private void LoadStorage()
         {
-            string filename = Path.Combine(
-                config.RealmDataPath,
-                this.Name + ".storage.xml");
-
+            // No XML reads here; DB-backed access happens on demand in getters
             localStorage.Clear();
-
-            if (File.Exists(filename))
-            {
-                XML.realmStorage? root;
-
-                XmlSerializer ser = new XmlSerializer(typeof(XML.realmStorage));
-                using (FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read))
-                {
-                    root = (XML.realmStorage?)ser.Deserialize(fs);
-                }
-
-                if (root != null)
-                {
-                    if (root.realm.ToLower() != this.Name.ToLower())
-                        throw new Exception("Storage file doesn't match this realm");
-
-                    if (root.item != null)
-                        foreach (XML.storageItemType item in root.item)
-                            localStorage.Add(item.key, item.Value);
-
-                    if (root.player != null)
-                        foreach (XML.realmStoragePlayer player in root.player)
-                            if (player.item != null)
-                                foreach (XML.storageItemType item in player.item)
-                                    localStorage.Add(player.name + "\0" + item.key, item.Value);
-                }
-            }
         }
 
         private void SaveStorage()
@@ -340,26 +313,38 @@ namespace Guncho
 
             root.player = players.ToArray();
 
-            string filename = Path.Combine(
-                config.RealmDataPath,
-                this.Name + ".storage.xml");
-
-            XmlSerializer ser = new XmlSerializer(typeof(XML.realmStorage));
-            using (FileStream fs = new FileStream(filename, FileMode.Create, FileAccess.Write))
-            {
-                ser.Serialize(fs, root);
-            }
+            // Do not write XML; persistence is handled via StorageRepository in setters
         }
 
         public string GetRealmStorage(string key)
         {
+            // Prefer DB if available
+            try
+            {
+                if (services != null && DatabaseId > 0)
+                {
+                    using var scope = services.CreateScope();
+                    var repo = scope.ServiceProvider.GetService<StorageRepository>();
+                    if (repo != null)
+                    {
+                        var val = repo.GetRealmValueAsync(DatabaseId, key).GetAwaiter().GetResult();
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            lock (localStorage)
+                            {
+                                localStorage[key] = val!;
+                            }
+                            return val!;
+                        }
+                        return "";
+                    }
+                }
+            }
+            catch { }
+
             lock (localStorage)
             {
-                string? value;
-                if (localStorage.TryGetValue(key, out value))
-                    return value;
-                else
-                    return "";
+                return localStorage.TryGetValue(key, out var value) ? value : "";
             }
         }
 
@@ -371,19 +356,73 @@ namespace Guncho
                     localStorage.Remove(key);
                 else
                     localStorage[key] = value;
-
-                SaveStorage();
             }
+
+            // Persist to DB if available
+            try
+            {
+                if (services != null && DatabaseId > 0)
+                {
+                    using var scope = services.CreateScope();
+                    var repo = scope.ServiceProvider.GetService<StorageRepository>();
+                    if (repo != null)
+                    {
+                        // Fire-and-forget to avoid blocking VM thread
+                        _ = repo.SetRealmValueAsync(DatabaseId, key, value ?? "");
+                    }
+                }
+            }
+            catch { }
         }
 
         public string GetPlayerStorage(Player player, string key)
         {
+            // Prefer DB if available
+            try
+            {
+                if (services != null && DatabaseId > 0)
+                {
+                    using var scope = services.CreateScope();
+                    var repo = scope.ServiceProvider.GetService<StorageRepository>();
+                    if (repo != null)
+                    {
+                        var val = repo.GetPlayerValueAsync(DatabaseId, player.ID, key).GetAwaiter().GetResult();
+                        if (!string.IsNullOrEmpty(val))
+                        {
+                            lock (localStorage)
+                            {
+                                localStorage[player.Name + "\0" + key] = val!;
+                            }
+                            return val!;
+                        }
+                        return "";
+                    }
+                }
+            }
+            catch { }
+
             return GetRealmStorage(player.Name + "\0" + key);
         }
 
         public void SetPlayerStorage(Player player, string key, string value)
         {
+            // Update in-memory cache
             SetRealmStorage(player.Name + "\0" + key, value);
+
+            // Persist to DB if available
+            try
+            {
+                if (services != null && DatabaseId > 0)
+                {
+                    using var scope = services.CreateScope();
+                    var repo = scope.ServiceProvider.GetService<StorageRepository>();
+                    if (repo != null)
+                    {
+                        _ = repo.SetPlayerValueAsync(DatabaseId, player.ID, key, value ?? "");
+                    }
+                }
+            }
+            catch { }
         }
 
         #endregion

@@ -163,8 +163,15 @@ public class Inform6RealmFactoryTests
         {
             File.WriteAllText(tempSource, factory.GetInitialSourceText("Test", "Test"));
 
+            // Stage as assets dictionary using new API
+            var fileName = Path.GetFileName(tempSource);
+            var assets = new Dictionary<string, byte[]>
+            {
+                [fileName] = await File.ReadAllBytesAsync(tempSource)
+            };
+
             // Act
-            var result = await factory.CompileRealmAsync("TestRealm", tempSource, tempOutput);
+            var result = await factory.CompileRealmAsync("TestRealm", assets, fileName, tempOutput);
 
             // Assert
             Assert.Equal(RealmEditingOutcome.InfError, result);

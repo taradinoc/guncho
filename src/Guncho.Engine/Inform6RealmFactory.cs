@@ -32,11 +32,11 @@ namespace Guncho
         public override string GetInitialSourceText(string ownerName, string realmName)
         {
             // Provide a basic Inform 6 template
-            return $@"Constant Story = '{realmName}';
-Constant Headline = 'An Inform 6 realm for Guncho.';
+            return $@"Constant Story = ""{realmName}"";
+Constant Headline = ""An Inform 6 realm for Guncho."";
 
-Include 'Parser';
-Include 'VerbLib';
+Include ""Parser"";
+Include ""VerbLib"";
 
 [ Initialise;
     location = Room1;
@@ -47,7 +47,7 @@ Object Room1 ""Room1""
     with description ""A plain room."",
     has light;
 
-End;
+Include ""Grammar"";
 ";
         }
 
@@ -57,7 +57,7 @@ End;
             // Compile using inform6.exe
             var process = new System.Diagnostics.Process();
             process.StartInfo.FileName = inform6CompilerPath;
-            process.StartInfo.Arguments = $"-v3 -w1 -G \"{sourceFile}\" \"{outputFile}\" +include_path=\"{inform6LibraryDir}\"";
+            process.StartInfo.Arguments = $"-w -G \"{sourceFile}\" \"{outputFile}\" +include_path=\"{inform6LibraryDir}\"";
             var wd = Path.GetDirectoryName(sourceFile);
             if (!string.IsNullOrEmpty(wd))
                 process.StartInfo.WorkingDirectory = wd;

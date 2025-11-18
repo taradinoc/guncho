@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -114,6 +115,33 @@ app.MapHub<PlayHub>("/signalr/play");
 app.MapFallbackToFile("index.html");
 
 // Initialize game server components
+// Ensure database file and schema exist before services that query the DB run
+try
+{
+    var connString = builder.Configuration.GetConnectionString("GunchoDatabase");
+    if (!string.IsNullOrWhiteSpace(connString))
+    {
+        var csb = new SqliteConnectionStringBuilder(connString);
+        var dbPath = csb.DataSource;
+        string? dbDir = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(dbDir))
+        {
+            Directory.CreateDirectory(dbDir);
+        }
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<GunchoDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[DB INIT] Failed to ensure database is created: {ex.Message}");
+    throw;
+}
+
 var serverServices = app.Services.GetRequiredService<GunchoServerServices>();
 await serverServices.InitializeAsync();
 

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<realmStorage xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" realm="The Outer Realm">
-  <item key="robot">=default</item>
-  <item key="hammer">=basement,east</item>
-  <item key="sand_dollar">=beach</item>
-  <item key="sand">~</item>
-  <item key="pebble">=obdeck</item>
-  <item key="cog">=factory</item>
-</realmStorage>
