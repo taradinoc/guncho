@@ -8,6 +8,7 @@
   <Project Path="src/Guncho.Engine.Tests/Guncho.Engine.Tests.csproj" />
   <Project Path="src/Guncho.Engine/Guncho.Engine.csproj" />
   <Project Path="src/Guncho.Migrator/Guncho.Migrator.csproj" />
+  <Project Path="src/Guncho.Tools/Guncho.Tools.csproj" />
   <Project Path="src/Guncho.Shared/Guncho.Shared.csproj" />
   <Project Path="src/Guncho.WebHost.Tests/Guncho.WebHost.Tests.csproj" />
   <Project Path="src/Guncho.WebHost/Guncho.WebHost.csproj" />

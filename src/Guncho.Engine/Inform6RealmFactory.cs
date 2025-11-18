@@ -23,6 +23,10 @@ namespace Guncho
             this.indexOutputDir = indexOutputDir;
         }
 
+        public string Inform6CompilerExecutable => inform6CompilerPath;
+
+        public string Inform6LibraryDirectory => inform6LibraryDir;
+
         public override string SourceFileExtension => ".inf";
 
         public override string Description => "Inform 6 with Glulx support";

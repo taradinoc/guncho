@@ -161,6 +161,7 @@ namespace Guncho
                 proc.StartInfo.Arguments = argText.ToString();
                 proc.StartInfo.UseShellExecute = false;
                 proc.StartInfo.RedirectStandardOutput = true;
+                proc.StartInfo.RedirectStandardError = true;
                 proc.StartInfo.EnvironmentVariables["HOME"] = homeDir;
 
                 /*Console.WriteLine("Executing: \"{0}\" {1}",
@@ -168,11 +169,23 @@ namespace Guncho
                     proc.StartInfo.Arguments);*/
 
                 StringBuilder output = new StringBuilder();
+                StringBuilder error = new StringBuilder();
                 proc.OutputDataReceived += delegate (object sender, DataReceivedEventArgs e)
                 {
+                    if (e.Data == null)
+                        return;
                     if (output.Length > 0)
                         output.AppendLine();
                     output.Append(e.Data);
+                };
+
+                proc.ErrorDataReceived += delegate (object sender, DataReceivedEventArgs e)
+                {
+                    if (e.Data == null)
+                        return;
+                    if (error.Length > 0)
+                        error.AppendLine();
+                    error.Append(e.Data);
                 };
 
                 //var tcs = new TaskCompletionSource();
@@ -184,9 +197,17 @@ namespace Guncho
 
                 proc.Start();
                 proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
 
                 if (proc.WaitForExit(timeoutMilliseconds))
                 {
+                    proc.WaitForExit();
+                    if (error.Length > 0)
+                    {
+                        if (output.Length > 0)
+                            output.AppendLine();
+                        output.Append(error);
+                    }
                     return Task.FromResult(output.ToString());
                 }
                 else

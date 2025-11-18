@@ -32,6 +32,16 @@ namespace Guncho
             this.indexOutputDir = indexOutputDir;
         }
 
+        public string NiCompilerPath => niCompilerPath;
+
+        public string NiExtensionDirectory => niExtensionDir;
+
+        public string Inform6CompilerPath => infCompilerPath;
+
+        public string Inform6LibraryDirectory => infLibraryDir;
+
+        public string IndexOutputDirectory => indexOutputDir;
+
         public override string SourceFileExtension
         {
             get { return ".ni"; }
@@ -161,6 +171,7 @@ namespace Guncho
                                 wtr.WriteLine("</pre></font>");
                             }
 
+                            logger.LogMessage(LogLevel.Warning, "Inform 6 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
                             return RealmEditingOutcome.InfError;
                         }
 
@@ -170,15 +181,28 @@ namespace Guncho
                 }
                 else
                 {
+                    logger.LogMessage(LogLevel.Warning, "Inform 7 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
                     return RealmEditingOutcome.NiError;
                 }
             }
         }
 
-    private static readonly string[] niBinsWin = { "ni.exe" };
-    private static readonly string[] niBinsUnix = { "ni", "ni.exe" };
-    private static readonly string[] i6BinsWin = { "inform-631.exe" };
-    private static readonly string[] i6BinsUnix = { "inform-6.31-biplatform", "inform-631.exe" };
+        private static string TruncateCompilerOutput(string? text)
+        {
+            const int limit = 4000;
+            if (string.IsNullOrWhiteSpace(text))
+                return "<no output>";
+
+            if (text!.Length <= limit)
+                return text;
+
+            return text.Substring(0, limit) + "... (truncated)";
+        }
+
+    private static readonly string[] niBinsWin = ["ni.exe"];
+    private static readonly string[] niBinsUnix = ["ni", "ni.exe"];
+    private static readonly string[] i6BinsWin = ["inform-631.exe"];
+    private static readonly string[] i6BinsUnix = ["inform-6.31-biplatform", "inform-631.exe"];
 
         private static bool FindCompilers(string dir, [NotNullWhen(true)] out string? nibin, [NotNullWhen(true)] out string? i6bin)
         {

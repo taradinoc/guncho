@@ -51,31 +51,16 @@ RUN rm -rf /src/src/Guncho.WebHost/wwwroot
 WORKDIR /src/src/Guncho.WebHost
 RUN dotnet publish -c Release -o /app/publish /p:RunAOTCompilation=false
 
+# Build the diagnostics CLI (Guncho.Tools)
+WORKDIR /src/src/Guncho.Tools
+RUN dotnet publish -c Release -o /app/tools
+
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Inform 7 needs libicu-dev
 RUN apt-get update && apt-get install -y libicu-dev && rm -rf /var/lib/apt/lists/*
-
-# Copy published application
-COPY --from=build /app/publish .
-COPY --from=build /app/Factories/Inform6/inform6 /app/Factories/Inform6/
-
-# Workaround for .NET 10 HotReload file naming bug
-# The published file has a double hash but the loader expects a single hash
-RUN if [ -d /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser ]; then \
-    cd /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser/ && \
-    for file in *.*.lib.module.js*; do \
-        # Extract the hash from the filename (first occurrence)
-        hash=$(echo "$file" | grep -oP '\.[a-z0-9]+\.' | head -1 | tr -d '.') && \
-        # Generate the target filename with single hash
-        newname=$(echo "$file" | sed "s/\.$hash\.$hash\.lib\.module\.js/.$hash.lib.module.js/") && \
-        if [ "$file" != "$newname" ] && [ ! -e "$newname" ]; then \
-            ln -s "$file" "$newname"; \
-        fi; \
-    done; \
-fi
 
 # Copy runtime data and resources from the workspace
 # These are needed for realm compilation and game execution
@@ -106,6 +91,26 @@ ENV Guncho__GameServerPort=4108
 # - 5000: Web server (ASP.NET Core Kestrel with Blazor UI)
 # - 4108: TCP server (telnet/MUD protocol for game connections)
 EXPOSE 5000 4108
+
+# Copy published application and tools
+COPY --from=build /app/publish .
+COPY --from=build /app/tools ./tools
+COPY --from=build /app/Factories/Inform6/inform6 /app/Factories/Inform6/
+
+# Workaround for .NET 10 HotReload file naming bug
+# The published file has a double hash but the loader expects a single hash
+RUN if [ -d /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser ]; then \
+    cd /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser/ && \
+    for file in *.*.lib.module.js*; do \
+        # Extract the hash from the filename (first occurrence)
+        hash=$(echo "$file" | grep -oP '\.[a-z0-9]+\.' | head -1 | tr -d '.') && \
+        # Generate the target filename with single hash
+        newname=$(echo "$file" | sed "s/\.$hash\.$hash\.lib\.module\.js/.$hash.lib.module.js/") && \
+        if [ "$file" != "$newname" ] && [ ! -e "$newname" ]; then \
+            ln -s "$file" "$newname"; \
+        fi; \
+    done; \
+fi
 
 # Run the application
 ENTRYPOINT ["dotnet", "Guncho.WebHost.dll"]

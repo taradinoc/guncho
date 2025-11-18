@@ -1,3 +1,4 @@
+using Guncho;
 using Guncho.Services;
 using Guncho.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -119,6 +120,22 @@ namespace Guncho.WebHost.Controllers
                 return BadRequest(ModelState);
             }
 
+            bool factoryChanged = false;
+            if (!string.IsNullOrWhiteSpace(newRealm.FactoryName) &&
+                !string.Equals(newRealm.FactoryName, realm.Factory.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                var factory = _realmService.GetRealmFactories()
+                    .FirstOrDefault(f => f.Name.Equals(newRealm.FactoryName, StringComparison.OrdinalIgnoreCase));
+
+                if (factory == null)
+                {
+                    return BadRequest($"Unknown factory: {newRealm.FactoryName}");
+                }
+
+                realm.Factory = factory;
+                factoryChanged = true;
+            }
+
             // Update privacy level
             if ((Guncho.RealmPrivacyLevel)newRealm.PrivacyLevel != realm.PrivacyLevel)
             {
@@ -141,6 +158,15 @@ namespace Guncho.WebHost.Controllers
             }
 
             await _realmService.SaveRealmAsync(realm);
+
+            if (factoryChanged)
+            {
+                var outcome = await _realmService.UpdateRealmSourceAsync(realm);
+                if (outcome != RealmEditingOutcome.Success)
+                {
+                    return StatusCode(500, $"Realm updated but recompilation failed: {outcome}");
+                }
+            }
 
             return Ok(MakeDto(realm));
         }

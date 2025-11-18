@@ -1,5 +1,6 @@
 using Guncho.Connections;
 using Guncho.Services;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -31,6 +32,7 @@ namespace Guncho.WebHost.Services
         private readonly ConcurrentDictionary<Player, IInstance> _playerInstances = new();
         private readonly ConcurrentDictionary<Connection, Task> _openConnections = new();
         private readonly List<RealmFactory> _realmFactories = new();
+        private readonly ConcurrentDictionary<string, Task<bool>> _realmCompilationTasks = new(StringComparer.OrdinalIgnoreCase);
 
         // Event queue for serializing game logic
         private readonly AsyncProducerConsumerQueue<Func<Task>> _eventQueue = new();
@@ -301,8 +303,43 @@ namespace Guncho.WebHost.Services
 
             _realms[realm.Name.ToLower()] = realm;
 
-            // TODO: Save realm to XML and persist game state
-            await Task.CompletedTask;
+            try
+            {
+                using var scope = _services.CreateScope();
+                var realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+
+                if (realmRepo != null)
+                {
+                    var metadata = new Guncho.Repositories.RealmMetadata
+                    {
+                        Id = realm.DatabaseId,
+                        Name = realm.Name,
+                        OwnerId = realm.Owner.ID,
+                        OwnerName = realm.Owner.Name,
+                        Privacy = realm.PrivacyLevel.ToString().ToLowerInvariant(),
+                        Factory = realm.Factory.Name,
+                        MainFile = realm.MainFile ?? realm.Factory.DefaultMainFileName,
+                        Assets = new List<Guncho.Repositories.RealmAssetMetadata>(),
+                        AccessList = realm.AccessList.Select(a => new Guncho.Repositories.RealmAccessMetadata
+                        {
+                            PlayerId = a.Player.ID,
+                            AccessLevel = a.Level.ToString().ToLowerInvariant()
+                        }).ToList()
+                    };
+
+                    var savedId = await realmRepo.SaveAsync(metadata);
+                    realm.DatabaseId = savedId;
+                }
+                else
+                {
+                    _logger.LogMessage(LogLevel.Warning, "RealmRepository not available; realm changes not persisted to the database.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogMessage(LogLevel.Error, $"Failed to persist realm '{realm.Name}': {ex.Message}");
+                _logger.LogException(ex);
+            }
         }
 
         public IEnumerable<Realm> GetAllRealms()
@@ -414,6 +451,139 @@ namespace Guncho.WebHost.Services
             }
         }
 
+        private async Task<RealmEditingOutcome> CompileRealmToPathAsync(Realm realm, string outputUlxPath)
+        {
+            ArgumentNullException.ThrowIfNull(realm);
+            ArgumentException.ThrowIfNullOrEmpty(outputUlxPath);
+
+            Guncho.Repositories.RealmRepository? realmRepo = null;
+            Guncho.Repositories.RealmAssetRepository? assetRepo = null;
+
+            if (_services != null)
+            {
+                using var scope = _services.CreateScope();
+                realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+                assetRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmAssetRepository>();
+
+                if (realmRepo != null && assetRepo != null)
+                {
+                    var meta = await realmRepo.GetByNameAsync(realm.Name);
+                    if (meta != null)
+                    {
+                        var assets = await assetRepo.GetAllContentForRealmAsync(meta.Id);
+                        if (assets.Count > 0)
+                        {
+                            var mainFile = meta.MainFile;
+                            if (string.IsNullOrWhiteSpace(mainFile))
+                            {
+                                mainFile = realm.Factory.DefaultMainFileName;
+                                if (!assets.ContainsKey(mainFile))
+                                {
+                                    var preferredExt = realm.Factory.SourceFileExtension;
+                                    var candidate = assets.Keys.FirstOrDefault(k => k.EndsWith(preferredExt, StringComparison.OrdinalIgnoreCase));
+                                    if (!string.IsNullOrEmpty(candidate))
+                                    {
+                                        mainFile = candidate;
+                                    }
+                                }
+                            }
+
+                            mainFile ??= realm.Factory.DefaultMainFileName;
+                            return await realm.Factory.CompileRealmAsync(realm.Name, assets, mainFile, outputUlxPath);
+                        }
+                    }
+                }
+            }
+
+            // Fallback to legacy source file on disk
+            var sourcePath = realm.SourceFile;
+            if (!File.Exists(sourcePath))
+            {
+                throw new FileNotFoundException($"Realm source file not found: {sourcePath}");
+            }
+
+            var fileName = Path.GetFileName(sourcePath);
+            var fileBytes = await File.ReadAllBytesAsync(sourcePath);
+            var dict = new Dictionary<string, byte[]> { [fileName] = fileBytes };
+            return await realm.Factory.CompileRealmAsync(realm.Name, dict, fileName, outputUlxPath);
+        }
+
+        private async Task<bool> EnsureRealmCompiledAsync(Realm realm)
+        {
+            ArgumentNullException.ThrowIfNull(realm);
+
+            if (File.Exists(realm.StoryFile))
+                return true;
+
+            var key = realm.Name.ToLowerInvariant();
+
+            Task<bool> CompilationFactory()
+            {
+                return DoCompileAsync();
+            }
+
+            async Task<bool> DoCompileAsync()
+            {
+                if (File.Exists(realm.StoryFile))
+                    return true;
+
+                var storyDir = Path.GetDirectoryName(realm.StoryFile);
+                if (!string.IsNullOrEmpty(storyDir))
+                {
+                    Directory.CreateDirectory(storyDir);
+                }
+
+                var tempUlx = Path.Combine(_config.CachePath, $"{realm.Name}.{Guid.NewGuid():N}.bootstrap.ulx");
+                try
+                {
+                    RealmEditingOutcome outcome;
+                    try
+                    {
+                        outcome = await CompileRealmToPathAsync(realm, tempUlx).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogMessage(LogLevel.Error, $"Initial compile threw for realm '{realm.Name}': {ex.Message}");
+                        _logger.LogException(ex);
+                        return false;
+                    }
+
+                    if (outcome != RealmEditingOutcome.Success)
+                    {
+                        _logger.LogMessage(LogLevel.Warning, $"Initial compile failed for realm '{realm.Name}' with outcome {outcome}.");
+                        return false;
+                    }
+
+                    File.Copy(tempUlx, realm.StoryFile, overwrite: true);
+                    return true;
+                }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(tempUlx))
+                        {
+                            File.Delete(tempUlx);
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            var compileTask = _realmCompilationTasks.GetOrAdd(key, _ => CompilationFactory());
+            try
+            {
+                return await compileTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                if (compileTask.IsCompleted)
+                {
+                    _realmCompilationTasks.TryRemove(key, out _);
+                }
+            }
+        }
+
         public async Task<RealmEditingOutcome> UpdateRealmSourceAsync(Realm realm)
         {
             ArgumentNullException.ThrowIfNull(realm);
@@ -424,53 +594,7 @@ namespace Guncho.WebHost.Services
             var tempUlx = Path.Combine(_config.CachePath, $"{realm.Name}.preview.ulx");
             try
             {
-                RealmEditingOutcome outcome;
-                // Try to compile from database assets
-                using (var scope = _services.CreateScope())
-                {
-                    var realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
-                    var assetRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmAssetRepository>();
-
-                    var meta = realmRepo != null ? await realmRepo.GetByNameAsync(realm.Name) : null;
-                    if (meta != null && assetRepo != null)
-                    {
-                        var assets = await assetRepo.GetAllContentForRealmAsync(meta.Id);
-                        if (assets.Count > 0)
-                        {
-                            // Determine main file
-                            var mainFile = meta.MainFile;
-                            if (string.IsNullOrWhiteSpace(mainFile))
-                            {
-                                mainFile = realm.Factory.DefaultMainFileName;
-                                if (!assets.ContainsKey(mainFile))
-                                {
-                                    // Heuristics: pick first .ni for I7 or first .inf for I6
-                                    var preferredExt = realm.Factory.SourceFileExtension;
-                                    var candidate = assets.Keys.FirstOrDefault(k => k.EndsWith(preferredExt, StringComparison.OrdinalIgnoreCase));
-                                    if (!string.IsNullOrEmpty(candidate)) mainFile = candidate;
-                                }
-                            }
-
-                            outcome = await realm.Factory.CompileRealmAsync(realm.Name, assets, mainFile!, tempUlx);
-                        }
-                        else
-                        {
-                            // Fallback to legacy single-file path via assets API
-                            var fileName = Path.GetFileName(realm.SourceFile);
-                            var fileBytes = await File.ReadAllBytesAsync(realm.SourceFile);
-                            var dict = new Dictionary<string, byte[]> { [fileName] = fileBytes };
-                            outcome = await realm.Factory.CompileRealmAsync(realm.Name, dict, fileName, tempUlx);
-                        }
-                    }
-                    else
-                    {
-                        // Fallback to legacy single-file path via assets API
-                        var fileName = Path.GetFileName(realm.SourceFile);
-                        var fileBytes = await File.ReadAllBytesAsync(realm.SourceFile);
-                        var dict = new Dictionary<string, byte[]> { [fileName] = fileBytes };
-                        outcome = await realm.Factory.CompileRealmAsync(realm.Name, dict, fileName, tempUlx);
-                    }
-                }
+                var outcome = await CompileRealmToPathAsync(realm, tempUlx);
                 if (outcome != RealmEditingOutcome.Success)
                 {
                     _logger.LogMessage(LogLevel.Warning, $"Compile failed for realm '{realm.Name}' with outcome {outcome}.");
@@ -742,6 +866,11 @@ namespace Guncho.WebHost.Services
                 return existingInstance;
 
             // Create new instance through the factory (pass original name to factory)
+            if (!await EnsureRealmCompiledAsync(realm))
+            {
+                throw new InvalidOperationException($"Unable to compile realm '{realm.Name}' before loading instance.");
+            }
+
             var instance = realm.Factory.LoadInstance(this, realm, realm.Name, _logger);
             _instances[instanceName] = instance;
 
@@ -845,6 +974,20 @@ namespace Guncho.WebHost.Services
 
             // Load realms
             await LoadRealmsAsync();
+
+            // Ensure the start realm has a compiled ULX available
+            var startRealm = _realms.Values.FirstOrDefault(r => r.Name.Equals(_config.StartRealmName, StringComparison.OrdinalIgnoreCase));
+            if (startRealm != null)
+            {
+                if (!await EnsureRealmCompiledAsync(startRealm))
+                {
+                    _logger.LogMessage(LogLevel.Warning, $"Failed to compile start realm '{startRealm.Name}' during initialization.");
+                }
+            }
+            else
+            {
+                _logger.LogMessage(LogLevel.Warning, $"Start realm '{_config.StartRealmName}' not found during initialization.");
+            }
 
             // Subscribe to connection events
             _connectionManager.ConnectionAccepted += OnConnectionAccepted;
