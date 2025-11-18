@@ -1,5 +1,6 @@
 using Guncho.Services;
 using Guncho.Shared.Models;
+using Guncho.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
@@ -12,11 +13,15 @@ namespace Guncho.WebHost.Controllers
     {
         private readonly IRealmService _realmService;
         private readonly IServerConfiguration _config;
+        private readonly RealmRepository _realmRepository;
+        private readonly RealmAssetRepository _assetRepository;
 
-        public RealmAssetsController(IRealmService realmService, IServerConfiguration config)
+        public RealmAssetsController(IRealmService realmService, IServerConfiguration config, RealmRepository realmRepository, RealmAssetRepository assetRepository)
         {
             _realmService = realmService;
             _config = config;
+            _realmRepository = realmRepository;
+            _assetRepository = assetRepository;
         }
 
         [HttpGet("manifest")]
@@ -29,19 +34,17 @@ namespace Guncho.WebHost.Controllers
                 return NotFound();
             }
 
-            var list = new List<RealmAssetSummaryDto>();
-            var filePath = GetSourceFilePath(realmName);
-            if (System.IO.File.Exists(filePath))
+            var meta = await _realmRepository.GetByNameAsync(realmName);
+            if (meta == null) return NotFound();
+
+            var assets = await _assetRepository.GetAllForRealmAsync(meta.Id);
+            var list = assets.Select(a => new RealmAssetSummaryDto
             {
-                var updated = System.IO.File.GetLastWriteTimeUtc(filePath);
-                list.Add(new RealmAssetSummaryDto
-                {
-                    Path = "story.ni",
-                    ContentType = "text/plain",
-                    Version = (int)new DateTimeOffset(updated).ToUnixTimeSeconds(),
-                    UpdatedAt = new DateTimeOffset(updated)
-                });
-            }
+                Path = a.Name,
+                ContentType = a.ContentType,
+                Version = (int)new DateTimeOffset(a.UpdatedAt).ToUnixTimeSeconds(),
+                UpdatedAt = new DateTimeOffset(a.UpdatedAt)
+            }).ToList();
 
             return Ok(list);
         }
@@ -61,21 +64,21 @@ namespace Guncho.WebHost.Controllers
                 return NotFound();
             }
 
-            var filePath = GetSourceFilePath(realmName);
-            if (!System.IO.File.Exists(filePath))
-            {
-                return NotFound();
-            }
+            var meta = await _realmRepository.GetByNameAsync(realmName);
+            if (meta == null) return NotFound();
 
-            var content = await System.IO.File.ReadAllTextAsync(filePath, Encoding.UTF8);
-            var updated = System.IO.File.GetLastWriteTimeUtc(filePath);
+            var normalized = NormalizePath(assetPath);
+            var contentBytes = await _assetRepository.GetContentAsync(meta.Id, normalized);
+            if (contentBytes == null) return NotFound();
+
+            var info = (await _assetRepository.GetAllForRealmAsync(meta.Id)).FirstOrDefault(a => a.Name == normalized);
             var dto = new RealmAssetDto
             {
-                Path = "story.ni",
-                ContentType = "text/plain",
-                Version = (int)new DateTimeOffset(updated).ToUnixTimeSeconds(),
-                UpdatedAt = new DateTimeOffset(updated),
-                Content = content
+                Path = normalized,
+                ContentType = info?.ContentType ?? "text/plain",
+                Version = info != null ? (int)new DateTimeOffset(info.UpdatedAt).ToUnixTimeSeconds() : 0,
+                UpdatedAt = info?.UpdatedAt ?? DateTimeOffset.UtcNow,
+                Content = Encoding.UTF8.GetString(contentBytes)
             };
 
             return Ok(dto);
@@ -106,24 +109,12 @@ namespace Guncho.WebHost.Controllers
                 return BadRequest(ModelState);
             }
 
-            var filePath = GetSourceFilePath(realmName);
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            var meta = await _realmRepository.GetByNameAsync(realmName);
+            if (meta == null) return NotFound();
 
-            // Optimistic concurrency check
-            if (System.IO.File.Exists(filePath) && update.ExpectedVersion.HasValue)
-            {
-                var currentVersion = (int)new DateTimeOffset(System.IO.File.GetLastWriteTimeUtc(filePath)).ToUnixTimeSeconds();
-                if (currentVersion != update.ExpectedVersion.Value)
-                {
-                    return Conflict($"Asset has been modified since you last loaded it (expected version {update.ExpectedVersion.Value}, current {currentVersion}).");
-                }
-            }
-
-            await System.IO.File.WriteAllTextAsync(filePath, update.Content ?? string.Empty, Encoding.UTF8);
+            var normalized = NormalizePath(assetPath);
+            var contentBytes = Encoding.UTF8.GetBytes(update.Content ?? string.Empty);
+            await _assetRepository.SaveAsync(meta.Id, normalized, contentBytes, update.ContentType ?? "text/plain");
 
             // Compile and reload the realm, transferring players
             var outcome = await _realmService.UpdateRealmSourceAsync(realm);
@@ -132,13 +123,12 @@ namespace Guncho.WebHost.Controllers
                 return Conflict($"Compilation failed: {outcome}");
             }
 
-            var updated = System.IO.File.GetLastWriteTimeUtc(filePath);
             var dto = new RealmAssetDto
             {
-                Path = "story.ni",
+                Path = normalized,
                 ContentType = update.ContentType ?? "text/plain",
-                Version = (int)new DateTimeOffset(updated).ToUnixTimeSeconds(),
-                UpdatedAt = new DateTimeOffset(updated),
+                Version = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                UpdatedAt = DateTimeOffset.UtcNow,
                 Content = update.Content ?? string.Empty
             };
 
@@ -164,11 +154,11 @@ namespace Guncho.WebHost.Controllers
                 return Forbid();
             }
 
-            var filePath = GetSourceFilePath(realmName);
-            if (System.IO.File.Exists(filePath))
-            {
-                System.IO.File.Delete(filePath);
-            }
+            var meta = await _realmRepository.GetByNameAsync(realmName);
+            if (meta == null) return NotFound();
+
+            var normalized = NormalizePath(assetPath);
+            await _assetRepository.DeleteAsync(meta.Id, normalized);
 
             return NoContent();
         }
@@ -176,14 +166,33 @@ namespace Guncho.WebHost.Controllers
         private static bool IsSupportedAsset(string assetPath)
         {
             if (string.IsNullOrWhiteSpace(assetPath)) return false;
-            var normalized = assetPath.Replace('\\', '/').Trim('/');
-            return string.Equals(normalized, "story.ni", StringComparison.OrdinalIgnoreCase);
+            var normalized = NormalizePath(assetPath);
+            // Accept common Inform 7/6 source and header files
+            return normalized.EndsWith(".ni", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith(".inf", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith(".h", StringComparison.OrdinalIgnoreCase)
+                || normalized.EndsWith(".i6t", StringComparison.OrdinalIgnoreCase);
         }
 
-        private string GetSourceFilePath(string realmName)
+        private static string NormalizePath(string assetPath)
         {
-            // Map logical asset story.ni -> physical file <RealmDataPath>/<RealmName>.ni
-            return Path.Combine(_config.RealmDataPath, $"{realmName}.ni");
+            return assetPath.Replace('\\', '/').Trim('/');
+        }
+
+        [HttpPut("_main")]
+        public async Task<IActionResult> SetMainFileAsync(string realmName, [FromBody] RealmAssetSummaryDto dto)
+        {
+            var realm = await _realmService.GetRealmAsync(realmName);
+            if (realm == null) return NotFound();
+
+            var meta = await _realmRepository.GetByNameAsync(realmName);
+            if (meta == null) return NotFound();
+
+            if (string.IsNullOrWhiteSpace(dto.Path)) return BadRequest("Path is required");
+            var normalized = NormalizePath(dto.Path);
+
+            await _realmRepository.SetMainFileAsync(meta.Id, normalized);
+            return NoContent();
         }
     }
 }

@@ -22,7 +22,9 @@ namespace Guncho.Services
         string ConnectTextFileName { get; }
         int GameServerPort { get; }
         bool FilterBlankLines { get; }
-        
+
+        string Inform6CompilerPath { get; }
+        string Inform6LibraryPath { get; }
         // Computed paths
         string MotdPath { get; }
         string GuestMotdPath { get; }

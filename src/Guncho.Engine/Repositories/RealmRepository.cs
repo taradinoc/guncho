@@ -141,6 +141,7 @@ public class RealmRepository
             OwnerName = entity.Owner.Name,
             Privacy = entity.Privacy,
             Factory = entity.Factory,
+            MainFile = entity.MainFile,
                 Assets = entity.Assets.Select(a => new RealmAssetMetadata
                 {
                     Id = a.Id,
@@ -156,6 +157,16 @@ public class RealmRepository
             }).ToList()
         };
     }
+
+    public async Task SetMainFileAsync(int realmId, string mainFileName)
+    {
+        var entity = await _dbContext.Realms.FindAsync(realmId);
+        if (entity != null)
+        {
+            entity.MainFile = mainFileName;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
 }
 
 /// <summary>
@@ -169,10 +180,10 @@ public class RealmMetadata
     public string OwnerName { get; set; } = string.Empty;
     public string Privacy { get; set; } = "public";
     public string Factory { get; set; } = "5Z71";
+    public string? MainFile { get; set; }
         public List<RealmAssetMetadata> Assets { get; set; } = new();
     public List<RealmAccessMetadata> AccessList { get; set; } = new();
 }
-
     /// <summary>
     /// Lightweight metadata for realm asset (doesn't include content).
     /// </summary>

@@ -32,7 +32,9 @@ namespace Guncho.WebHost.Configuration
         public string ConnectTextFileName => _configuration["Guncho:ConnectTextFileName"] ?? "connect.txt";
         public int GameServerPort => int.Parse(_configuration["Guncho:GameServerPort"] ?? "4108");
         public bool FilterBlankLines => bool.TryParse(_configuration["Guncho:FilterBlankLines"], out var filtered) && filtered;
-        
+
+        public string Inform6CompilerPath => _configuration["Guncho:Inform6CompilerPath"] ?? "e:\\guncho\\Factories\\Inform6";
+        public string Inform6LibraryPath => _configuration["Guncho:Inform6LibraryPath"] ?? "e:\\guncho\\Factories\\Inform6\\library";
         // Computed paths
         public string MotdPath => Path.Combine(RealmDataPath, MotdFileName);
         public string GuestMotdPath => Path.Combine(RealmDataPath, GuestMotdFileName);

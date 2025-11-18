@@ -210,7 +210,7 @@ namespace Guncho.WebHost.Controllers
             return Ok(factories.Select(f => new RealmFactoryDto
             {
                 Name = f.Name,
-                Description = $"Inform 7 version {f.Name} with Glulx support"
+                Description = f.Description
             }));
         }
     }

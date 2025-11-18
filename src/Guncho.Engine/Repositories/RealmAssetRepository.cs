@@ -46,6 +46,20 @@ public class RealmAssetRepository
     }
 
     /// <summary>
+    /// Get all assets with their content for a realm (for compilation).
+    /// Returns a dictionary of asset name -> content bytes.
+    /// </summary>
+    public async Task<Dictionary<string, byte[]>> GetAllContentForRealmAsync(int realmId)
+    {
+        var assets = await _dbContext.RealmAssets
+            .Where(a => a.RealmId == realmId)
+            .Select(a => new { a.Name, a.Content })
+            .ToListAsync();
+        
+        return assets.ToDictionary(a => a.Name, a => a.Content);
+    }
+
+    /// <summary>
     /// Get asset content as bytes.
     /// </summary>
     public async Task<byte[]?> GetContentAsync(int realmId, string name)

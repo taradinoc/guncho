@@ -37,6 +37,8 @@ namespace Guncho
             get { return ".ni"; }
         }
 
+        public override string Description => $"Inform 7 version {Name} with Glulx support";
+
         public override string GetInitialSourceText(string ownerName, string realmName)
         {
             StringBuilder sb = new StringBuilder(100);
@@ -56,6 +58,7 @@ namespace Guncho
             return sb.ToString();
         }
 
+        [Obsolete("Use CompileRealmAsync with assets dictionary instead")]
         public override async Task<RealmEditingOutcome> CompileRealmAsync(string realmName, string sourceFile, string outputFile)
         {
             string skeleton = config.NiSkeletonPath;

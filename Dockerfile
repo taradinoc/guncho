@@ -38,14 +38,19 @@ RUN dotnet publish -c Release -o /app/publish /p:RunAOTCompilation=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install dependencies for Inform 7 compiler (if needed at runtime)
-# The compiler requires some Linux tools
+# Install dependencies for Inform compilers
+# Inform 7 needs libicu-dev, Inform 6 needs gcc for compilation
 RUN apt-get update && apt-get install -y \
     libicu-dev \
+    gcc \
+    make \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy published application
 COPY --from=build /app/publish .
+
+# Copy Inform 6 source for building Linux compiler
+COPY Factories/Inform6/inform6-6.44/ /tmp/inform6-src/
 
 # Workaround for .NET 10 HotReload file naming bug
 # The published file has a double hash but the loader expects a single hash
@@ -62,10 +67,19 @@ RUN if [ -d /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser
     done; \
 fi
 
+# Build Inform 6 compiler for Linux
+RUN cd /tmp/inform6-src && \
+    gcc -O2 -o inform6 *.c && \
+    mkdir -p /app/Factories/Inform6 && \
+    mv inform6 /app/Factories/Inform6/ && \
+    chmod +x /app/Factories/Inform6/inform6 && \
+    rm -rf /tmp/inform6-src
+
 # Copy runtime data and resources from the workspace
 # These are needed for realm compilation and game execution
 COPY RealmData/ /app/RealmData/
-COPY Factories/ /app/Factories/
+COPY Factories/Inform7/ /app/Factories/Inform7/
+COPY Factories/Inform6/library/ /app/Factories/Inform6/library/
 
 # Create necessary directories
 RUN mkdir -p /app/Cache /app/Logs
@@ -80,6 +94,8 @@ ENV Guncho__RealmDataPath=/app/RealmData
 ENV Guncho__LogPath=/app/Logs
 ENV Guncho__NiInstallationsPath=/app/Factories/Inform7
 ENV Guncho__NiSkeletonPath=/app/Factories/Inform7/Skeleton.inform
+ENV Guncho__Inform6CompilerPath=/app/Factories/Inform6
+ENV Guncho__Inform6LibraryPath=/app/Factories/Inform6/library
 ENV Guncho__StartRealmName="The Outer Realm"
 ENV Guncho__WebServerPort=5000
 ENV Guncho__GameServerPort=4108

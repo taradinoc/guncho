@@ -22,6 +22,7 @@ namespace Guncho.WebHost.Services
         private readonly IServerConfiguration _config;
         private readonly ILogger _logger;
         private readonly ISignalRConnectionManager _connectionManager;
+        private readonly IServiceProvider _services;
 
         private readonly ConcurrentDictionary<string, Player> _players = new();
         private readonly ConcurrentDictionary<int, Player> _playersById = new();
@@ -45,11 +46,13 @@ namespace Guncho.WebHost.Services
         public GunchoServerServices(
             IServerConfiguration config,
             ILogger logger,
-            ISignalRConnectionManager connectionManager)
+            ISignalRConnectionManager connectionManager,
+            IServiceProvider services)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectionManager = connectionManager ?? throw new ArgumentNullException(nameof(connectionManager));
+            _services = services ?? throw new ArgumentNullException(nameof(services));
         }
 
         #region IPlayerService
@@ -451,11 +454,57 @@ namespace Guncho.WebHost.Services
 
             _logger.LogMessage(LogLevel.Verbose, $"Updating source for realm '{realm.Name}'.");
 
-            // Compile to a temporary ULX first
+            // Compile to a temporary ULX first (using DB-backed assets when available)
             var tempUlx = Path.Combine(_config.CachePath, $"{realm.Name}.preview.ulx");
             try
             {
-                var outcome = await realm.Factory.CompileRealmAsync(realm.Name, realm.SourceFile, tempUlx);
+                RealmEditingOutcome outcome;
+                // Try to compile from database assets
+                using (var scope = _services.CreateScope())
+                {
+                    var realmRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
+                    var assetRepo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmAssetRepository>();
+
+                    var meta = realmRepo != null ? await realmRepo.GetByNameAsync(realm.Name) : null;
+                    if (meta != null && assetRepo != null)
+                    {
+                        var assets = await assetRepo.GetAllContentForRealmAsync(meta.Id);
+                        if (assets.Count > 0)
+                        {
+                            // Determine main file
+                            var mainFile = meta.MainFile;
+                            if (string.IsNullOrWhiteSpace(mainFile))
+                            {
+                                mainFile = realm.Factory.DefaultMainFileName;
+                                if (!assets.ContainsKey(mainFile))
+                                {
+                                    // Heuristics: pick first .ni for I7 or first .inf for I6
+                                    var preferredExt = realm.Factory.SourceFileExtension;
+                                    var candidate = assets.Keys.FirstOrDefault(k => k.EndsWith(preferredExt, StringComparison.OrdinalIgnoreCase));
+                                    if (!string.IsNullOrEmpty(candidate)) mainFile = candidate;
+                                }
+                            }
+
+                            outcome = await realm.Factory.CompileRealmAsync(realm.Name, assets, mainFile!, tempUlx);
+                        }
+                        else
+                        {
+                            // Fallback to legacy single-file path via assets API
+                            var fileName = Path.GetFileName(realm.SourceFile);
+                            var fileBytes = await File.ReadAllBytesAsync(realm.SourceFile);
+                            var dict = new Dictionary<string, byte[]> { [fileName] = fileBytes };
+                            outcome = await realm.Factory.CompileRealmAsync(realm.Name, dict, fileName, tempUlx);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback to legacy single-file path via assets API
+                        var fileName = Path.GetFileName(realm.SourceFile);
+                        var fileBytes = await File.ReadAllBytesAsync(realm.SourceFile);
+                        var dict = new Dictionary<string, byte[]> { [fileName] = fileBytes };
+                        outcome = await realm.Factory.CompileRealmAsync(realm.Name, dict, fileName, tempUlx);
+                    }
+                }
                 if (outcome != RealmEditingOutcome.Success)
                 {
                     _logger.LogMessage(LogLevel.Warning, $"Compile failed for realm '{realm.Name}' with outcome {outcome}.");
@@ -860,7 +909,19 @@ namespace Guncho.WebHost.Services
                     indexOutputDir: _config.IndexPath);
 
                 _realmFactories.AddRange(factories);
-                _logger.LogMessage(LogLevel.Verbose, $"Registered {factories.Length} realm factories");
+                _logger.LogMessage(LogLevel.Verbose, $"Registered {factories.Length} Inform 7 realm factories");
+
+                // Register Inform 6 realm factory
+                var inform6CompilerPath = _config.Inform6CompilerPath;
+                var inform6LibraryPath = _config.Inform6LibraryPath;
+                var inform6Factories = Guncho.Inform6RealmFactory.ConstructAll(
+                    config: _config,
+                    logger: _logger,
+                    compilerPath: inform6CompilerPath,
+                    libraryPath: inform6LibraryPath,
+                    indexOutputDir: _config.IndexPath);
+                _realmFactories.AddRange(inform6Factories);
+                _logger.LogMessage(LogLevel.Verbose, $"Registered {inform6Factories.Length} Inform 6 realm factories");
             }
             catch (Exception ex)
             {

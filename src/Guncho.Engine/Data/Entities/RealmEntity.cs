@@ -26,6 +26,15 @@ public class RealmEntity
     [MaxLength(50)]
     public string Factory { get; set; } = "5Z71"; // Inform 7 compiler version
 
+    /// <summary>
+    /// The name of the asset that should be passed to the compiler as the main file.
+    /// For Inform 7: typically "story.ni"
+    /// For Inform 6: the main .inf file (e.g., "main.inf")
+    /// If null, defaults to factory-specific convention.
+    /// </summary>
+    [MaxLength(200)]
+    public string? MainFile { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? LastCompiledAt { get; set; }

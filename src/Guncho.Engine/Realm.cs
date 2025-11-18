@@ -120,6 +120,17 @@ namespace Guncho
         private bool condemned;
         private int failureCount;
 
+        /// <summary>
+        /// Database ID of the realm. Used to load assets from the database.
+        /// </summary>
+        public int DatabaseId { get; set; }
+
+        /// <summary>
+        /// Name of the main file asset to compile (e.g., "story.ni", "main.inf").
+        /// If null, uses factory's default.
+        /// </summary>
+        public string? MainFile { get; set; }
+
 
         public Realm(RealmFactory factory, IServerConfiguration config, string name, string sourceFile, string storyFile,
             Player owner)

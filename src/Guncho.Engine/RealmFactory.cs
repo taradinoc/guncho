@@ -28,9 +28,77 @@ namespace Guncho
             get { return name; }
         }
 
+        public virtual string Description => $"{Name} realm factory";
+
         public abstract string SourceFileExtension { get; }
+        
+        /// <summary>
+        /// Gets the default main file name for this factory (e.g., "story.ni" for Inform 7, "main.inf" for Inform 6).
+        /// </summary>
+        public virtual string DefaultMainFileName => $"story{SourceFileExtension}";
+        
         public abstract string GetInitialSourceText(string ownerName, string realmName);
+        
+        /// <summary>
+        /// Legacy compile method - compiles from a single source file on disk.
+        /// </summary>
+        [Obsolete("Use CompileRealmAsync with assets dictionary instead")]
         public abstract Task<RealmEditingOutcome> CompileRealmAsync(string realmName, string sourceFile, string outputFile);
+
+        /// <summary>
+        /// Compiles realm from assets stored in the database.
+        /// </summary>
+        /// <param name="realmName">Name of the realm</param>
+        /// <param name="assets">Dictionary of asset name -> content (byte[])</param>
+        /// <param name="mainFileName">Name of the main file to pass to the compiler</param>
+        /// <param name="outputFile">Path where the compiled .ulx should be written</param>
+        public virtual async Task<RealmEditingOutcome> CompileRealmAsync(
+            string realmName,
+            IReadOnlyDictionary<string, byte[]> assets,
+            string mainFileName,
+            string outputFile)
+        {
+            // Default implementation: write assets to temp directory and call legacy method
+            var tempDir = Path.Combine(Path.GetTempPath(), $"guncho-compile-{Guid.NewGuid()}");
+            try
+            {
+                Directory.CreateDirectory(tempDir);
+                
+                // Write all assets to temp directory
+                foreach (var kvp in assets)
+                {
+                    var assetPath = Path.Combine(tempDir, kvp.Key);
+                    var assetDir = Path.GetDirectoryName(assetPath);
+                    if (!string.IsNullOrEmpty(assetDir))
+                    {
+                        Directory.CreateDirectory(assetDir);
+                    }
+                    await File.WriteAllBytesAsync(assetPath, kvp.Value);
+                }
+                
+                var mainFilePath = Path.Combine(tempDir, mainFileName);
+                if (!File.Exists(mainFilePath))
+                {
+                    throw new FileNotFoundException($"Main file '{mainFileName}' not found in assets");
+                }
+                
+#pragma warning disable CS0618 // Type or member is obsolete
+                return await CompileRealmAsync(realmName, mainFilePath, outputFile);
+#pragma warning restore CS0618 // Type or member is obsolete
+            }
+            finally
+            {
+                // Clean up temp directory
+                try
+                {
+                    if (Directory.Exists(tempDir))
+                    {
+                        Directory.Delete(tempDir, true);
+                    }
+                }
+                catch { /* Ignore cleanup errors */ }
+            }
+        }
 
         public Realm LoadRealm(string name, string sourceFile, string storyFile, Player owner)
         {
