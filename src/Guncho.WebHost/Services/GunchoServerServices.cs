@@ -234,7 +234,7 @@ namespace Guncho.WebHost.Services
                             realm.AccessList = acl.ToArray();
                         }
 
-                        _realms[realm.Name] = realm;
+                        _realms[realm.Name.ToLower()] = realm;
                         _logger.LogMessage(LogLevel.Verbose, $"Loaded realm: {realm.Name}");
                     }
                     catch (Exception ex)
@@ -286,7 +286,7 @@ namespace Guncho.WebHost.Services
 
         public Realm? GetRealm(string name)
         {
-            _realms.TryGetValue(name, out var realm);
+            _realms.TryGetValue(name.ToLower(), out var realm);
             return realm;
         }
 
@@ -299,7 +299,7 @@ namespace Guncho.WebHost.Services
         {
             ArgumentNullException.ThrowIfNull(realm);
 
-            _realms[realm.Name] = realm;
+            _realms[realm.Name.ToLower()] = realm;
 
             // TODO: Save realm to XML and persist game state
             await Task.CompletedTask;
@@ -1512,13 +1512,18 @@ namespace Guncho.WebHost.Services
 
         private async Task CmdTeleportAsync(Connection conn, Player player, string args)
         {
-            var dest = GetInstance(args.Trim());
-
-            if (dest == null)
+            var realmName = args.Trim();
+            
+            // First check if realm exists
+            var realm = GetRealm(realmName);
+            if (realm == null)
             {
                 await conn.WriteLineAsync("No such realm.");
                 return;
             }
+
+            // Get or create the default instance for this realm
+            var dest = await GetDefaultInstanceAsync(realm);
 
             IInstance? inst;
 
@@ -1528,10 +1533,8 @@ namespace Guncho.WebHost.Services
                 return;
             }
 
-            var realm = dest.Realm;
-
             if (realm.GetAccessLevel(player) < RealmAccessLevel.Invited &&
-                args.Trim().ToLower() != _config.StartRealmName.ToLower())
+                realmName.ToLower() != _config.StartRealmName.ToLower())
             {
                 await conn.WriteLineAsync("Permission denied.");
                 return;

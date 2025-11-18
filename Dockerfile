@@ -5,6 +5,23 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
+# Inform 6 needs gcc for compilation
+RUN apt-get update && apt-get install -y \
+    gcc \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Inform 6 source for building Linux compiler
+COPY Factories/Inform6/inform6-6.44/ /tmp/inform6-src/
+
+# Build Inform 6 compiler for Linux
+RUN cd /tmp/inform6-src && \
+    gcc -O2 -o inform6 *.c && \
+    mkdir -p /app/Factories/Inform6 && \
+    mv inform6 /app/Factories/Inform6/ && \
+    chmod +x /app/Factories/Inform6/inform6 && \
+    rm -rf /tmp/inform6-src
+
 # Copy solution structure
 COPY Directory.Build.props .
 COPY Guncho.slnx .
@@ -38,19 +55,12 @@ RUN dotnet publish -c Release -o /app/publish /p:RunAOTCompilation=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install dependencies for Inform compilers
-# Inform 7 needs libicu-dev, Inform 6 needs gcc for compilation
-RUN apt-get update && apt-get install -y \
-    libicu-dev \
-    gcc \
-    make \
-    && rm -rf /var/lib/apt/lists/*
+# Inform 7 needs libicu-dev
+RUN apt-get update && apt-get install -y libicu-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy published application
 COPY --from=build /app/publish .
-
-# Copy Inform 6 source for building Linux compiler
-COPY Factories/Inform6/inform6-6.44/ /tmp/inform6-src/
+COPY --from=build /app/Factories/Inform6/inform6 /app/Factories/Inform6/
 
 # Workaround for .NET 10 HotReload file naming bug
 # The published file has a double hash but the loader expects a single hash
@@ -66,14 +76,6 @@ RUN if [ -d /app/wwwroot/_content/Microsoft.DotNet.HotReload.WebAssembly.Browser
         fi; \
     done; \
 fi
-
-# Build Inform 6 compiler for Linux
-RUN cd /tmp/inform6-src && \
-    gcc -O2 -o inform6 *.c && \
-    mkdir -p /app/Factories/Inform6 && \
-    mv inform6 /app/Factories/Inform6/ && \
-    chmod +x /app/Factories/Inform6/inform6 && \
-    rm -rf /tmp/inform6-src
 
 # Copy runtime data and resources from the workspace
 # These are needed for realm compilation and game execution

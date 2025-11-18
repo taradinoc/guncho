@@ -4,7 +4,58 @@ let windowsCreated = false;
 let lastOutputWasPrompt = false;
 let dotnetRef = null;
 let pendingUpdate = null;
+let gameportElement = null; // Persistent gameport element
 // Sizing is driven by GlkOte's own arrange/init metrics.
+
+function createGameportElement() {
+    const gameport = document.createElement('div');
+    gameport.id = 'gameport';
+    gameport.style.height = '100%';
+    gameport.style.width = '100%';
+    
+    const windowport = document.createElement('div');
+    windowport.id = 'windowport';
+    
+    const noscript = document.createElement('noscript');
+    const hr1 = document.createElement('hr');
+    const p = document.createElement('p');
+    p.textContent = "You'll need to turn on JavaScript to play.";
+    const hr2 = document.createElement('hr');
+    noscript.appendChild(hr1);
+    noscript.appendChild(p);
+    noscript.appendChild(hr2);
+    windowport.appendChild(noscript);
+    
+    const loadingpane = document.createElement('div');
+    loadingpane.id = 'loadingpane';
+    const em = document.createElement('em');
+    em.textContent = 'Loading...';
+    loadingpane.appendChild(em);
+    
+    const errorpane = document.createElement('div');
+    errorpane.id = 'errorpane';
+    errorpane.style.display = 'none';
+    const errorcontent = document.createElement('div');
+    errorcontent.id = 'errorcontent';
+    errorcontent.textContent = '...';
+    errorpane.appendChild(errorcontent);
+    
+    const layouttestpane = document.createElement('div');
+    layouttestpane.id = 'layouttestpane';
+    layouttestpane.style.display = 'none';
+    layouttestpane.innerHTML = `
+        This should not be visible
+        <div id="layouttest_grid" class="WindowFrame GridWindow"><div id="layouttest_gridline" class="GridLine"><span id="layouttest_gridspan" class="Style_normal">12345678</span></div><div id="layouttest_gridline2" class="GridLine"><span class="Style_normal">12345678</span></div></div>
+        <div id="layouttest_buffer" class="WindowFrame BufferWindow"><div id="layouttest_bufferline" class="BufferLine"><span id="layouttest_bufferspan" class="Style_normal">12345678</span></div><div id="layouttest_bufferline2" class="BufferLine"><span class="Style_normal">12345678</span></div></div>
+    `;
+    
+    gameport.appendChild(windowport);
+    gameport.appendChild(loadingpane);
+    gameport.appendChild(errorpane);
+    gameport.appendChild(layouttestpane);
+    
+    return gameport;
+}
 
 function removePrompts() {
     try {
@@ -111,7 +162,24 @@ export function init(element, dotnet) {
         throw new Error('GlkOte is not loaded.');
     }
 
-    window.GlkOte.init({
+    // Create or reuse the persistent gameport element
+    if (!gameportElement) {
+        gameportElement = createGameportElement();
+    }
+    
+    // Attach the gameport element to the container
+    if (element && element.firstChild !== gameportElement) {
+        // Clear the container
+        while (element.firstChild) {
+            element.removeChild(element.firstChild);
+        }
+        // Attach the persistent gameport
+        element.appendChild(gameportElement);
+    }
+    
+    // Initialize GlkOte only once
+    if (!windowsCreated) {
+        window.GlkOte.init({
         accept: (event) => {
             if (typeof event.gen === 'number') {
                 generation = event.gen + 1;
@@ -212,6 +280,7 @@ export function init(element, dotnet) {
             flushUpdates(true);
         }
     });
+    }
 }
 
 export function appendText(line) {
@@ -250,5 +319,7 @@ export function interrupt() {
 }
 
 export function dispose() {
+    // Don't destroy the gameport - just disconnect dotnet reference
+    // The gameport element persists in memory for reattachment
     dotnetRef = null;
 }

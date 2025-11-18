@@ -32,8 +32,8 @@ namespace Guncho
         public override string GetInitialSourceText(string ownerName, string realmName)
         {
             // Provide a basic Inform 6 template
-            return $@"Constant Story = ""{realmName}"";
-Constant Headline = ""An Inform 6 realm for Guncho."";
+            return $@"Constant Story ""{realmName}"";
+Constant Headline ""An Inform 6 realm for Guncho."";
 
 Include ""Parser"";
 Include ""VerbLib"";
