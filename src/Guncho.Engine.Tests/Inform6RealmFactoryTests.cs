@@ -62,9 +62,9 @@ public class Inform6RealmFactoryTests
         var source = factory.GetInitialSourceText("TestOwner", "TestRealm");
 
         // Assert
-        Assert.Contains("Constant Story 'TestRealm'", source);
-        Assert.Contains("Include 'Parser'", source);
-        Assert.Contains("Include 'VerbLib'", source);
+        Assert.Contains("Constant Story \"TestRealm\"", source);
+        Assert.Contains("Include \"Parser\"", source);
+        Assert.Contains("Include \"VerbLib\"", source);
         Assert.Contains("[ Initialise;", source);
         Assert.Contains("Object Room1", source);
         Assert.Contains("created by TestOwner", source);
