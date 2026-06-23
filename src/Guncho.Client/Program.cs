@@ -12,7 +12,14 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // In production, BaseAddress is the server. In dev with separate client, use API server.
 var baseAddress = builder.HostEnvironment.BaseAddress;
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(baseAddress) });
+
+// Register the auth message handler that detects 401 responses and clears stale auth state.
+builder.Services.AddScoped<AuthMessageHandler>();
+builder.Services.AddScoped(sp =>
+{
+    var handler = sp.GetRequiredService<AuthMessageHandler>();
+    return new HttpClient(handler) { BaseAddress = new Uri(baseAddress) };
+});
 
 // Add authentication
 builder.Services.AddBlazoredLocalStorage();

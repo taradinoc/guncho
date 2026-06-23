@@ -38,7 +38,10 @@ public class AuthService
                 return AuthResult<TokenResponseDto>.Failure("Login succeeded but no token was returned.");
             }
 
-            await authStateProvider.MarkUserAsAuthenticated(tokenResponse.AccessToken, tokenResponse.UserName);
+            await authStateProvider.MarkUserAsAuthenticated(
+                tokenResponse.AccessToken,
+                tokenResponse.UserName,
+                tokenResponse.ExpiresIn);
             return AuthResult<TokenResponseDto>.Success(tokenResponse);
         }
         catch (Exception ex)
