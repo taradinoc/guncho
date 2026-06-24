@@ -17,6 +17,7 @@ public class AuthMessageHandler : DelegatingHandler
     private readonly ILogger<AuthMessageHandler> logger;
 
     public AuthMessageHandler(IServiceProvider serviceProvider, ILogger<AuthMessageHandler> logger)
+        : base(new HttpClientHandler())
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
