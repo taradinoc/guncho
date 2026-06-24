@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   guncho:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: guncho-webhost
+    container_name: guncho-server
     ports:
       # Web server (ASP.NET Core Kestrel with Blazor UI)
       - "5000:5000"
