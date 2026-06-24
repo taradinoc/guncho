@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +23,7 @@ namespace Guncho
         private readonly Stream zfile;
         private readonly RealmIO io;
         private readonly string name;
-        private readonly ILogger logger;
+        private readonly Microsoft.Extensions.Logging.ILogger logger;
 
         private Engine vm;
 
@@ -71,7 +72,7 @@ namespace Guncho
         /// <param name="zfile">The compiled realm file.</param>
         /// <param name="name">The unique name of the instance.</param>
         /// <param name="logger">The logger.</param>
-        public FyreVMInstance(IInstanceSite site, IServerConfiguration config, Realm realm, Stream zfile, string name, ILogger logger)
+        public FyreVMInstance(IInstanceSite site, IServerConfiguration config, Realm realm, Stream zfile, string name, Microsoft.Extensions.Logging.ILogger logger)
         {
             this.site = site;
             this.config = config;
@@ -171,7 +172,7 @@ namespace Guncho
 
                         activationTime = DateTime.Now;
 
-                        logger.LogMessage(LogLevel.Verbose, "Activating realm '{0}'", name);
+                        logger.LogDebug("Activating realm '{0}'", name);
                     }
                 }
             });
@@ -195,7 +196,7 @@ namespace Guncho
                     // Wait up to 2 seconds for natural termination
                     if (!theThread.Join(2000))
                     {
-                        logger.LogMessage(LogLevel.Warning, "Interpreter thread did not terminate within timeout for '{0}'", name);
+                        logger.LogWarning("Interpreter thread did not terminate within timeout for '{0}'", name);
                     }
 
                     lock (terpThreadLock)
@@ -257,7 +258,7 @@ namespace Guncho
             }
             catch (Exception ex)
             {
-                logger.LogException(ex);
+                logger.LogError(ex, ex.Message);
                 throw;
             }
         }
@@ -350,13 +351,13 @@ namespace Guncho
             if (!rawMode)
             {
                 // Extra diagnostics to confirm that disconnect triggers $part and realm responds.
-                logger.LogMessage(LogLevel.Spam, "RemovePlayerAsync: sending $part for player {0} in instance '{1}'", player.ID, name);
+                logger.LogTrace("RemovePlayerAsync: sending $part for player {0} in instance '{1}'", player.ID, name);
                         string result = await SendAndGetAsync(string.Format("$part {0}", player.ID), trimResponse: false);
                         if (!string.IsNullOrEmpty(result) && !result.EndsWith("\n"))
                         {
                             result += "\n";
                         }
-                logger.LogMessage(LogLevel.Spam, "RemovePlayerAsync: received $part response (length {0}) for player {1} in '{2}'", result.Length, player.ID, name);
+                logger.LogTrace("RemovePlayerAsync: received $part response (length {0}) for player {1} in '{2}'", result.Length, player.ID, name);
                 await HandleOutputAsync(result);
                 await FlushAllAsync();
             }
@@ -801,8 +802,7 @@ namespace Guncho
         {
             if (curPlayer == Announcer || curPlayer == null)
             {
-                logger.LogMessage(LogLevel.Warning,
-                    "Illegal transfer (curPlayer is {0}) attempted from {1} to {2}.",
+                logger.LogWarning("Illegal transfer (curPlayer is {0}) attempted from {1} to {2}.",
                     curPlayer == Announcer ? "Announcer" : "null",
                     name, spec);
             }
@@ -816,8 +816,7 @@ namespace Guncho
         {
             if (curPlayer == Announcer || curPlayer == null)
             {
-                logger.LogMessage(LogLevel.Warning,
-                    "Illegal (curPlayer is {0}) disambiguation mode request.",
+                logger.LogWarning("Illegal (curPlayer is {0}) disambiguation mode request.",
                     curPlayer == Announcer ? "Announcer" : "null");
             }
             else
@@ -907,8 +906,7 @@ namespace Guncho
                         {
                             // got a transaction
                             curTrans = (Transaction)dqResult.Item;
-                            instance.logger.LogMessage(LogLevel.Spam,
-                                "Transaction in {0}: {1}",
+                            instance.logger.LogTrace("Transaction in {0}: {1}",
                                 instance.name, curTrans.Query);
                             return curTrans.Query;
                         }
@@ -918,8 +916,7 @@ namespace Guncho
 
                             // got a line of player input
                             string line = (string)dqResult.Item;
-                            instance.logger.LogMessage(LogLevel.Spam,
-                                "Processing in {0}: {1}",
+                            instance.logger.LogTrace("Processing in {0}: {1}",
                                 instance.name, line);
 
                             if (!instance.rawMode)

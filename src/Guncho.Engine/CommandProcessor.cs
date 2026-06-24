@@ -14,22 +14,19 @@ namespace Guncho
         private readonly IConnectionService connectionService;
         private readonly IInstanceService instanceService;
         private readonly IRealmService realmService;
-        private readonly ILogger logger;
 
         public CommandProcessor(
             IServerConfiguration config,
             IPlayerService playerService,
             IConnectionService connectionService,
             IInstanceService instanceService,
-            IRealmService realmService,
-            ILogger logger)
+            IRealmService realmService)
         {
             this.config = config;
             this.playerService = playerService;
             this.connectionService = connectionService;
             this.instanceService = instanceService;
             this.realmService = realmService;
-            this.logger = logger;
         }
 
         public struct HandleCommandResult

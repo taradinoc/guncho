@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -105,7 +106,7 @@ namespace Guncho
             return new Realm(this, config, name, sourceFile, storyFile, owner);
         }
 
-        public abstract IInstance LoadInstance(IInstanceSite site, Realm realm, string name, ILogger logger);
+        public abstract IInstance LoadInstance(IInstanceSite site, Realm realm, string name, Microsoft.Extensions.Logging.ILogger logger);
 
         protected static string MakeUUID(string realmName)
         {

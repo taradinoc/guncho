@@ -1,4 +1,4 @@
-using Guncho.Services;
+﻿using Guncho.Services;
 using Guncho.Shared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,9 +14,9 @@ namespace Guncho.WebHost.Controllers
     public sealed class PlayersController : GunchoApiController
     {
         private readonly IPlayerService _playerService;
-        private readonly ILogger _logger;
+        private readonly Microsoft.Extensions.Logging.ILogger<PlayersController> _logger;
 
-        public PlayersController(IPlayerService playerService, ILogger logger)
+        public PlayersController(IPlayerService playerService, Microsoft.Extensions.Logging.ILogger<PlayersController> logger)
         {
             _playerService = playerService;
             _logger = logger;
@@ -43,32 +43,32 @@ namespace Guncho.WebHost.Controllers
         [HttpGet("{name}")]
         public async Task<IActionResult> GetPlayerByNameAsync(string name)
         {
-            _logger.LogMessage(LogLevel.Verbose, "PlayersController.GetPlayerByNameAsync called with name: {0}", name);
+            _logger.LogDebug("PlayersController.GetPlayerByNameAsync called with name: {0}", name);
             
             // Handle "me" as a special case
             if (name.Equals("me", StringComparison.OrdinalIgnoreCase))
             {
                 var userName = User?.Identity?.Name;
-                _logger.LogMessage(LogLevel.Verbose, "Handling 'me' request, userName from identity: {0}", userName ?? "(null)");
+                _logger.LogDebug("Handling 'me' request, userName from identity: {0}", userName ?? "(null)");
                 
                 if (string.IsNullOrEmpty(userName))
                 {
-                    _logger.LogMessage(LogLevel.Warning, "'me' request but no userName in identity");
+                    _logger.LogWarning("'me' request but no userName in identity");
                     return Unauthorized();
                 }
 
                 var currentPlayer = await _playerService.GetPlayerByNameAsync(userName);
                 if (currentPlayer == null)
                 {
-                    _logger.LogMessage(LogLevel.Error, "Player not found for userName: {0}", userName);
+                    _logger.LogError("Player not found for userName: {0}", userName);
                     return NotFound();
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, "Returning player: {0}", currentPlayer.Name);
+                _logger.LogDebug("Returning player: {0}", currentPlayer.Name);
                 return Ok(MakeDto(currentPlayer));
             }
 
-            _logger.LogMessage(LogLevel.Verbose, "Looking up player by name: {0}", name);
+            _logger.LogDebug("Looking up player by name: {0}", name);
             var player = await _playerService.GetPlayerByNameAsync(name);
 
             if (player == null)
@@ -82,12 +82,12 @@ namespace Guncho.WebHost.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutPlayerByIdAsync(string id, [FromBody] PlayerDto updatedPlayer)
         {
-            _logger.LogMessage(LogLevel.Verbose, "PlayersController.PutPlayerByIdAsync called with id: {0}", id);
+            _logger.LogDebug("PlayersController.PutPlayerByIdAsync called with id: {0}", id);
             
             var player = await _playerService.GetPlayerByIdAsync(id);
             if (player == null)
             {
-                _logger.LogMessage(LogLevel.Warning, "Player not found for id: {0}", id);
+                _logger.LogWarning("Player not found for id: {0}", id);
                 return NotFound();
             }
 
@@ -126,7 +126,7 @@ namespace Guncho.WebHost.Controllers
 
             await _playerService.SavePlayerAsync(player);
             
-            _logger.LogMessage(LogLevel.Verbose, "Player {0} updated successfully", player.Name);
+            _logger.LogDebug("Player {0} updated successfully", player.Name);
             return Ok(MakeDto(player));
         }
     }

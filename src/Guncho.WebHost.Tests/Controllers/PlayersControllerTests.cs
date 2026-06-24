@@ -3,6 +3,7 @@ using Guncho.Shared.Models;
 using Guncho.WebHost.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using System.Security.Claims;
 using Xunit;
@@ -12,13 +13,13 @@ namespace Guncho.WebHost.Tests.Controllers;
 public class PlayersControllerTests
 {
     private readonly Mock<IPlayerService> _mockPlayerService;
-    private readonly Mock<ILogger> _mockLogger;
+    private readonly Mock<ILogger<PlayersController>> _mockLogger;
     private readonly PlayersController _controller;
 
     public PlayersControllerTests()
     {
         _mockPlayerService = new Mock<IPlayerService>();
-        _mockLogger = new Mock<ILogger>();
+        _mockLogger = new Mock<ILogger<PlayersController>>();
         _controller = new PlayersController(_mockPlayerService.Object, _mockLogger.Object);
     }
 

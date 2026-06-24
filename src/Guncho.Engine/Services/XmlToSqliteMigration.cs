@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using Guncho.Data;
 using Guncho.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -13,9 +14,9 @@ public class XmlToSqliteMigration
 {
     private readonly GunchoDbContext _dbContext;
     private readonly string _realmDataPath;
-    private readonly ILogger _logger;
+    private readonly Microsoft.Extensions.Logging.ILogger _logger;
 
-    public XmlToSqliteMigration(GunchoDbContext dbContext, string realmDataPath, ILogger logger)
+    public XmlToSqliteMigration(GunchoDbContext dbContext, string realmDataPath, Microsoft.Extensions.Logging.ILogger logger)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _realmDataPath = realmDataPath ?? throw new ArgumentNullException(nameof(realmDataPath));
@@ -27,7 +28,7 @@ public class XmlToSqliteMigration
     /// </summary>
     public async Task MigrateAsync()
     {
-        _logger.LogMessage(LogLevel.Notice, "Starting XML to SQLite migration...");
+        _logger.LogInformation("Starting XML to SQLite migration...");
 
         // Ensure database is created
         await _dbContext.Database.EnsureCreatedAsync();
@@ -35,7 +36,7 @@ public class XmlToSqliteMigration
         // Check if migration already done
         if (await _dbContext.Players.AnyAsync())
         {
-            _logger.LogMessage(LogLevel.Warning, "Database already contains data. Skipping migration.");
+            _logger.LogWarning("Database already contains data. Skipping migration.");
             return;
         }
 
@@ -44,7 +45,7 @@ public class XmlToSqliteMigration
         await MigrateRealmsAsync();
         await MigrateRealmStorageAsync();
 
-        _logger.LogMessage(LogLevel.Notice, "Migration completed successfully!");
+        _logger.LogInformation("Migration completed successfully!");
     }
 
     private async Task MigratePlayersAsync()
@@ -52,7 +53,7 @@ public class XmlToSqliteMigration
         var playerIndexPath = Path.Combine(_realmDataPath, "playerIndex.xml");
         if (!File.Exists(playerIndexPath))
         {
-            _logger.LogMessage(LogLevel.Warning, $"playerIndex.xml not found at {playerIndexPath}");
+            _logger.LogWarning($"playerIndex.xml not found at {playerIndexPath}");
             return;
         }
 
@@ -64,7 +65,7 @@ public class XmlToSqliteMigration
 
             if (index?.Item?.player == null)
             {
-                _logger.LogMessage(LogLevel.Warning, "No players found in playerIndex.xml");
+                _logger.LogWarning("No players found in playerIndex.xml");
                 return;
             }
 
@@ -77,7 +78,7 @@ public class XmlToSqliteMigration
                 // Skip duplicate player IDs
                 if (seenPlayerIds.Contains(xmlPlayer.id))
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Duplicate player ID {xmlPlayer.id} ('{xmlPlayer.name}'). Skipping duplicate entry.");
+                    _logger.LogWarning($"Duplicate player ID {xmlPlayer.id} ('{xmlPlayer.name}'). Skipping duplicate entry.");
                     continue;
                 }
                 seenPlayerIds.Add(xmlPlayer.id);
@@ -115,11 +116,11 @@ public class XmlToSqliteMigration
             }
 
             await _dbContext.SaveChangesAsync();
-            _logger.LogMessage(LogLevel.Notice, $"Migrated {playerCount} players with {attributeCount} attributes");
+            _logger.LogInformation($"Migrated {playerCount} players with {attributeCount} attributes");
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex);
+            _logger.LogError(ex, ex.Message);
             throw new InvalidOperationException("Failed to migrate players from XML", ex);
         }
     }
@@ -129,7 +130,7 @@ public class XmlToSqliteMigration
         var realmIndexPath = Path.Combine(_realmDataPath, "realmIndex.xml");
         if (!File.Exists(realmIndexPath))
         {
-            _logger.LogMessage(LogLevel.Warning, $"realmIndex.xml not found at {realmIndexPath}");
+            _logger.LogWarning($"realmIndex.xml not found at {realmIndexPath}");
             return;
         }
 
@@ -141,7 +142,7 @@ public class XmlToSqliteMigration
 
             if (index?.realms == null)
             {
-                _logger.LogMessage(LogLevel.Warning, "No realms found in realmIndex.xml");
+                _logger.LogWarning("No realms found in realmIndex.xml");
                 return;
             }
 
@@ -156,7 +157,7 @@ public class XmlToSqliteMigration
 
                 if (ownerEntity == null)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Owner '{xmlRealm.owner}' not found for realm '{xmlRealm.name}'. Skipping realm.");
+                    _logger.LogWarning($"Owner '{xmlRealm.owner}' not found for realm '{xmlRealm.name}'. Skipping realm.");
                     continue;
                 }
 
@@ -193,7 +194,7 @@ public class XmlToSqliteMigration
                     }
                     else
                     {
-                        _logger.LogMessage(LogLevel.Warning, $"Source file '{sourceFileName}' not found for realm '{xmlRealm.name}'. Realm created without assets.");
+                        _logger.LogWarning($"Source file '{sourceFileName}' not found for realm '{xmlRealm.name}'. Realm created without assets.");
                     }
 
                 // Migrate ACLs
@@ -206,7 +207,7 @@ public class XmlToSqliteMigration
 
                         if (playerEntity == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"Player '{xmlAccess.player}' not found for ACL in realm '{xmlRealm.name}'. Skipping ACL entry.");
+                            _logger.LogWarning($"Player '{xmlAccess.player}' not found for ACL in realm '{xmlRealm.name}'. Skipping ACL entry.");
                             continue;
                         }
 
@@ -226,11 +227,11 @@ public class XmlToSqliteMigration
             }
 
             await _dbContext.SaveChangesAsync();
-            _logger.LogMessage(LogLevel.Notice, $"Migrated {realmCount} realms with {aclCount} ACL entries");
+            _logger.LogInformation($"Migrated {realmCount} realms with {aclCount} ACL entries");
         }
         catch (Exception ex)
         {
-            _logger.LogException(ex);
+            _logger.LogError(ex, ex.Message);
             throw new InvalidOperationException("Failed to migrate realms from XML", ex);
         }
     }
@@ -287,7 +288,7 @@ public class XmlToSqliteMigration
 
                         if (playerEntity == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"Player '{xmlPlayer.name}' not found for storage in realm '{realm.Name}'. Skipping player storage.");
+                            _logger.LogWarning($"Player '{xmlPlayer.name}' not found for storage in realm '{realm.Name}'. Skipping player storage.");
                             continue;
                         }
 
@@ -311,15 +312,15 @@ public class XmlToSqliteMigration
                 }
 
                 await _dbContext.SaveChangesAsync();
-                _logger.LogMessage(LogLevel.Verbose, $"Migrated {storageCount} storage entries for realm '{realm.Name}'");
+                _logger.LogDebug($"Migrated {storageCount} storage entries for realm '{realm.Name}'");
                 totalStorageCount += storageCount;
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Failed to migrate storage for realm '{realm.Name}': {ex.Message}");
+                _logger.LogError($"Failed to migrate storage for realm '{realm.Name}': {ex.Message}");
             }
         }
 
-        _logger.LogMessage(LogLevel.Notice, $"Migrated {totalStorageCount} total storage entries");
+        _logger.LogInformation($"Migrated {totalStorageCount} total storage entries");
     }
 }

@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -8,12 +9,12 @@ namespace Guncho
     // Inform 6 realm factory for Guncho
     public sealed partial class Inform6RealmFactory : RealmFactory
     {
-        private readonly ILogger logger;
+        private readonly Microsoft.Extensions.Logging.ILogger logger;
         private readonly string inform6CompilerPath;
         private readonly string inform6LibraryDir;
         private readonly string indexOutputDir;
 
-        public Inform6RealmFactory(IServerConfiguration config, ILogger logger, string name,
+        public Inform6RealmFactory(IServerConfiguration config, Microsoft.Extensions.Logging.ILogger logger, string name,
             string inform6CompilerPath, string inform6LibraryDir, string indexOutputDir)
             : base(name, config)
         {
@@ -82,27 +83,27 @@ Include ""Grammar"";
                 // Check for compilation errors
                 if (process.ExitCode != 0)
                 {
-                    logger.LogMessage(LogLevel.Error, $"Inform 6 compilation failed for '{realmName}': {output}");
+                    logger.LogError($"Inform 6 compilation failed for '{realmName}': {output}");
                     return RealmEditingOutcome.InfError;
                 }
 
                 if (!File.Exists(outputFile))
                 {
-                    logger.LogMessage(LogLevel.Error, $"Inform 6 compilation succeeded but output file not found: '{outputFile}'");
+                    logger.LogError($"Inform 6 compilation succeeded but output file not found: '{outputFile}'");
                     return RealmEditingOutcome.InfError;
                 }
 
-                logger.LogMessage(LogLevel.Verbose, $"Successfully compiled Inform 6 realm '{realmName}'");
+                logger.LogDebug($"Successfully compiled Inform 6 realm '{realmName}'");
                 return RealmEditingOutcome.Success;
             }
             catch (Exception ex)
             {
-                logger.LogMessage(LogLevel.Error, $"Exception during Inform 6 compilation of '{realmName}': {ex.Message}");
+                logger.LogError($"Exception during Inform 6 compilation of '{realmName}': {ex.Message}");
                 return RealmEditingOutcome.InfError;
             }
         }
 
-        public override IInstance LoadInstance(IInstanceSite site, Realm realm, string name, ILogger logger)
+        public override IInstance LoadInstance(IInstanceSite site, Realm realm, string name, Microsoft.Extensions.Logging.ILogger logger)
         {
             // Inform 6 compiles to Glulx (.ulx), which runs on FyreVM just like Inform 7
             FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);

@@ -1,4 +1,4 @@
-using Guncho.Repositories;
+﻿using Guncho.Repositories;
 using Guncho.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +11,7 @@ namespace Guncho.WebHost.Services;
 public class EfCorePlayerService : IPlayerService
 {
     private readonly IDbContextFactory<Data.GunchoDbContext> _dbContextFactory;
-    private readonly ILogger _logger;
+    private readonly Microsoft.Extensions.Logging.ILogger<EfCorePlayerService> _logger;
 
     // In-memory cache for performance (still needed for event queue pattern)
     private readonly Dictionary<string, Player> _players = new();
@@ -20,7 +20,7 @@ public class EfCorePlayerService : IPlayerService
 
     public EfCorePlayerService(
         IDbContextFactory<Data.GunchoDbContext> dbContextFactory,
-        ILogger logger)
+        Microsoft.Extensions.Logging.ILogger<EfCorePlayerService> logger)
     {
         _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -45,7 +45,7 @@ public class EfCorePlayerService : IPlayerService
             }
         }
 
-        _logger.LogMessage(LogLevel.Verbose, $"Loaded {_players.Count} players from database");
+        _logger.LogDebug($"Loaded {_players.Count} players from database");
     }
 
     public Task<Player?> GetPlayerByNameAsync(string name)
@@ -127,7 +127,7 @@ public class EfCorePlayerService : IPlayerService
             _playersById[player.ID] = player;
         }
 
-        _logger.LogMessage(LogLevel.Verbose, $"Saved player: {player.Name}");
+        _logger.LogDebug($"Saved player: {player.Name}");
     }
 
     public async Task DeletePlayerAsync(Player player)
@@ -146,7 +146,7 @@ public class EfCorePlayerService : IPlayerService
             _playersById.Remove(player.ID);
         }
 
-        _logger.LogMessage(LogLevel.Verbose, $"Deleted player: {player.Name}");
+        _logger.LogDebug($"Deleted player: {player.Name}");
     }
 
     public IEnumerable<Player> GetAllPlayers()

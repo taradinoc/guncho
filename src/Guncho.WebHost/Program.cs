@@ -67,7 +67,6 @@ builder.Services.AddCors(options =>
 // Register Guncho configuration and services
 builder.Services.AddSingleton<IServerConfiguration>(sp => 
     new GunchoConfiguration(builder.Configuration));
-builder.Services.AddSingleton<Guncho.ILogger, ConsoleLogger>();
 builder.Services.AddSingleton<ISignalRConnectionManager, SignalRConnectionManager>();
 
 // Register core game services - single instance implements multiple interfaces

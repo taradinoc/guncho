@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -12,13 +13,13 @@ namespace Guncho
 {
     public sealed class InformRealmFactory : RealmFactory
     {
-        private readonly ILogger logger;
+        private readonly Microsoft.Extensions.Logging.ILogger logger;
 
         private readonly string niCompilerPath, niExtensionDir;
         private readonly string infCompilerPath, infLibraryDir;
         private readonly string indexOutputDir;
 
-        public InformRealmFactory(IServerConfiguration config, ILogger logger, string name,
+        public InformRealmFactory(IServerConfiguration config, Microsoft.Extensions.Logging.ILogger logger, string name,
             string niCompilerPath, string niExtensionDir,
             string infCompilerPath, string infLibraryDir,
             string indexOutputDir)
@@ -109,7 +110,7 @@ namespace Guncho
                     wtr.WriteLine("</font>");
                 }
 
-                logger.LogMessage(LogLevel.Warning, "NI hung while compiling '{0}'", realmName);
+                logger.LogWarning("NI hung while compiling '{0}'", realmName);
 
                 return RealmEditingOutcome.NiError;
             }
@@ -148,7 +149,7 @@ namespace Guncho
                             wtr.WriteLine("</font>");
                         }
 
-                        logger.LogMessage(LogLevel.Warning, "Inform 6 hung while compiling '{0}'", realmName);
+                        logger.LogWarning("Inform 6 hung while compiling '{0}'", realmName);
 
                         return RealmEditingOutcome.InfError;
                     }
@@ -171,7 +172,7 @@ namespace Guncho
                                 wtr.WriteLine("</pre></font>");
                             }
 
-                            logger.LogMessage(LogLevel.Warning, "Inform 6 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
+                            logger.LogWarning("Inform 6 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
                             return RealmEditingOutcome.InfError;
                         }
 
@@ -181,7 +182,7 @@ namespace Guncho
                 }
                 else
                 {
-                    logger.LogMessage(LogLevel.Warning, "Inform 7 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
+                    logger.LogWarning("Inform 7 compiler output for '{0}': {1}", realmName, TruncateCompilerOutput(output));
                     return RealmEditingOutcome.NiError;
                 }
             }
@@ -236,7 +237,7 @@ namespace Guncho
             return (nibin != null) && (i6bin != null);
         }
 
-        public static InformRealmFactory[] ConstructAll(IServerConfiguration config, ILogger logger, string installationsPath, string indexOutputDir)
+        public static InformRealmFactory[] ConstructAll(IServerConfiguration config, Microsoft.Extensions.Logging.ILogger logger, string installationsPath, string indexOutputDir)
         {
             var result = new List<InformRealmFactory>();
 
@@ -263,7 +264,7 @@ namespace Guncho
             return result.ToArray();
         }
 
-        public override IInstance LoadInstance(IInstanceSite site, Realm realm, string name, ILogger logger)
+        public override IInstance LoadInstance(IInstanceSite site, Realm realm, string name, Microsoft.Extensions.Logging.ILogger logger)
         {
             FileStream stream = new FileStream(realm.StoryFile, FileMode.Open, FileAccess.Read);
             return new FyreVMInstance(site, config, realm, stream, name, logger);

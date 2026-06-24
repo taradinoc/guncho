@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using Guncho;
 using Guncho.Data;
 using Guncho.Services;
@@ -77,7 +78,8 @@ class Program
         await dbContext.Database.EnsureCreatedAsync();
 
         // Create logger
-        var logger = new ConsoleLogger();
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        var logger = loggerFactory.CreateLogger("Guncho.Migrator");
 
         // Run migration
         try
@@ -102,28 +104,5 @@ class Program
             Console.Error.WriteLine(ex.StackTrace);
             Environment.ExitCode = 1;
         }
-    }
-}
-
-/// <summary>
-/// Simple console logger implementation.
-/// </summary>
-class ConsoleLogger : ILogger
-{
-    public void LogMessage(LogLevel level, string text)
-    {
-        var color = level switch
-        {
-            LogLevel.Error => ConsoleColor.Red,
-            LogLevel.Warning => ConsoleColor.Yellow,
-            LogLevel.Notice => ConsoleColor.Green,
-            LogLevel.Verbose => ConsoleColor.Gray,
-            _ => ConsoleColor.White
-        };
-
-        var oldColor = Console.ForegroundColor;
-        Console.ForegroundColor = color;
-        Console.WriteLine($"[{level}] {text}");
-        Console.ForegroundColor = oldColor;
     }
 }

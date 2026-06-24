@@ -1,5 +1,6 @@
 using Guncho;
 using Guncho.Services;
+using Microsoft.Extensions.Logging;
 using Moq;
 using System.IO;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ namespace Guncho.Engine.Tests;
 public class Inform6RealmFactoryTests
 {
     private readonly Mock<IServerConfiguration> _mockConfig;
-    private readonly Mock<ILogger> _mockLogger;
+    private readonly Mock<Microsoft.Extensions.Logging.ILogger> _mockLogger;
     private readonly string _testCompilerPath;
     private readonly string _testLibraryPath;
     private readonly string _testIndexPath;
@@ -18,7 +19,7 @@ public class Inform6RealmFactoryTests
     public Inform6RealmFactoryTests()
     {
         _mockConfig = new Mock<IServerConfiguration>();
-        _mockLogger = new Mock<ILogger>();
+        _mockLogger = new Mock<Microsoft.Extensions.Logging.ILogger>();
         _testCompilerPath = "e:\\guncho\\Factories\\Inform6";
         _testLibraryPath = "e:\\guncho\\Factories\\Inform6\\library";
         _testIndexPath = Path.Combine(Path.GetTempPath(), "guncho-test-index");

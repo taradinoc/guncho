@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -10,7 +11,7 @@ namespace Guncho
         private static readonly string[] inform6BinsWin = { "inform6.exe" };
         private static readonly string[] inform6BinsUnix = { "inform6", "inform6.exe" };
 
-        public static Inform6RealmFactory[] ConstructAll(IServerConfiguration config, ILogger logger, string compilerPath, string libraryPath, string indexOutputDir)
+        public static Inform6RealmFactory[] ConstructAll(IServerConfiguration config, Microsoft.Extensions.Logging.ILogger logger, string compilerPath, string libraryPath, string indexOutputDir)
         {
             var factories = new List<Inform6RealmFactory>();
             
@@ -34,7 +35,7 @@ namespace Guncho
                 
                 if (actualCompilerPath == null)
                 {
-                    logger.LogMessage(LogLevel.Warning, $"Inform 6 compiler not found in directory: {compilerPath}");
+                    logger.LogWarning($"Inform 6 compiler not found in directory: {compilerPath}");
                     return factories.ToArray();
                 }
             }
@@ -44,7 +45,7 @@ namespace Guncho
             }
             else
             {
-                logger.LogMessage(LogLevel.Warning, $"Inform 6 compiler not found: {compilerPath}");
+                logger.LogWarning($"Inform 6 compiler not found: {compilerPath}");
                 return factories.ToArray();
             }
             
@@ -60,7 +61,7 @@ namespace Guncho
             }
             else
             {
-                logger.LogMessage(LogLevel.Warning, $"Inform 6 library not found: {libraryPath}");
+                logger.LogWarning($"Inform 6 library not found: {libraryPath}");
             }
             
             return factories.ToArray();

@@ -1,4 +1,4 @@
-using Guncho.Connections;
+﻿using Guncho.Connections;
 using Guncho.Services;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -21,7 +21,7 @@ namespace Guncho.WebHost.Services
     public class GunchoServerServices : IPlayerService, IRealmService, IInstanceService, IConnectionService, IInstanceSite
     {
         private readonly IServerConfiguration _config;
-        private readonly ILogger _logger;
+        private readonly Microsoft.Extensions.Logging.ILogger<GunchoServerServices> _logger;
         private readonly ISignalRConnectionManager _connectionManager;
         private readonly IServiceProvider _services;
 
@@ -47,7 +47,7 @@ namespace Guncho.WebHost.Services
 
         public GunchoServerServices(
             IServerConfiguration config,
-            ILogger logger,
+            Microsoft.Extensions.Logging.ILogger<GunchoServerServices> logger,
             ISignalRConnectionManager connectionManager,
             IServiceProvider services)
         {
@@ -152,7 +152,7 @@ namespace Guncho.WebHost.Services
                 var repo = scope.ServiceProvider.GetService<Guncho.Repositories.PlayerRepository>();
                 if (repo == null)
                 {
-                    _logger.LogMessage(LogLevel.Warning, "PlayerRepository not available; no players loaded");
+                    _logger.LogWarning("PlayerRepository not available; no players loaded");
                     return;
                 }
 
@@ -163,11 +163,11 @@ namespace Guncho.WebHost.Services
                     _playersById[p.ID] = p;
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_players.Count} players from database");
+                _logger.LogDebug($"Loaded {_players.Count} players from database");
             }
             catch (Exception ex)
             {
-                _logger.LogException(ex);
+                _logger.LogError(ex, ex.Message);
                 throw;
             }
         }
@@ -187,7 +187,7 @@ namespace Guncho.WebHost.Services
                 var repo = scope.ServiceProvider.GetService<Guncho.Repositories.RealmRepository>();
                 if (repo == null)
                 {
-                    _logger.LogMessage(LogLevel.Warning, "RealmRepository not available; no realms loaded");
+                    _logger.LogWarning("RealmRepository not available; no realms loaded");
                     return;
                 }
 
@@ -199,7 +199,7 @@ namespace Guncho.WebHost.Services
                         // Find owner from in-memory cache populated earlier
                         if (!_playersById.TryGetValue(meta.OwnerId, out var owner) || owner == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"Realm '{meta.Name}' owner id {meta.OwnerId} not loaded; skipping realm");
+                            _logger.LogWarning($"Realm '{meta.Name}' owner id {meta.OwnerId} not loaded; skipping realm");
                             continue;
                         }
 
@@ -208,7 +208,7 @@ namespace Guncho.WebHost.Services
                                     ?? _realmFactories.FirstOrDefault();
                         if (factory == null)
                         {
-                            _logger.LogMessage(LogLevel.Warning, $"No realm factory available for '{meta.Name}' (factory '{meta.Factory}')");
+                            _logger.LogWarning($"No realm factory available for '{meta.Name}' (factory '{meta.Factory}')");
                             continue;
                         }
 
@@ -237,19 +237,19 @@ namespace Guncho.WebHost.Services
                         }
 
                         _realms[realm.Name.ToLower()] = realm;
-                        _logger.LogMessage(LogLevel.Verbose, $"Loaded realm: {realm.Name}");
+                        _logger.LogDebug($"Loaded realm: {realm.Name}");
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogMessage(LogLevel.Error, $"Error loading realm '{meta.Name}': {ex.Message}");
+                        _logger.LogError($"Error loading realm '{meta.Name}': {ex.Message}");
                     }
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Loaded {_realms.Count} realms from database");
+                _logger.LogDebug($"Loaded {_realms.Count} realms from database");
             }
             catch (Exception ex)
             {
-                _logger.LogException(ex);
+                _logger.LogError(ex, ex.Message);
                 throw;
             }
         }
@@ -332,13 +332,13 @@ namespace Guncho.WebHost.Services
                 }
                 else
                 {
-                    _logger.LogMessage(LogLevel.Warning, "RealmRepository not available; realm changes not persisted to the database.");
+                    _logger.LogWarning("RealmRepository not available; realm changes not persisted to the database.");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Failed to persist realm '{realm.Name}': {ex.Message}");
-                _logger.LogException(ex);
+                _logger.LogError($"Failed to persist realm '{realm.Name}': {ex.Message}");
+                _logger.LogError(ex, ex.Message);
             }
         }
 
@@ -378,7 +378,7 @@ namespace Guncho.WebHost.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Failed to dispose instance '{instance.Name}' while deleting realm '{realm.Name}': {ex.Message}");
+                    _logger.LogWarning($"Failed to dispose instance '{instance.Name}' while deleting realm '{realm.Name}': {ex.Message}");
                 }
 
                 _instances.TryRemove(entry.Key, out _);
@@ -409,7 +409,7 @@ namespace Guncho.WebHost.Services
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Warning, $"Failed to remove files for realm '{realm.Name}': {ex.Message}");
+                _logger.LogWarning($"Failed to remove files for realm '{realm.Name}': {ex.Message}");
             }
 
             try
@@ -439,12 +439,12 @@ namespace Guncho.WebHost.Services
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Failed to delete realm '{realm.Name}' from database: {ex.Message}");
-                _logger.LogException(ex);
+                _logger.LogError($"Failed to delete realm '{realm.Name}' from database: {ex.Message}");
+                _logger.LogError(ex, ex.Message);
                 return false;
             }
 
-            _logger.LogMessage(LogLevel.Notice, $"Realm deleted: {realm.Name}");
+            _logger.LogInformation($"Realm deleted: {realm.Name}");
             return true;
         }
 
@@ -454,13 +454,13 @@ namespace Guncho.WebHost.Services
 
             if (!IsValidRealmName(name))
             {
-                _logger.LogMessage(LogLevel.Warning, $"Invalid realm name: {name}");
+                _logger.LogWarning($"Invalid realm name: {name}");
                 return null;
             }
 
             if (_realms.ContainsKey(key))
             {
-                _logger.LogMessage(LogLevel.Warning, $"Realm already exists: {name}");
+                _logger.LogWarning($"Realm already exists: {name}");
                 return null;
             }
 
@@ -471,7 +471,7 @@ namespace Guncho.WebHost.Services
                 int maxRealms = 5; // TODO: Make this configurable
                 if (count >= maxRealms)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Player {owner.Name} has reached realm limit ({maxRealms})");
+                    _logger.LogWarning($"Player {owner.Name} has reached realm limit ({maxRealms})");
                     return null;
                 }
             }
@@ -534,15 +534,15 @@ namespace Guncho.WebHost.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Failed to seed DB asset for realm '{name}': {ex.Message}");
+                    _logger.LogWarning($"Failed to seed DB asset for realm '{name}': {ex.Message}");
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Created realm: {name}");
+                _logger.LogDebug($"Created realm: {name}");
                 return realm;
             }
             catch (Exception ex)
             {
-                _logger.LogException(ex);
+                _logger.LogError(ex, ex.Message);
                 return null;
             }
         }
@@ -639,14 +639,14 @@ namespace Guncho.WebHost.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogMessage(LogLevel.Error, $"Initial compile threw for realm '{realm.Name}': {ex.Message}");
-                        _logger.LogException(ex);
+                        _logger.LogError($"Initial compile threw for realm '{realm.Name}': {ex.Message}");
+                        _logger.LogError(ex, ex.Message);
                         return false;
                     }
 
                     if (outcome != RealmEditingOutcome.Success)
                     {
-                        _logger.LogMessage(LogLevel.Warning, $"Initial compile failed for realm '{realm.Name}' with outcome {outcome}.");
+                        _logger.LogWarning($"Initial compile failed for realm '{realm.Name}' with outcome {outcome}.");
                         return false;
                     }
 
@@ -684,7 +684,7 @@ namespace Guncho.WebHost.Services
         {
             ArgumentNullException.ThrowIfNull(realm);
 
-            _logger.LogMessage(LogLevel.Verbose, $"Updating source for realm '{realm.Name}'.");
+            _logger.LogDebug($"Updating source for realm '{realm.Name}'.");
 
             // Compile to a temporary ULX first (using DB-backed assets when available)
             var tempUlx = Path.Combine(_config.CachePath, $"{realm.Name}.preview.ulx");
@@ -693,7 +693,7 @@ namespace Guncho.WebHost.Services
                 var outcome = await CompileRealmToPathAsync(realm, tempUlx);
                 if (outcome != RealmEditingOutcome.Success)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Compile failed for realm '{realm.Name}' with outcome {outcome}.");
+                    _logger.LogWarning($"Compile failed for realm '{realm.Name}' with outcome {outcome}.");
                     try { if (File.Exists(tempUlx)) File.Delete(tempUlx); } catch { }
                     return outcome;
                 }
@@ -708,7 +708,7 @@ namespace Guncho.WebHost.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogMessage(LogLevel.Error, $"VM preflight failed for realm '{realm.Name}': {ex.Message}");
+                    _logger.LogError($"VM preflight failed for realm '{realm.Name}': {ex.Message}");
                     try { if (File.Exists(tempUlx)) File.Delete(tempUlx); } catch { }
                     return RealmEditingOutcome.VMError;
                 }
@@ -736,7 +736,7 @@ namespace Guncho.WebHost.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Primary ULX overwrite failed for realm '{realm.Name}': {ex.Message}. Attempting fallback move.");
+                    _logger.LogWarning($"Primary ULX overwrite failed for realm '{realm.Name}': {ex.Message}. Attempting fallback move.");
                     try
                     {
                         if (File.Exists(realm.StoryFile))
@@ -747,13 +747,13 @@ namespace Guncho.WebHost.Services
                     }
                     catch (Exception ex2)
                     {
-                        _logger.LogMessage(LogLevel.Error, $"ULX replacement failed for realm '{realm.Name}': {ex2.Message}");
+                        _logger.LogError($"ULX replacement failed for realm '{realm.Name}': {ex2.Message}");
                         try { if (File.Exists(tempUlx)) File.Delete(tempUlx); } catch { }
                         return RealmEditingOutcome.VMError;
                     }
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Reloading realm '{realm.Name}'.");
+                _logger.LogDebug($"Reloading realm '{realm.Name}'.");
 
                 // Recreate instances and re-enter players
                 var connectionsByPlayer = _openConnections.Keys.ToLookup(c => c.Player);
@@ -782,7 +782,7 @@ namespace Guncho.WebHost.Services
             }
             catch (Exception ex)
             {
-                _logger.LogException(ex);
+                _logger.LogError(ex, ex.Message);
                 try { if (File.Exists(tempUlx)) File.Delete(tempUlx); } catch { }
 
                 // On failure, move players to the start realm if possible
@@ -882,11 +882,11 @@ namespace Guncho.WebHost.Services
                     serializer.Serialize(fs, index);
                 }
 
-                _logger.LogMessage(LogLevel.Verbose, $"Saved {_realms.Count} realms to realmIndex.xml");
+                _logger.LogDebug($"Saved {_realms.Count} realms to realmIndex.xml");
             }
             catch (Exception ex)
             {
-                _logger.LogException(ex);
+                _logger.LogError(ex, ex.Message);
                 throw;
             }
         }
@@ -982,13 +982,13 @@ namespace Guncho.WebHost.Services
             // Remove from previous instance if needed
             if (_playerInstances.TryGetValue(player, out var prevInstance) && prevInstance != instance)
             {
-                _logger.LogMessage(LogLevel.Verbose, "{0} (#{1}) leaving '{2}'", player.Name, player.ID, prevInstance.Name);
+                _logger.LogDebug("{0} (#{1}) leaving '{2}'", player.Name, player.ID, prevInstance.Name);
                 await prevInstance.RemovePlayerAsync(player);
             }
 
             _playerInstances[player] = instance;
 
-            _logger.LogMessage(LogLevel.Verbose, "{0} (#{1}) entering '{2}'", player.Name, player.ID, instance.Name);
+            _logger.LogDebug("{0} (#{1}) entering '{2}'", player.Name, player.ID, instance.Name);
 
             // Activate instance if not already active
             if (!instance.IsActive)
@@ -1037,7 +1037,7 @@ namespace Guncho.WebHost.Services
 
             if (!File.Exists(fullPath))
             {
-                _logger.LogMessage(LogLevel.Warning, $"Text file not found: {fullPath}");
+                _logger.LogWarning($"Text file not found: {fullPath}");
                 return;
             }
 
@@ -1054,7 +1054,7 @@ namespace Guncho.WebHost.Services
 
         public async Task InitializeAsync()
         {
-            _logger.LogMessage(LogLevel.Verbose, "Initializing Guncho server services...");
+            _logger.LogDebug("Initializing Guncho server services...");
 
             // Create required directories
             Directory.CreateDirectory(_config.CachePath);
@@ -1077,12 +1077,12 @@ namespace Guncho.WebHost.Services
             {
                 if (!await EnsureRealmCompiledAsync(startRealm))
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Failed to compile start realm '{startRealm.Name}' during initialization.");
+                    _logger.LogWarning($"Failed to compile start realm '{startRealm.Name}' during initialization.");
                 }
             }
             else
             {
-                _logger.LogMessage(LogLevel.Warning, $"Start realm '{_config.StartRealmName}' not found during initialization.");
+                _logger.LogWarning($"Start realm '{_config.StartRealmName}' not found during initialization.");
             }
 
             // Subscribe to connection events
@@ -1093,7 +1093,7 @@ namespace Guncho.WebHost.Services
             _running = true;
             _eventTask = Task.Run(ProcessEventsAsync);
 
-            _logger.LogMessage(LogLevel.Verbose, "Guncho server services initialized");
+            _logger.LogDebug("Guncho server services initialized");
         }
 
         private void RegisterRealmFactories()
@@ -1103,7 +1103,7 @@ namespace Guncho.WebHost.Services
                 var installationsPath = _config.NiInstallationsPath;
                 if (!Directory.Exists(installationsPath))
                 {
-                    _logger.LogMessage(LogLevel.Warning, $"Inform installations path not found: {installationsPath}");
+                    _logger.LogWarning($"Inform installations path not found: {installationsPath}");
                     return;
                 }
 
@@ -1114,7 +1114,7 @@ namespace Guncho.WebHost.Services
                     indexOutputDir: _config.IndexPath);
 
                 _realmFactories.AddRange(factories);
-                _logger.LogMessage(LogLevel.Verbose, $"Registered {factories.Length} Inform 7 realm factories");
+                _logger.LogDebug($"Registered {factories.Length} Inform 7 realm factories");
 
                 // Register Inform 6 realm factory
                 var inform6CompilerPath = _config.Inform6CompilerPath;
@@ -1126,11 +1126,11 @@ namespace Guncho.WebHost.Services
                     libraryPath: inform6LibraryPath,
                     indexOutputDir: _config.IndexPath);
                 _realmFactories.AddRange(inform6Factories);
-                _logger.LogMessage(LogLevel.Verbose, $"Registered {inform6Factories.Length} Inform 6 realm factories");
+                _logger.LogDebug($"Registered {inform6Factories.Length} Inform 6 realm factories");
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Failed to register realm factories: {ex.Message}");
+                _logger.LogError($"Failed to register realm factories: {ex.Message}");
             }
         }
 
@@ -1218,7 +1218,7 @@ namespace Guncho.WebHost.Services
         public void TransferPlayer(Player p, string spec)
         {
             // TODO: Implement player transfer between realms/instances
-            _logger.LogMessage(LogLevel.Verbose, $"Player transfer requested: {p.Name} -> {spec}");
+            _logger.LogDebug($"Player transfer requested: {p.Name} -> {spec}");
         }
 
         public TimeSpan? GetPlayerIdleTime(Player queriedPlayer)
@@ -1251,7 +1251,7 @@ namespace Guncho.WebHost.Services
 
         private void OnConnectionAccepted(object? sender, ConnectionAcceptedEventArgs e)
         {
-            _logger.LogMessage(LogLevel.Verbose, "SignalR: Accepting connection with ID {0}.", e.Connection.ConnectionId);
+            _logger.LogDebug("SignalR: Accepting connection with ID {0}.", e.Connection.ConnectionId);
             e.Connection.FilterBlankLines = _config.FilterBlankLines;
             var connTask = HandleConnectionAsync(e.Connection, e.AuthenticatedUserName);
             _openConnections.TryAdd(e.Connection, connTask);
@@ -1259,7 +1259,7 @@ namespace Guncho.WebHost.Services
 
         private void OnConnectionClosed(object? sender, ConnectionClosedEventArgs e)
         {
-            _logger.LogMessage(LogLevel.Verbose, "SignalR: Lost connection with ID {0}.", e.Connection.ConnectionId);
+            _logger.LogDebug("SignalR: Lost connection with ID {0}.", e.Connection.ConnectionId);
             _openConnections.TryRemove(e.Connection, out _);
         }
 
@@ -1281,7 +1281,7 @@ namespace Guncho.WebHost.Services
                     }
                     else
                     {
-                        _logger.LogMessage(LogLevel.Error, "Can't auto-login authenticatedUser because they don't exist: {0}", authenticatedUser);
+                        _logger.LogError("Can't auto-login authenticatedUser because they don't exist: {0}", authenticatedUser);
                         await GreetClientAsync(conn);
                     }
                 }
@@ -1349,7 +1349,7 @@ namespace Guncho.WebHost.Services
                 }
             }
 
-            _logger.LogMessage(LogLevel.Notice, "HandleConnectionAsync: Connection lost");
+            _logger.LogInformation("HandleConnectionAsync: Connection lost");
             
             var disconnectedPlayer = conn.Player;
             if (disconnectedPlayer != null)
@@ -1357,7 +1357,7 @@ namespace Guncho.WebHost.Services
                 if (conn is TcpConnection tcpConn && tcpConn.OtherSide != null)
                 {
                     // Mirror connect log style at NOTICE level for disconnects
-                    _logger.LogMessage(LogLevel.Notice, "TCP: Connection closed from {0}.", tcpConn.OtherSide);
+                    _logger.LogInformation("TCP: Connection closed from {0}.", tcpConn.OtherSide);
                 }
                 // If the player was in an instance, remove them so a subsequent
                 // reconnect can join cleanly and the VM sees a $part event.
@@ -1367,11 +1367,11 @@ namespace Guncho.WebHost.Services
                     {
                         await inst.RemovePlayerAsync(disconnectedPlayer);
                         _playerInstances.TryRemove(disconnectedPlayer, out _);
-                        _logger.LogMessage(LogLevel.Verbose, "Player {0} removed from instance {1} after connection loss.", disconnectedPlayer.Name, inst.Realm.Name);
+                        _logger.LogDebug("Player {0} removed from instance {1} after connection loss.", disconnectedPlayer.Name, inst.Realm.Name);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogMessage(LogLevel.Error, "Failed to remove player {0} from instance on disconnect: {1}", disconnectedPlayer.Name, ex.Message);
+                        _logger.LogError("Failed to remove player {0} from instance on disconnect: {1}", disconnectedPlayer.Name, ex.Message);
                     }
                 }
 
@@ -1404,7 +1404,7 @@ namespace Guncho.WebHost.Services
             var key = player.Name.ToLowerInvariant();
             if (_players.TryRemove(key, out _))
             {
-                _logger.LogMessage(LogLevel.Verbose, "Released guest slot {0}.", player.Name);
+                _logger.LogDebug("Released guest slot {0}.", player.Name);
             }
 
             _playersById.TryRemove(player.ID, out _);
@@ -1457,7 +1457,7 @@ namespace Guncho.WebHost.Services
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogMessage(LogLevel.Error, "Quit: failed RemovePlayerAsync for {0}: {1}", player.Name, ex.Message);
+                            _logger.LogError("Quit: failed RemovePlayerAsync for {0}: {1}", player.Name, ex.Message);
                         }
                     }
 
@@ -1467,11 +1467,11 @@ namespace Guncho.WebHost.Services
                     
                     if (conn is TcpConnection tcpConn && tcpConn.OtherSide != null)
                     {
-                        _logger.LogMessage(LogLevel.Notice, "TCP: Connection closed from {0} on quit command (player {1}).", tcpConn.OtherSide, player?.Name ?? "<none>");
+                        _logger.LogInformation("TCP: Connection closed from {0} on quit command (player {1}).", tcpConn.OtherSide, player?.Name ?? "<none>");
                     }
                     else
                     {
-                        _logger.LogMessage(LogLevel.Notice, "Connection terminated on quit command (player {0}).", player?.Name ?? "<none>");
+                        _logger.LogInformation("Connection terminated on quit command (player {0}).", player?.Name ?? "<none>");
                     }
 
                     if (player != null)
@@ -1663,7 +1663,7 @@ namespace Guncho.WebHost.Services
 
         private async Task LogInAsPlayerAsync(Connection conn, Player player)
         {
-            _logger.LogMessage(LogLevel.Spam, "Setting conn.Player");
+            _logger.LogTrace("Setting conn.Player");
 
             var oldConns = _openConnections.Keys.Where(c => c.Player == player).ToArray();
 
@@ -1674,32 +1674,32 @@ namespace Guncho.WebHost.Services
             {
                 await Task.WhenAll(oldConns.Select(async c =>
                 {
-                    _logger.LogMessage(LogLevel.Spam, "notifyOldConn: Starting");
+                    _logger.LogTrace("notifyOldConn: Starting");
                     await c.WriteLineAsync("*** Connection superseded ***");
                     await c.TerminateAsync();
-                    _logger.LogMessage(LogLevel.Spam, "notifyOldConn: Done");
+                    _logger.LogTrace("notifyOldConn: Done");
                 }));
 
-                _logger.LogMessage(LogLevel.Spam, "notifyNewConn: Starting");
+                _logger.LogTrace("notifyNewConn: Starting");
                 await conn.WriteLineAsync("*** Connection resumed ***");
                 await conn.FlushOutputAsync();
-                _logger.LogMessage(LogLevel.Spam, "notifyNewConn: Done");
+                _logger.LogTrace("notifyNewConn: Done");
             }
 
-            _logger.LogMessage(LogLevel.Spam, "Sending MOTD");
+            _logger.LogTrace("Sending MOTD");
             await SendTextFileAsync(conn, player.Name, _config.MotdPath);
             
-            _logger.LogMessage(LogLevel.Spam, "Entering instance");
+            _logger.LogTrace("Entering instance");
             var startRealm = _realms.Values.FirstOrDefault(r => r.Name.Equals(_config.StartRealmName, StringComparison.OrdinalIgnoreCase));
             if (startRealm != null)
             {
-                _logger.LogMessage(LogLevel.Verbose, "Auto-entering start realm: {0}", startRealm.Name);
+                _logger.LogDebug("Auto-entering start realm: {0}", startRealm.Name);
                 var defaultInstance = await GetDefaultInstanceAsync(startRealm);
                 await EnterInstanceAsync(player, defaultInstance);
             }
             else
             {
-                _logger.LogMessage(LogLevel.Warning, "Start realm not found: {0}", _config.StartRealmName);
+                _logger.LogWarning("Start realm not found: {0}", _config.StartRealmName);
                 await conn.WriteLineAsync("Welcome back, " + player.Name + "!");
                 await conn.WriteLineAsync("(Start realm not available)");
             }
@@ -1707,7 +1707,7 @@ namespace Guncho.WebHost.Services
             // Flush all buffered output (MOTD and realm entry messages)
             await conn.FlushOutputAsync();
             
-            _logger.LogMessage(LogLevel.Spam, "Login complete");
+            _logger.LogTrace("Login complete");
         }
 
         private async Task LogInAsGuestAsync(Connection conn)
@@ -1735,13 +1735,13 @@ namespace Guncho.WebHost.Services
             var startRealm = _realms.Values.FirstOrDefault(r => r.Name.Equals(_config.StartRealmName, StringComparison.OrdinalIgnoreCase));
             if (startRealm != null)
             {
-                _logger.LogMessage(LogLevel.Verbose, "Auto-entering start realm for guest: {0}", startRealm.Name);
+                _logger.LogDebug("Auto-entering start realm for guest: {0}", startRealm.Name);
                 var defaultInstance = await GetDefaultInstanceAsync(startRealm);
                 await EnterInstanceAsync(guest, defaultInstance);
             }
             else
             {
-                _logger.LogMessage(LogLevel.Warning, "Start realm not found: {0}", _config.StartRealmName);
+                _logger.LogWarning("Start realm not found: {0}", _config.StartRealmName);
                 await conn.WriteLineAsync("Welcome, " + guest.Name + "!");
                 await conn.WriteLineAsync("(Start realm not available)");
             }
@@ -1997,8 +1997,8 @@ namespace Guncho.WebHost.Services
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogMessage(LogLevel.Error, $"Error executing queued event: {ex.Message}");
-                            _logger.LogException(ex);
+                            _logger.LogError($"Error executing queued event: {ex.Message}");
+                            _logger.LogError(ex, ex.Message);
                         }
                         getQueuedEvent = _eventQueue.DequeueAsync();
                     }
@@ -2013,8 +2013,8 @@ namespace Guncho.WebHost.Services
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Fatal error in event processing loop: {ex.Message}");
-                _logger.LogException(ex);
+                _logger.LogError($"Fatal error in event processing loop: {ex.Message}");
+                _logger.LogError(ex, ex.Message);
                 throw;
             }
         }
@@ -2097,7 +2097,7 @@ namespace Guncho.WebHost.Services
 
         private async Task HandleInstanceFailureAsync(IInstance instance, string reason)
         {
-            _logger.LogMessage(LogLevel.Error, $"Instance '{instance.Realm.Name}' failed: {reason}");
+            _logger.LogError($"Instance '{instance.Realm.Name}' failed: {reason}");
 
             // Notify all players in the instance
             var playersInInstance = _playerInstances.Where(kvp => kvp.Value == instance).Select(kvp => kvp.Key).ToList();
@@ -2130,13 +2130,13 @@ namespace Guncho.WebHost.Services
             }
             catch (Exception ex)
             {
-                _logger.LogMessage(LogLevel.Error, $"Failed to restart instance: {ex.Message}");
+                _logger.LogError($"Failed to restart instance: {ex.Message}");
             }
         }
 
         public async Task ShutdownAsync(string reason)
         {
-            _logger.LogMessage(LogLevel.Notice, $"Server shutting down: {reason}");
+            _logger.LogInformation($"Server shutting down: {reason}");
 
             // Notify all connected players
             foreach (var conn in _openConnections.Keys)
@@ -2158,7 +2158,7 @@ namespace Guncho.WebHost.Services
                 await Task.WhenAny(_eventTask, Task.Delay(5000));
             }
 
-            _logger.LogMessage(LogLevel.Notice, "Server shutdown complete");
+            _logger.LogInformation("Server shutdown complete");
         }
 
         #endregion

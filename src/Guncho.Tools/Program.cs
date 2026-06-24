@@ -1,3 +1,4 @@
+﻿using Microsoft.Extensions.Logging;
 using System.Security.Cryptography;
 using System.Text;
 using System.Linq;
@@ -75,7 +76,8 @@ internal static class Program
 
         var configuration = BuildConfiguration(options.AppSettingsPath ?? DefaultAppSettings);
         var serverConfig = new CliServerConfiguration(configuration);
-        var logger = new ConsoleLogger();
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        var logger = loggerFactory.CreateLogger("Guncho.Tools");
         var simulator = new RealmBuildSimulator(configuration, serverConfig, logger);
         return await simulator.RunAsync(options);
     }
@@ -110,9 +112,9 @@ internal sealed class RealmBuildSimulator
 {
     private readonly IConfiguration _configuration;
     private readonly IServerConfiguration _serverConfig;
-    private readonly ILogger _logger;
+    private readonly Microsoft.Extensions.Logging.ILogger _logger;
 
-    public RealmBuildSimulator(IConfiguration configuration, IServerConfiguration serverConfig, ILogger logger)
+    public RealmBuildSimulator(IConfiguration configuration, IServerConfiguration serverConfig, Microsoft.Extensions.Logging.ILogger logger)
     {
         _configuration = configuration;
         _serverConfig = serverConfig;
@@ -511,14 +513,6 @@ internal sealed class CliServerConfiguration : IServerConfiguration
     public string MotdPath => Path.Combine(RealmDataPath, MotdFileName);
     public string GuestMotdPath => Path.Combine(RealmDataPath, GuestMotdFileName);
     public string ConnectTextPath => Path.Combine(RealmDataPath, ConnectTextFileName);
-}
-
-internal sealed class ConsoleLogger : ILogger
-{
-    public void LogMessage(LogLevel level, string text)
-    {
-        Console.WriteLine($"[{level}] {text}");
-    }
 }
 
 internal sealed record CompilerCommand(string Executable, IReadOnlyList<string> Arguments, string WorkingDirectory, IReadOnlyDictionary<string, string>? Environment = null)
