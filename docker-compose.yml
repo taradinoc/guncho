@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: us-central1-docker.pkg.dev/guncho-game/guncho-repository/guncho-guncho:latest
     container_name: guncho-server
     ports:
       # Web server (ASP.NET Core Kestrel with Blazor UI)
